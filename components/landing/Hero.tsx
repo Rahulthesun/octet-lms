@@ -61,7 +61,7 @@ export default function Hero() {
               {/* Oval whose ends cross at the right side — same yellow as the underline */}
               <svg
                 className="absolute pointer-events-none"
-                style={{ top: '-16px', left: '-10px', right: '-10px', bottom: '-8px' }}
+                style={{ top: '-6px', left: '-10px', right: '-10px', bottom: '-14px' }}
                 viewBox="0 0 320 82"
                 fill="none"
                 preserveAspectRatio="none"
