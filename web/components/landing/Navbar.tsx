@@ -18,12 +18,12 @@ const navLinks = [
   },
   {
     label: 'Learn',
-    href: '#about',
+    href: '/learn',
     sub: [
-      { label: 'Video Lectures', href: '#video' },
-      { label: 'Notes & Cheat Sheets', href: '#about' },
-      { label: 'Formula Sheets', href: '#about' },
-      { label: 'Practice Tests', href: '#about' },
+      { label: 'How We Teach',    href: '/learn#approach'  },
+      { label: 'Class Schedule',  href: '/learn#schedule'  },
+      { label: 'Exam Pathways',   href: '/learn#exams'     },
+      { label: 'Student Resources', href: '/learn#resources' },
     ],
   },
   {
