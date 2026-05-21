@@ -28,11 +28,12 @@ const navLinks = [
   },
   {
     label: 'About',
-    href: '#about',
+    href: '/about',
     sub: [
-      { label: 'Why Chemistry@OCTET', href: '#about' },
-      { label: 'Our Methodology', href: '#about' },
-      { label: 'Our Results', href: '#about' },
+      { label: 'Our Story',       href: '/about#story'   },
+      { label: 'The Founder',     href: '/about#founder' },
+      { label: 'Vision & Mission', href: '/about#vision'  },
+      { label: 'Photo Gallery',   href: '/about#gallery' },
     ],
   },
   {
