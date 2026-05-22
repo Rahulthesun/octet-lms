@@ -7,13 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 const navLinks = [
   {
     label: 'Courses',
-    href: '#courses',
+    href: '/courses',
     sub: [
-      { label: '11th Grade Chemistry', href: '#courses' },
-      { label: '12th Grade Chemistry', href: '#courses' },
-      { label: 'JEE Preparation', href: '#courses' },
-      { label: 'NEET Preparation', href: '#courses' },
-      { label: 'Board Excellence', href: '#courses' },
+      { label: '11th Grade Chemistry', href: '/courses#grade-11' },
+      { label: '12th Grade Chemistry', href: '/courses#grade-12' },
+      { label: 'JEE Chemistry',        href: '/courses#jee'      },
+      { label: 'NEET Chemistry',       href: '/courses#neet'     },
     ],
   },
   {
@@ -37,21 +36,22 @@ const navLinks = [
     ],
   },
   {
-    label: 'Community',
-    href: '#reviews',
+    label: 'Resources',
+    href: '/resources',
     sub: [
-      { label: 'Student Stories', href: '#reviews' },
-      { label: 'Parent Reviews', href: '#reviews' },
-      { label: 'Achievements', href: '#reviews' },
+      { label: 'Syllabus Updates', href: '/resources#syllabus'      },
+      { label: 'Chemistry Blog',   href: '/resources#blog'          },
+      { label: 'Exam Schedule',    href: '/resources#exams'         },
+      { label: 'Notifications',    href: '/resources#notifications' },
     ],
   },
   {
-    label: 'Contact',
-    href: '#footer',
+    label: 'Outcomes',
+    href: '/outcomes',
     sub: [
-      { label: 'Talk to Us', href: '#footer' },
-      { label: 'Admissions', href: '#footer' },
-      { label: 'Support', href: '#footer' },
+      { label: 'Top Results',    href: '/outcomes#results'  },
+      { label: 'Score Analysis', href: '/outcomes#analysis' },
+      { label: 'Parent Reviews', href: '/outcomes#reviews'  },
     ],
   },
 ]
