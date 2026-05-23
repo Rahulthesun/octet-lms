@@ -107,6 +107,7 @@ export default function Footer() {
                 { label: 'Demo Video', href: '#video' },
                 { label: 'Student Login', href: '/login' },
                 { label: 'Register', href: '/register' },
+                { label: 'Admin Login', href: '/admin' },
               ].map(({ label, href }) => (
                 <li key={label}>
                   <Link href={href} className="text-[#c8b8d8] text-[15px] hover:text-[#f8f9ed] transition-colors duration-150">

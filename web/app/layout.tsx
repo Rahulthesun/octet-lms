@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import LenisProvider from '@/components/providers/LenisProvider'
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'Chemistry@OCTET — Spread True Science',
@@ -13,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body>
         <LenisProvider>
           {children}
