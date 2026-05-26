@@ -9,7 +9,7 @@ const navItems = [
     label: "Dashboard",
     icon: (
       <svg
-        className="w-[22px] h-[22px] shrink-0"
+        className="w-5.5 h-5.5 shrink-0"
         viewBox="0 0 20 20"
         fill="none"
       >
@@ -57,7 +57,7 @@ const navItems = [
     label: "Content",
     icon: (
       <svg
-        className="w-[22px] h-[22px] shrink-0"
+        className="w-5.5 h-5.5 shrink-0"
         viewBox="0 0 20 20"
         fill="none"
       >
@@ -81,7 +81,7 @@ const navItems = [
     label: "Attendance",
     icon: (
       <svg
-        className="w-[22px] h-[22px] shrink-0"
+        className="w-5.5 h-5.5 shrink-0"
         viewBox="0 0 20 20"
         fill="none"
       >
@@ -111,7 +111,7 @@ const navItems = [
     label: "Test Results",
     icon: (
       <svg
-        className="w-[22px] h-[22px] shrink-0"
+        className="w-5.5 h-5.5 shrink-0"
         viewBox="0 0 20 20"
         fill="none"
       >
@@ -143,7 +143,7 @@ const navItems = [
     label: "Students",
     icon: (
       <svg
-        className="w-[22px] h-[22px] shrink-0"
+        className="w-5.5 h-5.5 shrink-0"
         viewBox="0 0 20 20"
         fill="none"
       >
@@ -165,31 +165,6 @@ const navItems = [
           d="M 14,13 Q 19,13 19,17"
           stroke="currentColor"
           strokeWidth="1.3"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "/admin/profile",
-    label: "My Profile",
-    icon: (
-      <svg
-        className="w-[22px] h-[22px] shrink-0"
-        viewBox="0 0 20 20"
-        fill="none"
-      >
-        <circle
-          cx="9"
-          cy="6.5"
-          r="3.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18"
-          stroke="currentColor"
-          strokeWidth="1.5"
           strokeLinecap="round"
         />
       </svg>
@@ -221,7 +196,7 @@ export default function AdminSidebar({
     >
       {/* Header */}
       {collapsed ? (
-        <div className="flex flex-col items-center justify-center h-14 py-2 gap-1.5 shrink-0">
+        <div className="flex flex-row items-center justify-center h-14 gap-2 shrink-0">
           <div className="w-6 h-6 shrink-0">
             <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
               <circle
@@ -254,7 +229,7 @@ export default function AdminSidebar({
           </div>
           <button
             onClick={onToggle}
-            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-[#5e4075] transition-colors"
+            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors"
             title="Expand sidebar"
           >
             <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
@@ -301,8 +276,8 @@ export default function AdminSidebar({
             </svg>
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="text-base text-[#5e4075] whitespace-nowrap leading-tight">
-              Chemistry<span className="text-[#8b6fa0]">@OCTET</span>
+            <p className="text-base text-primary whitespace-nowrap leading-tight">
+              Chemistry<span className="text-muted">@OCTET</span>
             </p>
           </div>
           <button
@@ -341,8 +316,8 @@ export default function AdminSidebar({
                 className={`relative flex items-center h-12 transition-colors group
  ${
    collapsed
-     ? `w-full justify-center border-l-2 ${active ? "border-[#5e4075] bg-[#f5f0fa] text-[#5e4075]" : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`
-     : `w-full px-4 gap-3 border-l-2 ${active ? "border-[#5e4075] bg-[#f5f0fa] text-[#5e4075]" : "border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`
+     ? `w-full justify-center border-l-2 ${active ? "border-primary bg-[#f5f0fa] text-primary" : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`
+     : `w-full px-4 gap-3 border-l-2 ${active ? "border-primary bg-[#f5f0fa] text-primary" : "border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`
  }`}
               >
                 {item.icon}
@@ -364,14 +339,48 @@ export default function AdminSidebar({
         })}
       </nav>
 
-      {/* User card / Sign out */}
-      <div
-        className={`border-t border-gray-200 py-3 ${collapsed ? "flex justify-center" : "px-3"}`}
-      >
+      {/* My Profile + Sign out */}
+      <div className={`${collapsed ? "flex flex-col items-center gap-1" : ""}`}>
+        {/* My Profile */}
+        {collapsed ? (
+          <Link
+            href="/admin/profile"
+            className={`relative group w-full h-12 flex items-center justify-center border-l-2 transition-colors ${
+              isActive("/admin/profile")
+                ? "border-primary bg-[#f5f0fa] text-primary"
+                : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-gray-900 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              My Profile
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/admin/profile"
+            className={`flex items-center gap-3 px-4 py-2.5 border-l-2 transition-colors group ${
+              isActive("/admin/profile")
+                ? "border-primary bg-[#f5f0fa] text-primary"
+                : "border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="text-lg whitespace-nowrap">My Profile</span>
+          </Link>
+        )}
+
+        {/* Sign out */}
         {collapsed ? (
           <button
             onClick={() => router.push("/")}
-            className="relative group w-8 h-8 bg-[#5e4075] flex items-center justify-center text-white font-inter text-base"
+            className="relative group w-12 mb-2 h-10 bg-primary flex items-center justify-center text-white font-inter text-base"
             title="Sign out"
           >
             A
@@ -380,8 +389,8 @@ export default function AdminSidebar({
             </span>
           </button>
         ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#5e4075] flex items-center justify-center text-white font-inter text-base shrink-0">
+          <div className="flex items-center gap-3 px-4 py-2">
+            <div className="w-9 h-9 bg-primary flex items-center justify-center text-white font-inter text-base shrink-0">
               A
             </div>
             <div className="flex-1 min-w-0">
@@ -390,7 +399,7 @@ export default function AdminSidebar({
               </p>
               <button
                 onClick={() => router.push("/")}
-                className="text-sm text-gray-400 hover:text-[#5e4075] transition-colors"
+                className="text-sm text-gray-400 hover:text-primary transition-colors"
               >
                 Sign out
               </button>
