@@ -53,6 +53,30 @@ const navItems = [
     ),
   },
   {
+    href: "/admin/content",
+    label: "Content",
+    icon: (
+      <svg
+        className="w-[22px] h-[22px] shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+      >
+        <path
+          d="M 2,8 Q 2,7 3,7 L 8.5,7 L 10,5 L 17,5 Q 18,5 18,6 L 18,15 Q 18,16 17,16 L 3,16 Q 2,16 2,15 Z"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M 10,9.5 L 10,13 M 8,11 L 12,11"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/attendance",
     label: "Attendance",
     icon: (
@@ -168,19 +192,6 @@ const navItems = [
           strokeWidth="1.5"
           strokeLinecap="round"
         />
-        <circle
-          cx="15.5"
-          cy="5"
-          r="2.2"
-          stroke="currentColor"
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 15.5,2.8 V 3.5 M 15.5,6.5 V 7.2 M 13.3,5 H 14 M 17,5 H 17.7 M 14.1,3.6 L 14.5,4 M 16.5,6 L 16.9,6.4 M 14.1,6.4 L 14.5,6 M 16.5,4 L 16.9,3.6"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          strokeLinecap="round"
-        />
       </svg>
     ),
   },
@@ -210,12 +221,8 @@ export default function AdminSidebar({
     >
       {/* Header */}
       {collapsed ? (
-        <div className="flex items-center justify-center h-14 shrink-0">
-          <button
-            onClick={onToggle}
-            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 transition-colors"
-            title="Expand sidebar"
-          >
+        <div className="flex flex-col items-center justify-center h-14 py-2 gap-1.5 shrink-0">
+          <div className="w-6 h-6 shrink-0">
             <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
               <circle
                 cx="18"
@@ -243,6 +250,21 @@ export default function AdminSidebar({
                 transform="rotate(-60 18 18)"
               />
               <circle cx="18" cy="18" r="3" fill="#5e4075" />
+            </svg>
+          </div>
+          <button
+            onClick={onToggle}
+            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-[#5e4075] transition-colors"
+            title="Expand sidebar"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M 4,2 L 8,6 L 4,10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>

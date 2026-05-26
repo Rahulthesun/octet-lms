@@ -86,7 +86,8 @@ html.lenis body {
   color: #5e4075;
 }
 
-/* Inter font for numeric displays in admin UI */
-.font-inter {
-  font-family: var(--font-inter), system-ui, sans-serif;
+/* Space Grotesk for numeric/data displays in admin UI */
+.font-inter,
+.font-data {
+  font-family: 'Space Grotesk', var(--font-data), system-ui, sans-serif;
 }
