@@ -532,8 +532,16 @@ export default function ResourcesPage() {
   const [activeTab, setActiveTab] = useState<string>('syllabus')
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '')
-    if (tabs.some((t) => t.id === hash)) setActiveTab(hash)
+    function applyHash() {
+      const hash = window.location.hash.replace('#', '')
+      if (tabs.some((t) => t.id === hash)) {
+        setActiveTab(hash)
+        document.getElementById('tab-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+    applyHash()
+    window.addEventListener('hashchange', applyHash)
+    return () => window.removeEventListener('hashchange', applyHash)
   }, [])
 
   const handleTabChange = (id: string) => setActiveTab(id)
@@ -620,7 +628,7 @@ export default function ResourcesPage() {
       </section>
 
       {/* ── Tabs + Content ───────────────────────────────────── */}
-      <section className="pb-24 px-6">
+      <section id="tab-section" className="pb-24 px-6">
         <div className="max-w-5xl mx-auto">
 
           {/* Tab Pills */}

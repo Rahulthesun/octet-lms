@@ -350,8 +350,17 @@ export default function CoursesPage() {
   const [openChapter, setOpenChapter] = useState<number | null>(null)
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '')
-    if (courses.some((c) => c.id === hash)) setActiveTab(hash)
+    function applyHash() {
+      const hash = window.location.hash.replace('#', '')
+      if (courses.some((c) => c.id === hash)) {
+        setActiveTab(hash)
+        setOpenChapter(null)
+        document.getElementById('tab-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+    applyHash()
+    window.addEventListener('hashchange', applyHash)
+    return () => window.removeEventListener('hashchange', applyHash)
   }, [])
 
   const activeCourse = courses.find((c) => c.id === activeTab)!
@@ -436,7 +445,7 @@ export default function CoursesPage() {
       </section>
 
       {/* ── Tabs + Content ───────────────────────────────────── */}
-      <section className="pb-24 px-6">
+      <section id="tab-section" className="pb-24 px-6">
         <div className="max-w-5xl mx-auto">
 
           {/* Tab Pills */}
