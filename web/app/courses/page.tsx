@@ -216,21 +216,21 @@ function ChapterCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-20px' }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.025, 0.15) }}
-      className="bg-white border border-[#d4c5e2]/60 rounded-2xl overflow-hidden hover:shadow-[0_4px_20px_rgba(94,64,117,0.08)] transition-shadow duration-300"
+      className="bg-white border border-accent3/60 rounded-2xl overflow-hidden hover:shadow-[0_4px_20px_rgba(94,64,117,0.08)] transition-shadow duration-300"
     >
       <button
         onClick={onToggle}
         className="w-full px-6 py-5 flex items-center gap-4 text-left"
       >
-        <span className="w-10 h-10 rounded-full bg-[#f8f9ed] border border-[#d4c5e2] text-[#5e4075] text-[14px] flex items-center justify-center flex-shrink-0 font-mono">
+        <span className="w-10 h-10 rounded-full bg-bg border border-accent3 text-primary text-[14px] flex items-center justify-center shrink-0 font-mono">
           {String(chapter.number).padStart(2, '0')}
         </span>
-        <span className="flex-1 text-base text-[#5e4075]">{chapter.title}</span>
-        <span className="text-[14px] text-[#8b6fa0] hidden sm:block mr-2 flex-shrink-0">
+        <span className="flex-1 text-base text-primary">{chapter.title}</span>
+        <span className="text-[14px] text-muted hidden sm:block mr-2 shrink-0">
           {chapter.topics.length} topics
         </span>
         <svg
-          className={`w-5 h-5 text-[#8b6fa0] transition-transform duration-200 flex-shrink-0 ${
+          className={`w-5 h-5 text-muted transition-transform duration-200 shrink-0 ${
             isOpen ? 'rotate-180' : ''
           }`}
           viewBox="0 0 20 20"
@@ -256,14 +256,14 @@ function ChapterCard({
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="px-6 pb-6 border-t border-[#e9deb5]/60">
+            <div className="px-6 pb-6 border-t border-accent1/60">
               <div className="pt-4 grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
                 {chapter.topics.map((topic, i) => (
                   <div key={i} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 text-[#8b6fa0] flex-shrink-0">
+                    <span className="mt-0.5 text-muted shrink-0">
                       <IconCheck className="w-4 h-4" />
                     </span>
-                    <span className="text-[15px] text-[#8b6fa0] leading-snug">{topic}</span>
+                    <span className="text-[15px] text-muted leading-snug">{topic}</span>
                   </div>
                 ))}
               </div>
@@ -311,10 +311,10 @@ function ChapterList({
         <div key={group.domain ?? 'ungrouped'}>
           {group.domain && (
             <div className="flex items-center gap-3 mb-4">
-              <span className="px-4 py-1.5 rounded-full bg-[#e9deb5] text-[14px] tracking-[0.08em] text-[#5e4075] whitespace-nowrap">
+              <span className="px-4 py-1.5 rounded-full bg-accent1 text-[14px] tracking-[0.08em] text-primary whitespace-nowrap">
                 {group.domain}
               </span>
-              <div className="flex-1 h-px bg-[#d4c5e2]" />
+              <div className="flex-1 h-px bg-accent3" />
             </div>
           )}
           <div className="space-y-3">
@@ -371,11 +371,11 @@ export default function CoursesPage() {
   }
 
   return (
-    <main className="bg-[#f8f9ed] min-h-screen">
+    <main className="bg-bg min-h-screen">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-[#f8f9ed]">
+      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
         <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
           <TestTubeSVG width={180} height={180} color="#5e4075" />
         </div>
@@ -393,29 +393,29 @@ export default function CoursesPage() {
             transition={{ duration: 0.5 }}
             className="flex items-center justify-center gap-2.5 mb-5"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
+            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
               Course Catalogue
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-[#5e4075] leading-tight mb-6"
+            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
           >
             Every Chapter.
             <br />
-            <span className="text-[#8b6fa0]">Every Concept.</span>
+            <span className="text-muted">Every Concept.</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-[#8b6fa0] max-w-2xl mx-auto leading-relaxed mb-10"
+            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
           >
             A complete chemistry curriculum mapped to NCERT, CBSE, TN State Board, JEE and NEET.
             Browse the full chapter and topic list for each programme below.
@@ -434,10 +434,10 @@ export default function CoursesPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="px-6 py-3.5 bg-white border border-[#e9deb5] rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
+                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
               >
-                <div className="text-xl text-[#5e4075]">{s.value}</div>
-                <div className="text-[14px] text-[#8b6fa0]">{s.label}</div>
+                <div className="text-xl text-primary">{s.value}</div>
+                <div className="text-[14px] text-muted">{s.label}</div>
               </div>
             ))}
           </motion.div>
@@ -461,8 +461,8 @@ export default function CoursesPage() {
                 onClick={() => handleTabChange(course.id)}
                 className={`px-6 py-3 rounded-full text-base transition-all duration-200 ${
                   activeTab === course.id
-                    ? 'bg-[#5e4075] text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
-                    : 'bg-white border border-[#d4c5e2] text-[#8b6fa0] hover:border-[#5e4075]/40 hover:text-[#5e4075]'
+                    ? 'bg-primary text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
+                    : 'bg-white border border-accent3 text-muted hover:border-primary/40 hover:text-primary'
                 }`}
               >
                 {course.navLabel}
@@ -491,20 +491,20 @@ export default function CoursesPage() {
                   {bannerDecorations[activeCourse.id]}
                 </div>
                 <div className="relative max-w-3xl">
-                  <p className="text-[14px] tracking-[0.2em] text-[#8b6fa0] uppercase mb-2">
+                  <p className="text-[14px] tracking-[0.2em] text-muted uppercase mb-2">
                     {activeCourse.boards}
                   </p>
-                  <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-3">
+                  <h2 className="text-3xl md:text-4xl text-primary leading-tight mb-3">
                     {activeCourse.label}
                   </h2>
-                  <p className="text-base text-[#5e4075]/70 leading-relaxed mb-7 max-w-2xl">
+                  <p className="text-base text-primary/70 leading-relaxed mb-7 max-w-2xl">
                     {activeCourse.description}
                   </p>
                   <div className="flex flex-wrap gap-10">
                     {activeCourse.stats.map((s) => (
                       <div key={s.label}>
-                        <div className="text-2xl text-[#5e4075]">{s.value}</div>
-                        <div className="text-[14px] text-[#8b6fa0]">{s.label}</div>
+                        <div className="text-2xl text-primary">{s.value}</div>
+                        <div className="text-[14px] text-muted">{s.label}</div>
                       </div>
                     ))}
                   </div>
@@ -529,27 +529,27 @@ export default function CoursesPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.5 }}
-          className="max-w-3xl mx-auto text-center bg-[#e9deb5]/30 border border-[#e9deb5] rounded-3xl p-12 relative overflow-hidden"
+          className="max-w-3xl mx-auto text-center bg-accent1/30 border border-accent1 rounded-3xl p-12 relative overflow-hidden"
         >
           <div className="absolute top-4 right-6 opacity-[0.08] pointer-events-none">
             <FlaskSVG width={120} height={120} color="#5e4075" />
           </div>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4 relative">
+          <h2 className="text-3xl md:text-4xl text-primary mb-4 relative">
             Ready to Begin?
           </h2>
-          <p className="text-base text-[#8b6fa0] mb-8 relative">
+          <p className="text-base text-muted mb-8 relative">
             Join Chemistry@OCTET and get access to all courses, live sessions and study resources.
           </p>
           <div className="flex flex-wrap gap-4 justify-center relative">
             <Link
               href="/register"
-              className="px-8 py-3.5 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
+              className="px-8 py-3.5 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
             >
               Enroll Now
             </Link>
             <Link
               href="/learn"
-              className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:border-[#5e4075]/60 transition-all duration-200"
+              className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:border-primary/60 transition-all duration-200"
             >
               How We Teach
             </Link>

@@ -16,13 +16,13 @@ export default function CoursesSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-14"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">What We Offer</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4">
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">What We Offer</p>
+          <h2 className="text-3xl md:text-4xl text-primary mb-4">
             Courses Built for
             <br />
-            <span className="text-[#8b6fa0]">11th & 12th Grade Excellence</span>
+            <span className="text-muted">11th & 12th Grade Excellence</span>
           </h2>
-          <p className="text-[#8b6fa0] text-base max-w-xl mx-auto">
+          <p className="text-muted text-base max-w-xl mx-auto">
             Each course is meticulously designed — from concept to exam — giving students everything they need in one place.
           </p>
         </motion.div>
@@ -35,7 +35,7 @@ export default function CoursesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="group relative bg-[#f8f9ed] rounded-2xl p-10 border border-[#d4c5e2]/60 hover:border-[#5e4075]/25 hover:shadow-[0_8px_32px_rgba(94,64,117,0.12)] transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+              className="group relative bg-bg rounded-2xl p-10 border border-accent3/60 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(94,64,117,0.12)] transition-all duration-300 hover:-translate-y-1 overflow-hidden"
             >
               <div
                 className="absolute top-0 right-0 w-28 h-28 rounded-bl-full opacity-50 transition-all duration-300 group-hover:opacity-70"
@@ -48,16 +48,16 @@ export default function CoursesSection() {
                 <ChemIcon icon={course.icon} width={42} height={42} color="#5e4075" />
               </div>
               <div className="flex items-center gap-2.5 mb-5">
-                <span className="text-[14px] px-3 py-1.5 rounded-full bg-[#5e4075]/10 text-[#5e4075] tracking-wide">
+                <span className="text-[14px] px-3 py-1.5 rounded-full bg-primary/10 text-primary tracking-wide">
                   Grade {course.grade}
                 </span>
-                <span className="text-[14px] px-3 py-1.5 rounded-full bg-[#e9deb5] text-[#8b6fa0]">
+                <span className="text-[14px] px-3 py-1.5 rounded-full bg-accent1 text-muted">
                   {course.chapters} Chapters
                 </span>
               </div>
-              <h3 className="text-[#5e4075] text-lg mb-4">{course.title}</h3>
-              <p className="text-[#8b6fa0] text-base leading-relaxed mb-8">{course.description}</p>
-              <Link href="/register" className="inline-flex items-center gap-2 text-[#5e4075] text-[15px] group-hover:gap-3 transition-all duration-200">
+              <h3 className="text-primary text-lg mb-4">{course.title}</h3>
+              <p className="text-muted text-base leading-relaxed mb-8">{course.description}</p>
+              <Link href="/register" className="inline-flex items-center gap-2 text-primary text-[15px] group-hover:gap-3 transition-all duration-200">
                 <span>Explore Course</span>
                 <svg className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" viewBox="0 0 16 16" fill="none">
                   <path d="M 3,8 L 13,8 M 9,4 L 13,8 L 9,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -74,7 +74,7 @@ export default function CoursesSection() {
           transition={{ duration: 0.5, delay: 0.5 }}
           className="text-center mt-14"
         >
-          <p className="text-[#8b6fa0] text-base">
+          <p className="text-muted text-base">
             All courses include video lectures, notes, cheat sheets, formula sheets, and regular tests.
           </p>
         </motion.div>

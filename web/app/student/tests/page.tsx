@@ -41,18 +41,18 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
             const y = c.month === 0 ? c.year - 1 : c.year
             return { year: y, month: m }
           })}
-          className="w-8 h-8 rounded-lg hover:bg-[#e9deb5]/40 flex items-center justify-center text-[#8b6fa0] hover:text-[#5e4075] transition-colors"
+          className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-primary transition-colors"
         >
           ←
         </button>
-        <h3 className="text-[#5e4075] text-[15px]">{MONTHS[current.month]} {current.year}</h3>
+        <h3 className="text-primary text-[15px]">{MONTHS[current.month]} {current.year}</h3>
         <button
           onClick={() => setCurrent((c) => {
             const m = c.month === 11 ? 0 : c.month + 1
             const y = c.month === 11 ? c.year + 1 : c.year
             return { year: y, month: m }
           })}
-          className="w-8 h-8 rounded-lg hover:bg-[#e9deb5]/40 flex items-center justify-center text-[#8b6fa0] hover:text-[#5e4075] transition-colors"
+          className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-primary transition-colors"
         >
           →
         </button>
@@ -61,7 +61,7 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
       {/* Day headers */}
       <div className="grid grid-cols-7 mb-2">
         {DAYS.map((d) => (
-          <div key={d} className="text-center text-[14px] text-[#8b6fa0] py-1">{d}</div>
+          <div key={d} className="text-center text-[14px] text-muted py-1">{d}</div>
         ))}
       </div>
 
@@ -81,11 +81,11 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
               onClick={() => test && onSelectDate(test.date)}
               className={`relative aspect-square flex flex-col items-center justify-center rounded-xl text-[15px] transition-all duration-150 ${
                 test
-                  ? 'hover:bg-[#e9deb5]/30 cursor-pointer'
+                  ? 'hover:bg-accent1/30 cursor-pointer'
                   : 'cursor-default'
-              } ${isToday ? 'ring-1 ring-[#5e4075]/30' : ''}`}
+              } ${isToday ? 'ring-1 ring-primary/30' : ''}`}
             >
-              <span className={`leading-none ${test ? 'text-[#5e4075]' : 'text-[#c8b8d8]'} ${isToday ? 'text-[#5e4075]' : ''}`}>
+              <span className={`leading-none ${test ? 'text-primary' : 'text-muted'} ${isToday ? 'text-primary' : ''}`}>
                 {day}
               </span>
               {test && (
@@ -108,7 +108,7 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
         ].map(({ label, color }) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-[14px] text-[#8b6fa0]">{label}</span>
+            <span className="text-[14px] text-muted">{label}</span>
           </div>
         ))}
       </div>
@@ -136,7 +136,7 @@ function TestCard({ test }: { test: Test }) {
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
             <span className={`flex items-center gap-1.5 text-[14px] px-3 py-1.5 rounded-full ${
-              test.type === 'online' ? 'bg-[#e9deb5]/60 text-[#5e4075]' : 'bg-[#daeae4]/60 text-[#3d7a5e]'
+              test.type === 'online' ? 'bg-accent1/60 text-primary' : 'bg-accent2/60 text-[#3d7a5e]'
             }`}>
               {test.type === 'online' ? (
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
@@ -157,55 +157,55 @@ function TestCard({ test }: { test: Test }) {
               {config.label}
             </span>
           </div>
-          <h3 className="text-[#5e4075] text-[15px] leading-snug">{test.title}</h3>
+          <h3 className="text-primary text-[15px] leading-snug">{test.title}</h3>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <p className="text-[#8b6fa0] text-[14px]">Date</p>
-          <p className="text-[#5e4075] text-[15px]">{test.date}</p>
+          <p className="text-muted text-[14px]">Date</p>
+          <p className="text-primary text-[15px]">{test.date}</p>
         </div>
         <div>
-          <p className="text-[#8b6fa0] text-[14px]">Time</p>
-          <p className="text-[#5e4075] text-[15px]">{test.time}</p>
+          <p className="text-muted text-[14px]">Time</p>
+          <p className="text-primary text-[15px]">{test.time}</p>
         </div>
         <div>
-          <p className="text-[#8b6fa0] text-[14px]">Duration</p>
-          <p className="text-[#5e4075] text-[15px]">{test.duration}</p>
+          <p className="text-muted text-[14px]">Duration</p>
+          <p className="text-primary text-[15px]">{test.duration}</p>
         </div>
         <div>
-          <p className="text-[#8b6fa0] text-[14px]">Total Marks</p>
-          <p className="text-[#5e4075] text-[15px] font-mono">{test.totalMarks}</p>
+          <p className="text-muted text-[14px]">Total Marks</p>
+          <p className="text-primary text-[15px] font-mono">{test.totalMarks}</p>
         </div>
       </div>
 
       {test.status === 'completed' && test.marksObtained !== null && (
         <div className="pt-4 border-t border-[#e2d5f0]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[#8b6fa0] text-[14px]">Score</span>
-            <span className="text-[#5e4075] text-[15px] font-mono">{test.marksObtained}/{test.totalMarks} ({test.percentage}%)</span>
+            <span className="text-muted text-[14px]">Score</span>
+            <span className="text-primary text-[15px] font-mono">{test.marksObtained}/{test.totalMarks} ({test.percentage}%)</span>
           </div>
-          <div className="h-2 bg-[#e9deb5]/50 rounded-full overflow-hidden">
+          <div className="h-2 bg-accent1/50 rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#5e4075] rounded-full"
+              className="h-full bg-primary rounded-full"
               style={{ width: `${test.percentage}%` }}
             />
           </div>
-          <p className="text-[#8b6fa0] text-[14px] mt-2">Rank {test.rank} out of {test.totalStudents} students</p>
+          <p className="text-muted text-[14px] mt-2">Rank {test.rank} out of {test.totalStudents} students</p>
         </div>
       )}
 
       {test.status === 'upcoming' && test.studyMaterials && test.studyMaterials.length > 0 && (
         <div className="pt-4 border-t border-[#e2d5f0]">
-          <p className="text-[#5e4075] text-[15px] mb-3">Study Materials for this Test</p>
+          <p className="text-primary text-[15px] mb-3">Study Materials for this Test</p>
           <div className="space-y-2">
             {test.studyMaterials.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 bg-[#e9deb5]/20 rounded-xl">
-                <span className="text-[#5e4075]">{studyMaterialIcon(m.type)}</span>
+              <div key={m.id} className="flex items-center gap-3 p-3 bg-accent1/20 rounded-xl">
+                <span className="text-primary">{studyMaterialIcon(m.type)}</span>
                 <div>
-                  <p className="text-[#5e4075] text-[15px]">{m.title}</p>
-                  <p className="text-[#8b6fa0] text-[14px]">{m.type}</p>
+                  <p className="text-primary text-[15px]">{m.title}</p>
+                  <p className="text-muted text-[14px]">{m.type}</p>
                 </div>
               </div>
             ))}
@@ -235,8 +235,8 @@ export default function TestsPage() {
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-2xl text-[#5e4075] mb-1">Tests</h1>
-        <p className="text-[#8b6fa0] text-[15px]">Track your upcoming, completed, and missed tests</p>
+        <h1 className="text-2xl text-primary mb-1">Tests</h1>
+        <p className="text-muted text-[15px]">Track your upcoming, completed, and missed tests</p>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -253,7 +253,7 @@ export default function TestsPage() {
             transition={{ duration: 0.5, delay: 0.15 }}
             className="bg-white rounded-2xl border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] p-5"
           >
-            <h3 className="text-[#5e4075] text-base mb-4">Test Summary</h3>
+            <h3 className="text-primary text-base mb-4">Test Summary</h3>
             {[
               { label: 'Total Tests', val: tests.length, color: '#5e4075' },
               { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: '#5e4075' },
@@ -261,7 +261,7 @@ export default function TestsPage() {
               { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: '#c06060' },
             ].map(({ label, val, color }) => (
               <div key={label} className="flex items-center justify-between py-2.5 border-b border-[#f0e8f8] last:border-0">
-                <span className="text-[#8b6fa0] text-[15px]">{label}</span>
+                <span className="text-muted text-[15px]">{label}</span>
                 <span className="text-[15px] font-mono" style={{ color }}>{val}</span>
               </div>
             ))}
@@ -278,8 +278,8 @@ export default function TestsPage() {
                 onClick={() => { setFilter(f); setSelectedDate(null) }}
                 className={`px-4 py-2.5 rounded-xl text-[15px] capitalize transition-all duration-150 ${
                   filter === f && !selectedDate
-                    ? 'bg-[#5e4075] text-[#f8f9ed]'
-                    : 'bg-[#e9deb5]/40 text-[#5e4075] hover:bg-[#e9deb5]/70'
+                    ? 'bg-primary text-bg'
+                    : 'bg-accent1/40 text-primary hover:bg-accent1/70'
                 }`}
               >
                 {f}
@@ -288,7 +288,7 @@ export default function TestsPage() {
             {selectedDate && (
               <button
                 onClick={() => setSelectedDate(null)}
-                className="ml-auto flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[15px] text-[#8b6fa0] hover:text-[#5e4075] hover:bg-[#e9deb5]/40 transition-all"
+                className="ml-auto flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[15px] text-muted hover:text-primary hover:bg-accent1/40 transition-all"
               >
                 Clear date filter
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
@@ -310,7 +310,7 @@ export default function TestsPage() {
               </motion.div>
             ))}
             {displayTests.length === 0 && (
-              <div className="text-center py-12 text-[#8b6fa0]">
+              <div className="text-center py-12 text-muted">
                 <p className="text-[15px]">No tests for this filter.</p>
               </div>
             )}

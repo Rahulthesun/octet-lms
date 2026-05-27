@@ -147,7 +147,7 @@ function ScheduleModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-base hover:bg-gray-50">Cancel</button>
-          <button onClick={create} className="flex-1 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors">Schedule</button>
+          <button onClick={create} className="flex-1 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors">Schedule</button>
         </div>
       </motion.div>
     </motion.div>
@@ -431,7 +431,7 @@ export default function TestResultsPage() {
           <p className="text-base text-gray-500 mt-1">Manage tests, upload papers, and record student scores.</p>
         </div>
         <button onClick={() => setShow(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors w-fit">
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-base hover:bg-[#3d2652] transition-colors w-fit">
           <IconCalendar className="w-5 h-5" />
           Schedule New Test
         </button>
@@ -443,7 +443,7 @@ export default function TestResultsPage() {
           <div key={label}
             className="flex items-center justify-center gap-3 bg-white border border-gray-200 rounded-full px-5 py-4 shadow-sm min-w-0">
             <span className="text-2xl font-inter font-bold shrink-0" style={{ color }}>{value}</span>
-            <span className="text-base text-gray-500 truncate">{label}</span>
+            <span className="text-lg text-gray-600 truncate">{label}</span>
           </div>
         ))}
       </div>

@@ -196,7 +196,7 @@ export default function AdminSidebar({
     >
       {/* Header */}
       {collapsed ? (
-        <div className="flex flex-row items-center justify-center h-14 gap-2 shrink-0">
+        <div className="flex items-center justify-center h-14 shrink-0">
           <div className="w-6 h-6 shrink-0">
             <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
               <circle
@@ -227,21 +227,6 @@ export default function AdminSidebar({
               <circle cx="18" cy="18" r="3" fill="#5e4075" />
             </svg>
           </div>
-          <button
-            onClick={onToggle}
-            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors"
-            title="Expand sidebar"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M 4,2 L 8,6 L 4,10"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
         </div>
       ) : (
         <div className="flex items-center h-14 shrink-0 px-4 gap-2">

@@ -153,7 +153,7 @@ const resources = [
 
 function LearnHero() {
   return (
-    <section className="relative flex flex-col items-center justify-center bg-[#f8f9ed] overflow-hidden pt-40 pb-28 px-6 text-center">
+    <section className="relative flex flex-col items-center justify-center bg-bg overflow-hidden pt-40 pb-28 px-6 text-center">
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <svg
@@ -197,10 +197,10 @@ function LearnHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#e9deb5]/60 border border-[#e9deb5] mb-8"
+          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-accent1/60 border border-accent1 mb-8"
         >
-          <span className="w-2 h-2 rounded-full bg-[#5e4075] animate-pulse" />
-          <span className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase">The Learning Journey</span>
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-[14px] tracking-[0.25em] text-muted uppercase">The Learning Journey</span>
         </motion.div>
 
         {/* Headline */}
@@ -208,10 +208,10 @@ function LearnHero() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.25 }}
-          className="text-5xl md:text-6xl text-[#5e4075] leading-tight mb-6"
+          className="text-5xl md:text-6xl text-primary leading-tight mb-6"
         >
           Chemistry Understood.<br />
-          <span className="text-[#8b6fa0] italic">Every Exam Conquered.</span>
+          <span className="text-muted italic">Every Exam Conquered.</span>
         </motion.h1>
 
         {/* Description */}
@@ -219,7 +219,7 @@ function LearnHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-base text-[#8b6fa0] max-w-2xl mx-auto mb-12 leading-relaxed"
+          className="text-base text-muted max-w-2xl mx-auto mb-12 leading-relaxed"
         >
           From basic concepts to complex numericals, our structured approach takes every student from
           confusion to clarity — across all major examinations.
@@ -237,9 +237,9 @@ function LearnHero() {
             { value: '92%',  label: 'Score Improvement'   },
             { value: '4',    label: 'Exam Boards Covered' },
           ].map((s) => (
-            <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-[#d4c5e2]/60 flex items-center gap-2.5">
-              <span className="text-xl font-mono text-[#5e4075]">{s.value}</span>
-              <span className="text-[14px] text-[#8b6fa0]">{s.label}</span>
+            <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-accent3/60 flex items-center gap-2.5">
+              <span className="text-xl font-mono text-primary">{s.value}</span>
+              <span className="text-[14px] text-muted">{s.label}</span>
             </div>
           ))}
         </motion.div>
@@ -263,7 +263,7 @@ function Approach() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5 }}
-              className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+              className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
             >
               Our Methodology
             </motion.p>
@@ -272,14 +272,14 @@ function Approach() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-12"
+              className="text-3xl md:text-4xl text-primary leading-tight mb-12"
             >
               Concepts Over Shortcuts
             </motion.h2>
 
             <div className="relative">
               {/* Vertical connector line */}
-              <div className="absolute left-5 top-10 bottom-10 w-px bg-[#d4c5e2] hidden sm:block" />
+              <div className="absolute left-5 top-10 bottom-10 w-px bg-accent3 hidden sm:block" />
               <div className="space-y-5">
                 {steps.map((step, i) => (
                   <motion.div
@@ -290,12 +290,12 @@ function Approach() {
                     transition={{ duration: 0.5, delay: i * 0.12 }}
                     className="relative flex gap-5"
                   >
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5e4075] text-white text-[14px] flex items-center justify-center z-10">
+                    <div className="shrink-0 w-10 h-10 rounded-full bg-primary text-white text-[14px] flex items-center justify-center z-10">
                       {step.num}
                     </div>
-                    <div className="flex-1 p-6 rounded-2xl border border-[#d4c5e2]/60 bg-[#f8f9ed] hover:border-[#5e4075]/25 hover:shadow-[0_4px_20px_rgba(94,64,117,0.08)] transition-all duration-300">
-                      <h3 className="text-lg text-[#5e4075] mb-2">{step.title}</h3>
-                      <p className="text-[15px] text-[#8b6fa0] leading-relaxed">{step.desc}</p>
+                    <div className="flex-1 p-6 rounded-2xl border border-accent3/60 bg-bg hover:border-primary/25 hover:shadow-[0_4px_20px_rgba(94,64,117,0.08)] transition-all duration-300">
+                      <h3 className="text-lg text-primary mb-2">{step.title}</h3>
+                      <p className="text-[15px] text-muted leading-relaxed">{step.desc}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -311,24 +311,24 @@ function Approach() {
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              <p className="text-base text-[#8b6fa0] leading-relaxed mb-6">
+              <p className="text-base text-muted leading-relaxed mb-6">
                 At Chemistry@OCTET, every teacher is a guide first and a lecturer second. Our sessions
                 are discussions, not monologues. Students ask questions, explore structures, and work
                 through problems collaboratively — building real intuition for chemistry that lasts
                 beyond the exam hall.
               </p>
-              <p className="text-base text-[#8b6fa0] leading-relaxed mb-10">
+              <p className="text-base text-muted leading-relaxed mb-10">
                 We believe the best preparation for JEE, NEET, or Board exams is deep understanding —
                 not the volume of problems solved. One concept understood thoroughly beats a hundred
                 problems solved mechanically.
               </p>
 
-              <blockquote className="border-l-4 border-[#e9deb5] pl-6 py-2 mb-12">
-                <p className="text-lg text-[#5e4075] leading-relaxed italic mb-3">
+              <blockquote className="border-l-4 border-accent1 pl-6 py-2 mb-12">
+                <p className="text-lg text-primary leading-relaxed italic mb-3">
                   &ldquo;The moment a student stops asking &lsquo;what is the formula?&rsquo; and starts
                   asking &lsquo;why does this work?&rsquo; — that is when real learning begins.&rdquo;
                 </p>
-                <cite className="text-[14px] text-[#8b6fa0] not-italic">
+                <cite className="text-[14px] text-muted not-italic">
                   — Chemistry@OCTET Teaching Philosophy
                 </cite>
               </blockquote>
@@ -355,7 +355,7 @@ function Schedule() {
   }
 
   return (
-    <section id="schedule" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="schedule" className="py-24 px-6 bg-bg">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-14">
           <motion.p
@@ -363,7 +363,7 @@ function Schedule() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
           >
             Programme Schedule
           </motion.p>
@@ -372,7 +372,7 @@ function Schedule() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-5"
+            className="text-3xl md:text-4xl text-primary leading-tight mb-5"
           >
             Find Your Learning Mode
           </motion.h2>
@@ -381,7 +381,7 @@ function Schedule() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-base text-[#8b6fa0] max-w-xl mx-auto"
+            className="text-base text-muted max-w-xl mx-auto"
           >
             Both modes follow the same curriculum and are taught by the same faculty.
           </motion.p>
@@ -395,15 +395,15 @@ function Schedule() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="flex justify-center mb-10"
         >
-          <div className="inline-flex bg-white border border-[#d4c5e2]/60 rounded-xl p-1.5 gap-1">
+          <div className="inline-flex bg-white border border-accent3/60 rounded-xl p-1.5 gap-1">
             {(['online', 'offline'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
                 className={`flex items-center gap-2.5 px-6 py-2.5 rounded-lg text-base transition-all duration-200 ${
                   mode === m
-                    ? 'bg-[#5e4075] text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
-                    : 'text-[#8b6fa0] hover:text-[#5e4075]'
+                    ? 'bg-primary text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
+                    : 'text-muted hover:text-primary'
                 }`}
               >
                 {m === 'online' ? <IconGlobe className="w-5 h-5" /> : <IconBuilding className="w-5 h-5" />}
@@ -423,15 +423,15 @@ function Schedule() {
             transition={{ duration: 0.22 }}
           >
             {/* Mode info bar */}
-            <div className={`rounded-2xl p-5 mb-4 flex items-center gap-4 ${mode === 'online' ? 'bg-[#d4c5e2]/25' : 'bg-[#daeae4]/25'}`}>
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0 ${mode === 'online' ? 'bg-[#5e4075]' : 'bg-[#3d7a5e]'}`}>
+            <div className={`rounded-2xl p-5 mb-4 flex items-center gap-4 ${mode === 'online' ? 'bg-accent3/25' : 'bg-accent2/25'}`}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 ${mode === 'online' ? 'bg-primary' : 'bg-[#3d7a5e]'}`}>
                 {mode === 'online' ? <IconGlobe className="w-5 h-5" /> : <IconBuilding className="w-5 h-5" />}
               </div>
               <div>
-                <p className="text-base text-[#5e4075]">
+                <p className="text-base text-primary">
                   {mode === 'online' ? 'Live Online Classes' : 'In-Person Classes'}
                 </p>
-                <p className="text-[14px] text-[#8b6fa0]">
+                <p className="text-[14px] text-muted">
                   {mode === 'online'
                     ? 'Platform: Google Meet / Zoom · Sessions recorded and available for 30 days'
                     : 'Venue: OCTET Study Centre · Bring your notes and practice sheets'}
@@ -440,21 +440,21 @@ function Schedule() {
             </div>
 
             {/* Schedule table */}
-            <div className="bg-white rounded-2xl border border-[#d4c5e2]/60 overflow-hidden">
-              <div className="grid grid-cols-3 bg-[#f8f9ed] border-b border-[#d4c5e2]/60 px-6 py-3.5">
-                <span className="text-[14px] text-[#8b6fa0] uppercase tracking-wide">Day</span>
-                <span className="text-[14px] text-[#8b6fa0] uppercase tracking-wide">Time</span>
-                <span className="text-[14px] text-[#8b6fa0] uppercase tracking-wide">Session Type</span>
+            <div className="bg-white rounded-2xl border border-accent3/60 overflow-hidden">
+              <div className="grid grid-cols-3 bg-bg border-b border-accent3/60 px-6 py-3.5">
+                <span className="text-[14px] text-muted uppercase tracking-wide">Day</span>
+                <span className="text-[14px] text-muted uppercase tracking-wide">Time</span>
+                <span className="text-[14px] text-muted uppercase tracking-wide">Session Type</span>
               </div>
               {schedule.map((row, i) => (
                 <div
                   key={row.day}
-                  className={`grid grid-cols-3 px-6 py-4 items-center hover:bg-[#f8f9ed]/60 transition-colors ${
-                    i < schedule.length - 1 ? 'border-b border-[#d4c5e2]/40' : ''
+                  className={`grid grid-cols-3 px-6 py-4 items-center hover:bg-bg/60 transition-colors ${
+                    i < schedule.length - 1 ? 'border-b border-accent3/40' : ''
                   }`}
                 >
-                  <span className="text-base text-[#5e4075]">{row.day}</span>
-                  <span className="text-base text-[#5e4075] font-mono">{row.time}</span>
+                  <span className="text-base text-primary">{row.day}</span>
+                  <span className="text-base text-primary font-mono">{row.time}</span>
                   <span className={`inline-flex w-fit px-3 py-1.5 rounded-full text-[14px] ${badgeClass(row.type)}`}>
                     {row.type}
                   </span>
@@ -480,7 +480,7 @@ function Schedule() {
           ].map((badge) => (
             <span
               key={badge}
-              className="px-4 py-2 rounded-full bg-white border border-[#d4c5e2]/60 text-[14px] text-[#8b6fa0]"
+              className="px-4 py-2 rounded-full bg-white border border-accent3/60 text-[14px] text-muted"
             >
               {badge}
             </span>
@@ -501,7 +501,7 @@ function ExamPathways() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
           >
             Exam Coverage
           </motion.p>
@@ -510,7 +510,7 @@ function ExamPathways() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-5"
+            className="text-3xl md:text-4xl text-primary leading-tight mb-5"
           >
             One Chemistry. Every Exam.
           </motion.h2>
@@ -519,7 +519,7 @@ function ExamPathways() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-base text-[#8b6fa0] max-w-2xl mx-auto"
+            className="text-base text-muted max-w-2xl mx-auto"
           >
             We teach the same chemistry — structured to meet the exact demands of each examination board.
           </motion.p>
@@ -533,7 +533,7 @@ function ExamPathways() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="relative p-7 rounded-2xl border border-[#d4c5e2]/60 bg-[#f8f9ed] overflow-hidden hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.12)] transition-all duration-300"
+              className="relative p-7 rounded-2xl border border-accent3/60 bg-bg overflow-hidden hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.12)] transition-all duration-300"
             >
               {/* Coloured corner accent */}
               <div
@@ -543,23 +543,23 @@ function ExamPathways() {
 
               <div className="relative">
                 <span
-                  className="inline-block px-3 py-1.5 rounded-full text-[14px] text-[#5e4075] mb-4"
+                  className="inline-block px-3 py-1.5 rounded-full text-[14px] text-primary mb-4"
                   style={{ backgroundColor: exam.accent }}
                 >
                   {exam.badge}
                 </span>
 
-                <h3 className="text-xl text-[#5e4075] mb-4">{exam.title}</h3>
+                <h3 className="text-xl text-primary mb-4">{exam.title}</h3>
 
                 <div className="flex items-baseline gap-2.5 mb-5">
-                  <span className="text-4xl font-mono text-[#5e4075]">{exam.stat}</span>
-                  <span className="text-[14px] text-[#8b6fa0]">{exam.statLabel}</span>
+                  <span className="text-4xl font-mono text-primary">{exam.stat}</span>
+                  <span className="text-[14px] text-muted">{exam.statLabel}</span>
                 </div>
 
                 <ul className="space-y-2.5">
                   {exam.points.map((pt) => (
-                    <li key={pt} className="flex items-start gap-2.5 text-[15px] text-[#8b6fa0]">
-                      <span className="mt-0.5 flex-shrink-0 text-[#5e4075]">
+                    <li key={pt} className="flex items-start gap-2.5 text-[15px] text-muted">
+                      <span className="mt-0.5 shrink-0 text-primary">
                         <IconCheck className="w-4 h-4" />
                       </span>
                       {pt}
@@ -577,7 +577,7 @@ function ExamPathways() {
 
 function Resources() {
   return (
-    <section id="resources" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="resources" className="py-24 px-6 bg-bg">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14">
           <motion.p
@@ -585,7 +585,7 @@ function Resources() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
           >
             What You Get
           </motion.p>
@@ -594,7 +594,7 @@ function Resources() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-5"
+            className="text-3xl md:text-4xl text-primary leading-tight mb-5"
           >
             Built to Support Every Step
           </motion.h2>
@@ -603,7 +603,7 @@ function Resources() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-base text-[#8b6fa0] max-w-xl mx-auto"
+            className="text-base text-muted max-w-xl mx-auto"
           >
             Every resource is created in-house by our teachers — not sourced from third parties.
           </motion.p>
@@ -617,17 +617,17 @@ function Resources() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="p-7 rounded-2xl bg-white border border-[#d4c5e2]/60 hover:border-[#5e4075]/25 hover:shadow-[0_8px_32px_rgba(94,64,117,0.1)] transition-all duration-300"
+              className="p-7 rounded-2xl bg-white border border-accent3/60 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(94,64,117,0.1)] transition-all duration-300"
             >
-              <div className="w-14 h-14 rounded-xl bg-[#e9deb5] flex items-center justify-center mb-5 text-[#5e4075]">
+              <div className="w-14 h-14 rounded-xl bg-accent1 flex items-center justify-center mb-5 text-primary">
                 <res.Icon className="w-7 h-7" />
               </div>
-              <h3 className="text-xl text-[#5e4075] mb-2">{res.title}</h3>
-              <p className="text-base text-[#8b6fa0] mb-5 leading-relaxed">{res.desc}</p>
+              <h3 className="text-xl text-primary mb-2">{res.title}</h3>
+              <p className="text-base text-muted mb-5 leading-relaxed">{res.desc}</p>
               <ul className="space-y-2.5">
                 {res.points.map((pt) => (
-                  <li key={pt} className="flex items-start gap-2.5 text-[15px] text-[#8b6fa0]">
-                    <span className="mt-0.5 flex-shrink-0 text-[#5e4075]">
+                  <li key={pt} className="flex items-start gap-2.5 text-[15px] text-muted">
+                    <span className="mt-0.5 shrink-0 text-primary">
                       <IconCheck className="w-4 h-4" />
                     </span>
                     {pt}
@@ -643,7 +643,7 @@ function Resources() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="text-center text-[14px] text-[#8b6fa0] mt-10"
+          className="text-center text-[14px] text-muted mt-10"
         >
           All resources unlock immediately after enrollment.
         </motion.p>
@@ -661,7 +661,7 @@ function EnrollCTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.6 }}
-          className="relative bg-[#e9deb5]/30 border border-[#e9deb5] rounded-3xl p-16 max-w-3xl mx-auto text-center overflow-hidden"
+          className="relative bg-accent1/30 border border-accent1 rounded-3xl p-16 max-w-3xl mx-auto text-center overflow-hidden"
         >
           {/* Decorative SVGs */}
           <div className="absolute top-4 right-4" style={{ opacity: 0.14 }}>
@@ -672,21 +672,21 @@ function EnrollCTA() {
           </div>
 
           <div className="relative z-10">
-            <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-4">Get Started</p>
-            <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-4">Ready to Begin?</h2>
-            <p className="text-base text-[#8b6fa0] mb-10 max-w-md mx-auto">
+            <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-4">Get Started</p>
+            <h2 className="text-3xl md:text-4xl text-primary leading-tight mb-4">Ready to Begin?</h2>
+            <p className="text-base text-muted mb-10 max-w-md mx-auto">
               Join 500+ students learning chemistry the right way — with clarity, confidence, and purpose.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <Link
                 href="/register"
-                className="px-8 py-3.5 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)]"
+                className="px-8 py-3.5 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)]"
               >
                 Enroll Now
               </Link>
               <Link
                 href="/#courses"
-                className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:bg-[#e9deb5]/40 transition-all duration-200"
+                className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:bg-accent1/40 transition-all duration-200"
               >
                 Explore Courses
               </Link>
@@ -702,7 +702,7 @@ function EnrollCTA() {
 
 export default function LearnPage() {
   return (
-    <main className="bg-[#f8f9ed] min-h-screen">
+    <main className="bg-bg min-h-screen">
       <Navbar />
       <LearnHero />
       <Approach />

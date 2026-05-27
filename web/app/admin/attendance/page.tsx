@@ -139,7 +139,7 @@ function AddStudentsModal({ grade, currentStudentIds, onAdd, onClose }: {
             {eligible.map((s) => (
               <label key={s.id} className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggleSel(s.id)}
-                  className="w-4 h-4 accent-[#5e4075]" />
+                  className="w-4 h-4 accent-primary" />
                 <div>
                   <p className="text-base text-gray-800">{s.name}</p>
                   <p className="text-sm text-gray-400">{s.roll} · current batch: {s.batch}</p>
@@ -151,7 +151,7 @@ function AddStudentsModal({ grade, currentStudentIds, onAdd, onClose }: {
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-base hover:bg-gray-50">Cancel</button>
           <button onClick={confirm} disabled={selected.length === 0}
-            className="flex-1 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            className="flex-1 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             Add {selected.length > 0 ? `${selected.length} Student${selected.length !== 1 ? 's' : ''}` : 'Selected'}
           </button>
         </div>
@@ -264,8 +264,9 @@ export default function AttendancePage() {
         <p className="text-base text-gray-600 mt-1">Select a grade and batch to mark or review attendance.</p>
       </div>
 
-      {/* ── Context selector ── */}
-      <div className="bg-white rounded-2xl shadow-sm px-5 py-4 space-y-4">
+      {/* ── Selectors + chart on single row ── */}
+      <div className="flex items-stretch gap-4">
+        <div className={`${hasContext && miniChartData.length > 0 ? 'w-1/2' : 'flex-1'} bg-white rounded-2xl shadow-sm px-5 pt-4 pb-3 space-y-4`}>
         {/* Grade selector */}
         <div className="flex items-center gap-4 flex-wrap">
           <span className="text-md text-gray-600 w-16 shrink-0">Grade</span>
@@ -349,7 +350,33 @@ export default function AttendancePage() {
             className="border border-gray-200 px-3 py-1.5 text-base text-gray-700 outline-none focus:border-gray-400"
           />
         </div>
-      </div>
+
+        {/* Stats — fills empty space below Date when batch is selected */}
+        {hasContext && (
+          <div className="flex justify-between border-t border-gray-100 pt-3">
+            {[
+              { label: 'Blocked',   count: stats.blocked,   color: '#9e4a4a' },
+              { label: 'Warning',   count: stats.warning,   color: '#9e7438' },
+              { label: 'Good',      count: stats.good,      color: '#3e7450' },
+              { label: 'Excellent', count: stats.excellent,  color: '#2e7470' },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-inter font-bold" style={{ color }}>{count}</span>
+                <span className="text-base text-gray-500">{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        </div>{/* end selector card */}
+
+        {/* Chart card — only when context is set */}
+        {hasContext && miniChartData.length > 0 && (
+          <div className="w-1/2 bg-white rounded-2xl shadow-sm px-5 py-4">
+            <p className="text-md text-gray-600 tracking-widest mb-3">Last <span className="font-inter">5</span> sessions</p>
+            <MiniChart data={miniChartData} />
+          </div>
+        )}
+      </div>{/* end flex row */}
 
       {/* ── Empty state ── */}
       {!hasContext && (
@@ -372,50 +399,36 @@ export default function AttendancePage() {
             transition={{ duration: 0.2 }}
             className="space-y-5"
           >
-            {/* Stats strip + mini chart */}
-            <div className="flex flex-col lg:flex-row lg:items-stretch gap-4">
-              {/* Compact inline stats */}
-              <div className="lg:w-1/2 shrink-0 bg-white rounded-2xl shadow-sm px-5 py-4">
-                <p className="text-md text-gray-600 tracking-widest mb-3">
-                  <span className="font-inter">{selectedGrade}</span> — {selectedBatch} — <span className="font-inter">{batchStudents.length}</span> students
-                </p>
-                <div className="flex flex-wrap gap-x-25 gap-y-2">
-                  {[
-                    { label: 'Blocked',   count: stats.blocked,   color: '#9e4a4a' },
-                    { label: 'Warning',   count: stats.warning,   color: '#9e7438' },
-                    { label: 'Good',      count: stats.good,      color: '#3e7450' },
-                    { label: 'Excellent', count: stats.excellent,  color: '#2e7470' },
-                  ].map(({ label, count, color }) => (
-                    <div key={label} className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-inter" style={{ color }}>{count}</span>
-                      <span className="text-lg text-gray-500">{label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Mini chart */}
-              {miniChartData.length > 0 && (
-                <div className="lg:w-1/2 shrink-0 bg-white rounded-2xl shadow-sm px-5 py-4">
-                  <p className="text-md text-gray-600 tracking-widest mb-3">Last <span className="font-inter">5</span> sessions</p>
-                  <MiniChart data={miniChartData} />
-                </div>
-              )}
-            </div>
-
             {/* Section toggle */}
-            <div className="flex border border-gray-200 rounded-xl bg-white overflow-hidden w-fit">
-              {(['mark', 'summary'] as Section[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSection(s)}
-                  className={`px-6 py-2.5 text-base transition-colors ${
-                    activeSection === s ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {s === 'mark' ? 'Mark Attendance' : 'Attendance Summary'}
-                </button>
-              ))}
+            <div className="flex items-center justify-between border-b border-gray-200">
+              <div className="flex gap-1">
+                {(['mark', 'summary'] as Section[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSection(s)}
+                    className={`px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
+                      activeSection === s
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    {s === 'mark' ? 'Mark Attendance' : 'Attendance Summary'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-4 pr-2 shrink-0">
+                <p className="text-base text-gray-700 font-medium">
+                  {activeSection === 'mark'
+                    ? <>Marking attendance for <span className="text-primary">{selectedGrade} — {selectedBatch}</span><span className="text-gray-600 font-normal"> — {dateLabel}</span></>
+                    : <>Summary — <span className="text-primary">{selectedGrade} — {selectedBatch}</span></>
+                  }
+                </p>
+                {activeSection === 'mark' && (
+                  <button onClick={() => setShowAddStudents(true)} className="text-base bg-primary p-2 rounded-xl text-white hover:cursor-pointer whitespace-nowrap">
+                    + Add Students
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* ── Mark Attendance ── */}
@@ -423,16 +436,6 @@ export default function AttendancePage() {
               {activeSection === 'mark' ? (
                 <motion.div key="mark" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                    {/* Context label */}
-                    <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                      <p className="text-lg text-gray-700 font-medium">
-                        Marking attendance for <span className="text-primary">{selectedGrade}  — {selectedBatch}</span>
-                        <span className="text-gray-600 font-normal"> - {dateLabel}</span>
-                      </p>
-                      <button onClick={() => setShowAddStudents(true)} className="text-md text-primary hover:cursor-pointer shrink-0 ml-4">
-                        + Add Students
-                      </button>
-                    </div>
 
                     {batchStudents.length === 0 ? (
                       <div className="py-14 flex flex-col items-center gap-4 text-gray-400">
@@ -525,11 +528,6 @@ export default function AttendancePage() {
                 /* ── Attendance Summary ── */
                 <motion.div key="summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-3">
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50">
-                      <p className="text-lg text-gray-700 font-medium">
-                        Summary — <span className="text-primary">{selectedGrade} — {selectedBatch}</span>
-                      </p>
-                    </div>
                     <div className="grid grid-cols-[1fr_90px_110px_100px] px-5 py-2.5 text-sm uppercase tracking-widest text-gray-600 border-b border-gray-100 bg-gray-100">
                       <span>Student</span>
                       <span className="text-right">Att. %</span>

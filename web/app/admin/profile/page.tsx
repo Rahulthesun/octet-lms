@@ -114,7 +114,7 @@ export default function AdminProfilePage() {
  <div className="relative shrink-0">
  <button
  onClick={() => avatarRef.current?.click()}
- className="w-20 h-20 bg-[#5e4075] flex items-center justify-center text-white text-3xl font-inter overflow-hidden hover:opacity-90 transition-opacity"
+ className="w-20 h-20 bg-primary flex items-center justify-center text-white text-3xl font-inter overflow-hidden hover:opacity-90 transition-opacity"
  title="Change profile picture"
  >
  {avatarSrc ? (
@@ -161,7 +161,7 @@ export default function AdminProfilePage() {
  <div className="flex items-center gap-4 mt-5">
  <button
  onClick={saveDetails}
- className="px-6 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors"
+ className="px-6 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors"
  >
  Save Changes
  </button>
@@ -212,7 +212,7 @@ export default function AdminProfilePage() {
  <button
  onClick={savePassword}
  disabled={!pw.current || !pw.newPw || !pw.confirm}
- className="px-6 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+ className="px-6 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
  >
  Update Password
  </button>

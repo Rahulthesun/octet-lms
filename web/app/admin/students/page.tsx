@@ -74,21 +74,21 @@ function ApplicationCard({ app, onApprove, onReject }: {
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
-      className="bg-white shadow-sm p-5 flex flex-col gap-4">
+      className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-4">
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg text-[#5e4075]">{app.name}</h3>
+            <h3 className="text-lg text-primary">{app.name}</h3>
             <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 rounded-full">{app.grade}</span>
             {!isPending && (
               <span className="text-sm px-2 py-0.5 border border-gray-200 text-gray-600 capitalize rounded-full">{app.status}</span>
             )}
           </div>
-          <p className="text-base text-gray-500 mt-0.5">{app.batch} · {app.board} Board</p>
-          <p className="text-base text-gray-500">{app.email} · {app.phone}</p>
-          <p className="text-base text-gray-400">Applied {app.appliedDate}</p>
+          <p className="text-base text-gray-600 mt-0.5">{app.batch} · {app.board} Board</p>
+          <p className="text-base text-gray-600">{app.email} · <span className="font-inter">{app.phone}</span></p>
+          <p className="text-base text-gray-600">Applied on <span className="font-inter">{app.appliedDate}</span></p>
         </div>
-        <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-[#5e4075] text-base shrink-0">
+        <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
           {initials(app.name)}
         </div>
       </div>
@@ -97,14 +97,12 @@ function ApplicationCard({ app, onApprove, onReject }: {
       <div className="grid grid-cols-2 gap-3">
         {[{ label: '10th ID Card', sub: 'Identity proof' }, { label: '10th Grade Paper', sub: 'Academic proof' }].map(({ label, sub }) => (
           <div key={label} className="border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1.5 py-3 bg-gray-50">
-            <div className="w-7 h-7 bg-gray-100 flex items-center justify-center text-[#5e4075]">
-              <IconDocument className="w-4 h-4" />
-            </div>
+            <IconDocument className="w-4 h-4" />
             <div className="text-center">
-              <p className="text-sm text-[#5e4075]">{label}</p>
+              <p className="text-sm text-primary">{label}</p>
               <p className="text-sm text-gray-500">{sub}</p>
             </div>
-            <button className="text-sm text-[#5e4075] underline underline-offset-2 hover:text-[#3d2652]">View Document</button>
+            <button className="text-sm text-primary hover:cursor-pointer hover:text-[#3d2652]">View Document</button>
           </div>
         ))}
       </div>
@@ -116,7 +114,7 @@ function ApplicationCard({ app, onApprove, onReject }: {
             <IconXCircle className="w-4 h-4" />Reject
           </button>
           <button onClick={() => onApprove(app.id)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors">
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors">
             <IconCheckCircle className="w-4 h-4" />Approve
           </button>
         </div>
@@ -159,23 +157,23 @@ export default function StudentsPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Students</h1>
-        <p className="text-base text-gray-500 mt-1">Verify applications and manage the student database.</p>
+        <p className="text-base text-gray-600 mt-1">Verify applications and manage the student database.</p>
       </div>
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-gray-200 mb-8">
         <button onClick={() => { setActiveTab('applications'); setSearch('') }}
           className={`flex items-center gap-2 px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
-            activeTab === 'applications' ? 'border-[#5e4075] text-[#5e4075]' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'applications' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-800'
           }`}>
           New Applications
           {pendingCount > 0 && (
-            <span className="text-sm px-2 py-0.5 bg-[#5e4075] text-white font-inter rounded-full">{pendingCount}</span>
+            <span className="text-sm px-2 py-0.5 bg-primary text-white font-inter rounded-full">{pendingCount}</span>
           )}
         </button>
         <button onClick={() => { setActiveTab('database'); setSearch('') }}
           className={`flex items-center gap-2 px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
-            activeTab === 'database' ? 'border-[#5e4075] text-[#5e4075]' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'database' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-800'
           }`}>
           Student Database
           <span className="text-sm px-2 py-0.5 border border-gray-200 text-gray-500 font-inter rounded-full">{students.length}</span>
@@ -187,11 +185,11 @@ export default function StudentsPage() {
         {activeTab === 'applications' && (
           <motion.div key="applications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }}>
             {pendingCount === 0 && applications.every((a) => a.status !== 'pending') && (
-              <div className="text-center py-16 text-gray-400 text-base">No pending applications.</div>
+              <div className="text-center py-16 text-gray-600 text-base">No pending applications.</div>
             )}
             {pendingCount > 0 && (
               <div className="mb-8">
-                <h2 className="text-base text-gray-600 mb-4">Pending Review ({pendingCount})</h2>
+                <h2 className="text-base text-gray-600 mb-4">Pending Review <span className="bg-primary text-white text-base font-inter px-2 py-0.5 rounded-full">{pendingCount}</span></h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   <AnimatePresence>
                     {applications.filter((a) => a.status === 'pending').map((app) => (
@@ -237,7 +235,7 @@ export default function StudentsPage() {
                   onClick={() => setFilterOpen((o) => !o)}
                   className={`flex items-center gap-2 px-4 py-2.5 border text-base transition-colors shrink-0 ${
                     filterOpen || activeFilterCount > 0
-                      ? 'border-[#5e4075] text-[#5e4075] bg-white'
+                      ? 'border-primary text-primary bg-white'
                       : 'border-gray-200 text-gray-600 bg-white hover:border-gray-400'
                   }`}
                 >
@@ -246,7 +244,7 @@ export default function StudentsPage() {
                   </svg>
                   Filter
                   {activeFilterCount > 0 && (
-                    <span className="w-5 h-5 bg-[#5e4075] text-white text-xs flex items-center justify-center font-inter leading-none rounded-full">{activeFilterCount}</span>
+                    <span className="w-5 h-5 bg-primary text-white text-xs flex items-center justify-center font-inter leading-none rounded-full">{activeFilterCount}</span>
                   )}
                   <svg className={`w-3.5 h-3.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} viewBox="0 0 12 12" fill="none">
                     <path d="M 2,4 L 6,8 L 10,4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
@@ -272,7 +270,7 @@ export default function StudentsPage() {
                           {GRADES.map((g) => (
                             <button key={g} onClick={() => setGradeFilter(g)}
                               className={`px-3 py-1.5 text-base rounded-full transition-colors ${
-                                gradeFilter === g ? 'bg-[#5e4075] text-white' : 'border border-gray-200 text-gray-600 hover:border-gray-400'
+                                gradeFilter === g ? 'bg-primary text-white' : 'border border-gray-200 text-gray-600 hover:border-gray-400'
                               }`}>
                               {g}
                             </button>
@@ -286,7 +284,7 @@ export default function StudentsPage() {
                           {STATUSES.map((s) => (
                             <button key={s} onClick={() => setStatusFilter(s)}
                               className={`px-3 py-1.5 text-base capitalize rounded-full transition-colors ${
-                                statusFilter === s ? 'bg-[#5e4075] text-white' : 'border border-gray-200 text-gray-600 hover:border-gray-400'
+                                statusFilter === s ? 'bg-primary text-white' : 'border border-gray-200 text-gray-600 hover:border-gray-400'
                               }`}>
                               {s}
                             </button>
@@ -295,7 +293,7 @@ export default function StudentsPage() {
                       </div>
                       {activeFilterCount > 0 && (
                         <button onClick={() => { setGradeFilter('All'); setStatusFilter('All') }}
-                          className="text-base text-gray-500 hover:text-[#5e4075] underline underline-offset-2">
+                          className="text-base text-gray-500 hover:text-primary underline underline-offset-2">
                           Clear all filters
                         </button>
                       )}
@@ -306,9 +304,9 @@ export default function StudentsPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white shadow-sm overflow-hidden">
-              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_110px_80px_110px_110px_80px_44px] gap-3 px-5 py-3 text-sm text-gray-400 border-b border-gray-200 bg-gray-50">
-                <span>#</span>
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_110px_80px_110px_110px_80px_44px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
+                <span>ID</span>
                 <span>Student</span>
                 <span>Roll</span>
                 <span>Grade</span>
@@ -319,35 +317,35 @@ export default function StudentsPage() {
               </div>
               <div className="divide-y divide-gray-100">
                 {filteredStudents.length === 0 ? (
-                  <div className="py-12 text-center text-gray-400 text-base">No students match your filters.</div>
+                  <div className="py-12 text-center text-gray-600 text-base">No students match your filters.</div>
                 ) : (
                   filteredStudents.map((s, i) => (
                     <div key={s.id}
                       className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_110px_80px_110px_110px_80px_44px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
                       <span className="text-base text-gray-400 font-inter w-10">{i + 1}</span>
                       <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none">
-                        <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-[#5e4075] text-base shrink-0">
+                        <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
                           {initials(s.name)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-base text-[#5e4075] truncate">{s.name}</p>
-                          <p className="text-sm text-gray-400 truncate">{s.email}</p>
+                          <p className="text-base text-primary truncate">{s.name}</p>
+                          <p className="text-base text-gray-600 truncate">{s.email}</p>
                         </div>
                       </div>
-                      <span className="text-base font-inter text-gray-500 hidden lg:block">{s.roll}</span>
-                      <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.grade}</span>
-                      <span className="text-base text-gray-500 hidden lg:block">{s.batch}</span>
+                      <span className="text-base font-inter text-gray-600 hidden lg:block">{s.roll}</span>
+                      <span className="text-base border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.grade}</span>
+                      <span className="text-base text-gray-600 hidden lg:block">{s.batch}</span>
                       <div className="text-right hidden lg:block">
-                        <span className="text-base font-inter font-bold text-[#5e4075]">{s.onlineAtt}%</span>
+                        <span className="text-base font-inter font-bold text-primary">{s.onlineAtt}%</span>
                         {s.offlineAtt !== null && (
                           <span className="text-base font-inter text-gray-400"> / {s.offlineAtt}%</span>
                         )}
                       </div>
-                      <span className={`text-sm text-right hidden lg:block ${s.status === 'blocked' ? 'text-red-500' : 'text-green-600'}`}>
+                      <span className={`text-base text-right hidden lg:block ${s.status === 'blocked' ? 'text-red-500' : 'text-green-600'}`}>
                         {s.status === 'blocked' ? 'Blocked' : 'Active'}
                       </span>
                       <Link href={`/admin/students/${s.id}`}
-                        className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-[#5e4075] transition-all shrink-0 ml-auto lg:ml-0">
+                        className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-primary transition-all shrink-0 ml-auto lg:ml-0">
                         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
                           <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>

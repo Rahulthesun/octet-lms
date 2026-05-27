@@ -20,11 +20,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-[#f8f9ed]">
+    <div className="h-screen flex overflow-hidden bg-bg">
       {/* Left panel — auth form */}
       <div className="w-full lg:w-1/2 flex flex-col h-full">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-8 py-3.5 border-b border-[#e9deb5] shrink-0">
+        <div className="flex items-center justify-between px-8 py-3.5 border-b border-accent1 shrink-0">
           <Link href="/" className="flex items-center gap-2.5">
             <svg viewBox="0 0 36 36" fill="none" className="w-8 h-8">
               <circle cx="18" cy="18" r="16" stroke="#5e4075" strokeWidth="1.8" />
@@ -32,9 +32,9 @@ export default function LoginPage() {
               <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(-60 18 18)" />
               <circle cx="18" cy="18" r="3" fill="#5e4075" />
             </svg>
-            <span className="text-[#5e4075] text-base">Chemistry<span className="text-[#8b6fa0]">@</span>OCTET</span>
+            <span className="text-primary text-base">Chemistry<span className="text-muted">@</span>OCTET</span>
           </Link>
-          <Link href="/" className="inline-flex items-center gap-2 text-[#8b6fa0] text-base hover:text-[#5e4075] transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-muted text-base hover:text-primary transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
               <path d="M 13,8 L 3,8 M 7,4 L 3,8 L 7,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -50,26 +50,26 @@ export default function LoginPage() {
             transition={{ duration: 0.5 }}
             className="w-full max-w-md"
           >
-            <div className="bg-white rounded-2xl border border-[#d4c5e2]/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-8">
-              <h1 className="text-2xl text-[#5e4075] mb-1">Welcome back</h1>
-              <p className="text-[#8b6fa0] text-[15px] mb-6">Sign in to access your student portal</p>
+            <div className="bg-white rounded-2xl border border-accent3/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-8">
+              <h1 className="text-2xl text-primary mb-1">Welcome back</h1>
+              <p className="text-muted text-[15px] mb-6">Sign in to access your student portal</p>
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-[#5e4075] text-[15px] mb-1.5">Email address</label>
+                  <label className="block text-primary text-[15px] mb-1.5">Email address</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@email.com"
-                    className="w-full px-4 py-3 rounded-xl border border-[#c8b8d8] bg-[#fdfcf8] text-[#5e4075] text-base placeholder:text-[#c8b8d8] focus:outline-none focus:border-[#5e4075]/60 focus:ring-2 focus:ring-[#5e4075]/10 transition-all duration-200"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
                   />
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[#5e4075] text-[15px]">Password</label>
-                    <a href="#" className="text-[#8b6fa0] text-[14px] hover:text-[#5e4075] transition-colors">
+                    <label className="text-primary text-[15px]">Password</label>
+                    <a href="#" className="text-muted text-[14px] hover:text-primary transition-colors">
                       Forgot password?
                     </a>
                   </div>
@@ -78,7 +78,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl border border-[#c8b8d8] bg-[#fdfcf8] text-[#5e4075] text-base placeholder:text-[#c8b8d8] focus:outline-none focus:border-[#5e4075]/60 focus:ring-2 focus:ring-[#5e4075]/10 transition-all duration-200"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
                   />
                 </div>
 
@@ -86,7 +86,7 @@ export default function LoginPage() {
                   type="submit"
                   disabled={loading}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-1"
+                  className="w-full py-3 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-1"
                 >
                   {loading ? (
                     <>
@@ -98,20 +98,20 @@ export default function LoginPage() {
               </form>
 
               <div className="flex items-center gap-4 my-5">
-                <div className="flex-1 h-px bg-[#e9deb5]" />
-                <span className="text-[#c8b8d8] text-[14px]">or</span>
-                <div className="flex-1 h-px bg-[#e9deb5]" />
+                <div className="flex-1 h-px bg-accent1" />
+                <span className="text-border text-[14px]">or</span>
+                <div className="flex-1 h-px bg-accent1" />
               </div>
 
-              <p className="text-[#8b6fa0] text-[15px] text-center">
+              <p className="text-muted text-[15px] text-center">
                 Don&apos;t have an account?{' '}
-                <Link href="/register" className="text-[#5e4075] hover:underline">
+                <Link href="/register" className="text-primary hover:underline">
                   Register here
                 </Link>
               </p>
             </div>
 
-            <p className="text-[#c8b8d8] text-[14px] text-center mt-3">
+            <p className="text-border text-[14px] text-center mt-3">
               Demo mode: any email & password will sign you in
             </p>
           </motion.div>
@@ -140,13 +140,13 @@ export default function LoginPage() {
               <path d="M 28,32 Q 26,20 36,14 Q 40,12 42,14 L 40,20 Q 36,22 36,28 L 42,28 L 42,40 L 28,40 Z" fill="#5e4075" />
             </svg>
           </div>
-          <blockquote className="text-[#5e4075] text-xl md:text-2xl leading-relaxed mb-6">
+          <blockquote className="text-primary text-xl md:text-2xl leading-relaxed mb-6">
             The art of chemistry is to understand the hidden order beneath apparent chaos.
           </blockquote>
-          <p className="text-[#8b6fa0] text-base tracking-wider">— Antoine Lavoisier</p>
+          <p className="text-muted text-base tracking-wider">— Antoine Lavoisier</p>
           <div className="mt-12 flex flex-col items-center gap-3">
-            <div className="w-px h-10 bg-[#5e4075]/20" />
-            <p className="text-[#8b6fa0] text-[14px] tracking-[0.22em] uppercase">Spread True Science</p>
+            <div className="w-px h-10 bg-primary/20" />
+            <p className="text-muted text-[14px] tracking-[0.22em] uppercase">Spread True Science</p>
           </div>
         </div>
       </motion.div>

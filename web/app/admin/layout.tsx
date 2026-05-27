@@ -32,7 +32,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <AdminSidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
-      <main className="relative z-[1] flex-1 h-full overflow-y-auto bg-transparent" data-lenis-prevent>
+
+      {/* Expand button — straddles sidebar right edge when collapsed */}
+      {collapsed && (
+        <button
+          onClick={() => setCollapsed(false)}
+          className="absolute z-20 w-6 h-6 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center bg-white border border-gray-200 rounded-md shadow-md text-gray-500 hover:text-primary hover:border-primary transition-colors"
+          style={{ left: 64, top: 28 }}
+          title="Expand sidebar"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
+            <path d="M 4,2 L 8,6 L 4,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+
+      <main className="relative z-1 flex-1 h-full overflow-y-auto bg-transparent" data-lenis-prevent>
         {children}
       </main>
     </div>

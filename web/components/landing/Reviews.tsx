@@ -22,19 +22,19 @@ function ReviewCard({ review }: { review: typeof landingReviews[0] }) {
   const color = accentColors[colorIdx % accentColors.length]
 
   return (
-    <div className="relative flex-shrink-0 bg-white border border-[#d4c5e2]/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden" style={{ width: 340 }}>
+    <div className="relative shrink-0 bg-white border border-accent3/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden" style={{ width: 340 }}>
       {/* Colored corner accent */}
       <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-3xl opacity-50" style={{ backgroundColor: color }} />
       <div className="relative z-10">
         <StarRating count={review.rating} />
-        <p className="text-[#5e4075] text-[15px] leading-relaxed mt-4 mb-5">&ldquo;{review.text}&rdquo;</p>
+        <p className="text-primary text-[15px] leading-relaxed mt-4 mb-5">&ldquo;{review.text}&rdquo;</p>
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full flex items-center justify-center text-[#5e4075] text-base shrink-0 border border-[#d4c5e2]/40" style={{ backgroundColor: color }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-primary text-base shrink-0 border border-accent3/40" style={{ backgroundColor: color }}>
             {review.name.charAt(0)}
           </div>
           <div>
-            <p className="text-[#5e4075] text-base">{review.name}</p>
-            <p className="text-[#8b6fa0] text-[14px]">{review.role}</p>
+            <p className="text-primary text-base">{review.name}</p>
+            <p className="text-muted text-[14px]">{review.role}</p>
           </div>
         </div>
       </div>
@@ -73,9 +73,9 @@ export default function Reviews() {
           transition={{ duration: 0.6 }}
           className="text-center mb-14"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">What People Say</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4 whitespace-nowrap">
-            Real Students. Real Parents. <span className="text-[#8b6fa0]">Real Results.</span>
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">What People Say</p>
+          <h2 className="text-3xl md:text-4xl text-primary mb-4 whitespace-nowrap">
+            Real Students. Real Parents. <span className="text-muted">Real Results.</span>
           </h2>
         </motion.div>
       </div>

@@ -26,9 +26,9 @@ export default function Dashboard() {
         transition={{ duration: 0.4 }}
         className="mb-10"
       >
-        <p className="text-[#8b6fa0] text-[14px] mb-2">{greeting},</p>
-        <h1 className="text-2xl md:text-3xl text-[#5e4075]">{student.name}</h1>
-        <p className="text-[#8b6fa0] text-[15px] mt-2">Grade {student.grade} · Roll No. {student.rollNumber}</p>
+        <p className="text-muted text-[14px] mb-2">{greeting},</p>
+        <h1 className="text-2xl md:text-3xl text-primary">{student.name}</h1>
+        <p className="text-muted text-[15px] mt-2">Grade {student.grade} · Roll No. {student.rollNumber}</p>
       </motion.div>
 
       {/* Stats row */}
@@ -45,11 +45,11 @@ export default function Dashboard() {
           { label: 'New Courses', value: 1, Icon: IconStar, color: '#c8e0da' },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} className={`${card} p-8 hover:shadow-[0_4px_20px_rgba(94,64,117,0.1)] transition-shadow duration-200`}>
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 text-[#5e4075]" style={{ backgroundColor: color }}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 text-primary" style={{ backgroundColor: color }}>
               <Icon className="w-6 h-6" />
             </div>
-            <p className="text-3xl text-[#5e4075] font-mono mb-2">{value}</p>
-            <p className="text-[#8b6fa0] text-[15px]">{label}</p>
+            <p className="text-3xl text-primary font-mono mb-2">{value}</p>
+            <p className="text-muted text-[15px]">{label}</p>
           </div>
         ))}
       </motion.div>
@@ -63,32 +63,32 @@ export default function Dashboard() {
           className={`lg:col-span-2 ${card} p-8`}
         >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-[#5e4075] text-base">Continue Watching</h2>
-            <Link href="/student/courses" className="text-[#8b6fa0] text-[14px] hover:text-[#5e4075] transition-colors">
+            <h2 className="text-primary text-base">Continue Watching</h2>
+            <Link href="/student/courses" className="text-muted text-[14px] hover:text-primary transition-colors">
               View All →
             </Link>
           </div>
           <div className="flex gap-6 items-center">
-            <div className="relative w-40 h-28 bg-gradient-to-br from-[#5e4075] to-[#3d2652] rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
+            <div className="relative w-40 h-28 bg-linear-to-br from-primary to-[#3d2652] rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
               <div className="relative z-10 w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                 <svg className="w-5 h-5 ml-0.5" viewBox="0 0 16 16" fill="white">
                   <path d="M 5,4 L 13,8 L 5,12 Z" />
                 </svg>
               </div>
               <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20">
-                <div className="h-full bg-[#e9deb5]" style={{ width: `${lastWatched.progress}%` }} />
+                <div className="h-full bg-accent1" style={{ width: `${lastWatched.progress}%` }} />
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[#8b6fa0] text-[14px] mb-2">{lastWatched.courseTitle}</p>
-              <p className="text-[#5e4075] text-[15px] leading-snug mb-4">{lastWatched.topicTitle}</p>
+              <p className="text-muted text-[14px] mb-2">{lastWatched.courseTitle}</p>
+              <p className="text-primary text-[15px] leading-snug mb-4">{lastWatched.topicTitle}</p>
               <div className="flex items-center gap-4">
-                <div className="flex-1 h-2 bg-[#e9deb5] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#5e4075] rounded-full" style={{ width: `${lastWatched.progress}%` }} />
+                <div className="flex-1 h-2 bg-accent1 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full" style={{ width: `${lastWatched.progress}%` }} />
                 </div>
-                <span className="text-[#8b6fa0] text-[14px] font-mono shrink-0">{lastWatched.progress}%</span>
+                <span className="text-muted text-[14px] font-mono shrink-0">{lastWatched.progress}%</span>
               </div>
-              <Link href="/student/courses" className="inline-flex items-center gap-1.5 mt-4 text-[#5e4075] text-[14px] hover:gap-2.5 transition-all">
+              <Link href="/student/courses" className="inline-flex items-center gap-1.5 mt-4 text-primary text-[14px] hover:gap-2.5 transition-all">
                 Resume →
               </Link>
             </div>
@@ -102,7 +102,7 @@ export default function Dashboard() {
           transition={{ duration: 0.4, delay: 0.13 }}
           className={`${card} p-8`}
         >
-          <h2 className="text-[#5e4075] text-base mb-6">Last Test Score</h2>
+          <h2 className="text-primary text-base mb-6">Last Test Score</h2>
           {lastTest && (
             <>
               <div className="relative w-32 h-32 mx-auto mb-6">
@@ -112,15 +112,15 @@ export default function Dashboard() {
                     strokeDasharray={`${(lastTest.percentage! / 100) * 264} 264`} />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl text-[#5e4075] font-mono">{lastTest.percentage}%</span>
-                  <span className="text-[14px] text-[#8b6fa0]">Score</span>
+                  <span className="text-2xl text-primary font-mono">{lastTest.percentage}%</span>
+                  <span className="text-[14px] text-muted">Score</span>
                 </div>
               </div>
-              <p className="text-[#5e4075] text-[14px] text-center line-clamp-1 mb-1">{lastTest.title}</p>
-              <p className="text-[#8b6fa0] text-[14px] text-center">Rank {lastTest.rank}/{lastTest.totalStudents}</p>
+              <p className="text-primary text-[14px] text-center line-clamp-1 mb-1">{lastTest.title}</p>
+              <p className="text-muted text-[14px] text-center">Rank {lastTest.rank}/{lastTest.totalStudents}</p>
               <div className="flex items-center justify-between mt-5 pt-5 border-t border-[#f0e8f8]">
-                <span className="text-[#8b6fa0] text-[14px]">Marks</span>
-                <span className="text-[#5e4075] text-[14px] font-mono">{lastTest.marksObtained}/{lastTest.totalMarks}</span>
+                <span className="text-muted text-[14px]">Marks</span>
+                <span className="text-primary text-[14px] font-mono">{lastTest.marksObtained}/{lastTest.totalMarks}</span>
               </div>
             </>
           )}
@@ -135,8 +135,8 @@ export default function Dashboard() {
         className={`${card} p-8 mb-6`}
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-[#5e4075] text-base">Performance History</h2>
-          <Link href="/student/tests" className="text-[#8b6fa0] text-[14px] hover:text-[#5e4075] transition-colors">
+          <h2 className="text-primary text-base">Performance History</h2>
+          <Link href="/student/tests" className="text-muted text-[14px] hover:text-primary transition-colors">
             View All Tests →
           </Link>
         </div>
@@ -172,11 +172,11 @@ export default function Dashboard() {
           <Link key={href} href={href}
             className={`${card} p-7 hover:shadow-[0_4px_20px_rgba(94,64,117,0.1)] transition-all duration-200 hover:-translate-y-0.5 group`}
           >
-            <div className="text-[#5e4075] mb-4">
+            <div className="text-primary mb-4">
               <Icon className="w-7 h-7" />
             </div>
-            <p className="text-[#5e4075] text-base group-hover:text-[#3d2652] mb-1">{label}</p>
-            <p className="text-[#8b6fa0] text-[14px]">{desc}</p>
+            <p className="text-primary text-base group-hover:text-[#3d2652] mb-1">{label}</p>
+            <p className="text-muted text-[14px]">{desc}</p>
           </Link>
         ))}
       </motion.div>

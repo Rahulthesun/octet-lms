@@ -46,7 +46,7 @@ const socialLinks = [
 
 export default function Footer() {
   return (
-    <footer id="footer" className="relative bg-[#5e4075] text-[#f8f9ed] overflow-hidden">
+    <footer id="footer" className="relative bg-primary text-bg overflow-hidden">
       {/* Logo watermark — swap src to actual logo once available */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
         <svg
@@ -73,23 +73,23 @@ export default function Footer() {
                 <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#f8f9ed" strokeWidth="1.5" transform="rotate(-60 18 18)" />
                 <circle cx="18" cy="18" r="3" fill="#f8f9ed" />
               </svg>
-              <span className="text-[#f8f9ed] text-lg tracking-wide">
-                Chemistry<span className="text-[#c8b8d8]">@</span>OCTET
+              <span className="text-bg text-lg tracking-wide">
+                Chemistry<span className="text-border">@</span>OCTET
               </span>
             </div>
-            <p className="text-[#c8b8d8] text-[15px] leading-relaxed mb-7">
+            <p className="text-border text-[15px] leading-relaxed mb-7">
               Where curiosity meets chemistry. We make 11th and 12th grade chemistry the subject your child masters.
             </p>
-            <p className="text-[#e9deb5] text-[14px] tracking-[0.2em] uppercase">✦ Spread True Science ✦</p>
+            <p className="text-accent1 text-[14px] tracking-[0.2em] uppercase">✦ Spread True Science ✦</p>
           </div>
 
           {/* Courses */}
           <div>
-            <h4 className="text-[#f8f9ed] text-base tracking-wider uppercase mb-7">Courses</h4>
+            <h4 className="text-bg text-base tracking-wider uppercase mb-7">Courses</h4>
             <ul className="space-y-4">
               {['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'JEE Preparation', 'NEET Preparation', 'Board Excellence'].map((c) => (
                 <li key={c}>
-                  <a href="#courses" className="text-[#c8b8d8] text-[15px] hover:text-[#f8f9ed] transition-colors duration-150">
+                  <a href="#courses" className="text-border text-[15px] hover:text-bg transition-colors duration-150">
                     {c}
                   </a>
                 </li>
@@ -99,7 +99,7 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-[#f8f9ed] text-base tracking-wider uppercase mb-7">Quick Links</h4>
+            <h4 className="text-bg text-base tracking-wider uppercase mb-7">Quick Links</h4>
             <ul className="space-y-4">
               {[
                 { label: 'About Us', href: '#about' },
@@ -110,7 +110,7 @@ export default function Footer() {
                 { label: 'Admin Login', href: '/admin' },
               ].map(({ label, href }) => (
                 <li key={label}>
-                  <Link href={href} className="text-[#c8b8d8] text-[15px] hover:text-[#f8f9ed] transition-colors duration-150">
+                  <Link href={href} className="text-border text-[15px] hover:text-bg transition-colors duration-150">
                     {label}
                   </Link>
                 </li>
@@ -120,15 +120,15 @@ export default function Footer() {
 
           {/* Contact & Social */}
           <div>
-            <h4 className="text-[#f8f9ed] text-base tracking-wider uppercase mb-7">Connect</h4>
+            <h4 className="text-bg text-base tracking-wider uppercase mb-7">Connect</h4>
             <ul className="space-y-5 mb-9">
-              <li className="flex items-center gap-3.5 text-[#c8b8d8] text-[15px]">
+              <li className="flex items-center gap-3.5 text-border text-[15px]">
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 16 16" fill="none">
                   <path d="M 2,4 Q 8,9 14,4 M 2,4 L 2,13 L 14,13 L 14,4 Z" stroke="#c8b8d8" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 hello@chemistryoctet.in
               </li>
-              <li className="flex items-center gap-3.5 text-[#c8b8d8] text-[15px]">
+              <li className="flex items-center gap-3.5 text-border text-[15px]">
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 16 16" fill="none">
                   <path d="M 5,2 Q 3,2 2,4 Q 1,6 2,8 Q 4,12 8,14 Q 10,15 12,14 Q 14,13 14,11 Q 14,10 12,9 L 10,8 Q 9,8 9,9 Q 9,10 8,10 Q 5,9 6,6 Q 6,5 7,5 Q 8,5 8,4 L 7,2 Z" stroke="#c8b8d8" strokeWidth="1.2" strokeLinecap="round" />
                 </svg>
@@ -136,14 +136,14 @@ export default function Footer() {
               </li>
             </ul>
 
-            <h4 className="text-[#f8f9ed] text-base tracking-wider uppercase mb-5">Follow Us</h4>
+            <h4 className="text-bg text-base tracking-wider uppercase mb-5">Follow Us</h4>
             <div className="flex gap-3 flex-wrap">
               {socialLinks.map(({ label, Icon }) => (
                 <a
                   key={label}
                   href="#footer"
                   aria-label={label}
-                  className="w-12 h-12 rounded-xl border border-white/15 flex items-center justify-center text-[#c8b8d8] hover:bg-white/10 hover:text-[#f8f9ed] transition-colors duration-200"
+                  className="w-12 h-12 rounded-xl border border-white/15 flex items-center justify-center text-border hover:bg-white/10 hover:text-bg transition-colors duration-200"
                 >
                   <Icon />
                 </a>
@@ -154,12 +154,12 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-5 pt-10">
-          <p className="text-[#8b6fa0] text-[14px]">
+          <p className="text-muted text-[14px]">
             © 2024 Chemistry@OCTET. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
             {['Privacy Policy', 'Terms of Service', 'Refund Policy'].map((link) => (
-              <a key={link} href="#footer" className="text-[#8b6fa0] text-[14px] hover:text-[#c8b8d8] transition-colors duration-150">
+              <a key={link} href="#footer" className="text-muted text-[14px] hover:text-bg transition-colors duration-150">
                 {link}
               </a>
             ))}

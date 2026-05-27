@@ -13,7 +13,7 @@ function VideoPlayer({ topic }: { topic: Topic | null }) {
 
   if (!topic) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-[#8b6fa0] gap-4 min-h-[300px]">
+      <div className="flex-1 flex flex-col items-center justify-center text-muted gap-4 min-h-75">
         <svg className="w-16 h-16 opacity-30" viewBox="0 0 64 64" fill="none">
           <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="2" />
           <path d="M 24,22 L 44,32 L 24,42 Z" fill="currentColor" opacity="0.5" />
@@ -26,7 +26,7 @@ function VideoPlayer({ topic }: { topic: Topic | null }) {
   return (
     <div className="flex-1">
       {/* Video */}
-      <div className="relative aspect-video bg-gradient-to-br from-[#5e4075] to-[#3d2652] rounded-2xl overflow-hidden mb-4">
+      <div className="relative aspect-video bg-linear-to-br from-primary to-[#3d2652] rounded-2xl overflow-hidden mb-4">
         {!playing ? (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer group"
@@ -62,8 +62,8 @@ function VideoPlayer({ topic }: { topic: Topic | null }) {
 
       {/* Topic info */}
       <div>
-        <h3 className="text-[#5e4075] text-base mb-1">{topic.title}</h3>
-        <p className="text-[#8b6fa0] text-[14px]">{topic.duration} · {topic.watched ? 'Watched' : 'Not watched'}</p>
+        <h3 className="text-primary text-base mb-1">{topic.title}</h3>
+        <p className="text-muted text-[14px]">{topic.duration} · {topic.watched ? 'Watched' : 'Not watched'}</p>
       </div>
     </div>
   )
@@ -92,7 +92,7 @@ export default function CoursesPage() {
         {/* Back button */}
         <button
           onClick={() => { setSelectedChapter(null); setSelectedTopic(null) }}
-          className="inline-flex items-center gap-2 text-[#8b6fa0] text-base hover:text-[#5e4075] transition-colors mb-6"
+          className="inline-flex items-center gap-2 text-muted text-base hover:text-primary transition-colors mb-6"
         >
           <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
             <path d="M 13,8 L 3,8 M 7,4 L 3,8 L 7,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -109,8 +109,8 @@ export default function CoursesPage() {
           {/* Right pane — topic list */}
           <div className="w-80 shrink-0 bg-white rounded-2xl border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-[#e2d5f0]">
-              <p className="text-[#8b6fa0] text-[14px] uppercase tracking-wider mb-1">Chapter</p>
-              <h3 className="text-[#5e4075] text-base leading-snug">{selectedChapter.title}</h3>
+              <p className="text-muted text-[14px] uppercase tracking-wider mb-1">Chapter</p>
+              <h3 className="text-primary text-base leading-snug">{selectedChapter.title}</h3>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {selectedChapter.subtopics.map((topic, i) => {
@@ -120,17 +120,17 @@ export default function CoursesPage() {
                     key={topic.id}
                     onClick={() => setSelectedTopic(topic)}
                     className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-150 mb-1 ${
-                      isSelected ? 'bg-[#5e4075]/8' : 'hover:bg-[#e9deb5]/30'
+                      isSelected ? 'bg-primary/8' : 'hover:bg-accent1/30'
                     }`}
                   >
                     {/* Progress line indicator */}
                     <div className="flex flex-col items-center shrink-0 pt-1">
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[14px] ${
                         topic.watched
-                          ? 'bg-[#5e4075] text-[#f8f9ed]'
+                          ? 'bg-primary text-bg'
                           : isSelected
-                          ? 'border-2 border-[#5e4075] text-[#5e4075]'
-                          : 'border border-[#c8b8d8] text-[#c8b8d8]'
+                          ? 'border-2 border-primary text-primary'
+                          : 'border border-border text-border'
                       }`}>
                         {topic.watched ? (
                           <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
@@ -139,14 +139,14 @@ export default function CoursesPage() {
                         ) : i + 1}
                       </div>
                       {i < selectedChapter.subtopics.length - 1 && (
-                        <div className={`w-0.5 h-6 mt-1 ${topic.watched ? 'bg-[#5e4075]/30' : 'bg-[#e9deb5]'}`} />
+                        <div className={`w-0.5 h-6 mt-1 ${topic.watched ? 'bg-primary/30' : 'bg-accent1'}`} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[15px] leading-snug ${isSelected ? 'text-[#5e4075]' : 'text-[#5e4075]/80'}`}>
+                      <p className={`text-[15px] leading-snug ${isSelected ? 'text-primary' : 'text-primary/80'}`}>
                         {topic.title}
                       </p>
-                      <p className="text-[#8b6fa0] text-[14px] mt-0.5 font-mono">{topic.duration}</p>
+                      <p className="text-muted text-[14px] mt-0.5 font-mono">{topic.duration}</p>
                     </div>
                   </button>
                 )
@@ -161,14 +161,14 @@ export default function CoursesPage() {
   return (
     <div className="p-8 lg:p-10 max-w-6xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-2xl text-[#5e4075] mb-1">Courses</h1>
-        <p className="text-[#8b6fa0] text-[14px]">All your chemistry courses in one place</p>
+        <h1 className="text-2xl text-primary mb-1">Courses</h1>
+        <p className="text-muted text-[14px]">All your chemistry courses in one place</p>
       </motion.div>
 
       {/* Search + view toggle */}
       <div className="flex items-center gap-4 mb-6">
         <div className="flex-1 relative">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b6fa0]" viewBox="0 0 16 16" fill="none">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M 11,11 L 14.5,14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
@@ -176,7 +176,7 @@ export default function CoursesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search courses, chapters, or topics..."
-            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-[#c8b8d8] bg-[#fdfcf8] text-[#5e4075] text-base placeholder:text-[#c8b8d8] focus:outline-none focus:border-[#5e4075]/40 focus:ring-2 focus:ring-[#5e4075]/10 transition-all"
+            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all"
           />
         </div>
         <div className="flex items-center gap-1 bg-[#f0e8f8] rounded-xl p-1 border border-[#e2d5f0]">
@@ -185,7 +185,7 @@ export default function CoursesPage() {
               key={v}
               onClick={() => setView(v)}
               className={`px-3 py-1.5 rounded-lg text-[14px] transition-all duration-150 ${
-                view === v ? 'bg-[#f8f9ed] text-[#5e4075] shadow-sm' : 'text-[#8b6fa0] hover:text-[#5e4075]'
+                view === v ? 'bg-bg text-primary shadow-sm' : 'text-muted hover:text-primary'
               }`}
             >
               {v === 'grid' ? (
@@ -218,10 +218,10 @@ export default function CoursesPage() {
             {/* Course header */}
             <div className="p-5 border-b border-[#e2d5f0]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[14px] px-3 py-1.5 rounded-full bg-[#e9deb5]/60 text-[#8b6fa0]">Grade {course.grade}</span>
-                <span className="text-[#8b6fa0] text-[14px]">{course.chapters.length} chapters</span>
+                <span className="text-[14px] px-3 py-1.5 rounded-full bg-accent1/60 text-muted">Grade {course.grade}</span>
+                <span className="text-muted text-[14px]">{course.chapters.length} chapters</span>
               </div>
-              <h3 className="text-[#5e4075] text-base">{course.title}</h3>
+              <h3 className="text-primary text-base">{course.title}</h3>
             </div>
 
             {/* Chapters */}
@@ -243,19 +243,19 @@ export default function CoursesPage() {
                         strokeDasharray={`${(chapter.progress / 100) * 100.5} 100.5`}
                       />
                     </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-[14px] text-[#5e4075] font-mono">
+                    <span className="absolute inset-0 flex items-center justify-center text-[14px] text-primary font-mono">
                       {chapter.progress}%
                     </span>
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-[#5e4075] text-base group-hover:text-[#3d2652] transition-colors">{chapter.title}</p>
-                    <p className="text-[#8b6fa0] text-[14px] mt-0.5">
+                    <p className="text-primary text-base group-hover:text-[#3d2652] transition-colors">{chapter.title}</p>
+                    <p className="text-muted text-[14px] mt-0.5">
                       {chapter.subtopics.length} topics · {chapter.duration}
                     </p>
                   </div>
 
-                  <svg className="w-4 h-4 text-[#c8b8d8] group-hover:text-[#5e4075] transition-colors shrink-0" viewBox="0 0 16 16" fill="none">
+                  <svg className="w-4 h-4 text-border group-hover:text-primary transition-colors shrink-0" viewBox="0 0 16 16" fill="none">
                     <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
@@ -266,7 +266,7 @@ export default function CoursesPage() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-16 text-[#8b6fa0]">
+        <div className="text-center py-16 text-muted">
           <p className="text-[15px]">No courses match your search.</p>
         </div>
       )}

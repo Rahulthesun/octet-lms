@@ -52,7 +52,7 @@ const svgPositions = [
 
 export default function AboutUs() {
   return (
-    <section id="about" className="py-24 px-6 overflow-hidden bg-[#f8f9ed]">
+    <section id="about" className="py-24 px-6 overflow-hidden bg-bg">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -61,11 +61,11 @@ export default function AboutUs() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">Why Choose Us</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight">
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">Why Choose Us</p>
+          <h2 className="text-3xl md:text-4xl text-primary leading-tight">
             The Reason Parents Choose
             <br />
-            Chemistry<span className="text-[#8b6fa0]">@</span>OCTET
+            Chemistry<span className="text-muted">@</span>OCTET
           </h2>
         </motion.div>
 
@@ -76,7 +76,7 @@ export default function AboutUs() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="w-full lg:w-1/2 relative h-[500px] lg:h-[620px]"
+            className="w-full lg:w-1/2 relative h-125 lg:h-155"
           >
             {svgPositions.map(({ top, left, Component, color, size, rotate }, i) => (
               <motion.div
@@ -114,12 +114,12 @@ export default function AboutUs() {
                 transition={{ duration: 0.5, delay: 0.05 * i }}
                 className="flex gap-5 items-start group"
               >
-                <div className="w-14 h-14 rounded-xl bg-[#e9deb5] flex items-center justify-center shrink-0 group-hover:bg-[#ddd0a0] transition-colors duration-200">
+                <div className="w-14 h-14 rounded-xl bg-accent1 flex items-center justify-center shrink-0 group-hover:bg-[#ddd0a0] transition-colors duration-200">
                   <point.Icon width={34} height={34} color="#5e4075" />
                 </div>
                 <div>
-                  <h3 className="text-[#5e4075] text-lg mb-1.5">{point.title}</h3>
-                  <p className="text-[#8b6fa0] text-base leading-relaxed">{point.desc}</p>
+                  <h3 className="text-primary text-lg mb-1.5">{point.title}</h3>
+                  <p className="text-muted text-base leading-relaxed">{point.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -133,7 +133,7 @@ export default function AboutUs() {
             >
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2.5 px-8 py-4 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.25)] hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.25)] hover:-translate-y-0.5"
               >
                 Explore Our Courses
                 <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">

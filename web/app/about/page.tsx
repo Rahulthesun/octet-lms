@@ -81,7 +81,7 @@ const galleryCards = [
 
 function AboutHero() {
   return (
-    <section className="relative flex flex-col items-center justify-center bg-[#f8f9ed] overflow-hidden pt-40 pb-28 px-6 text-center">
+    <section className="relative flex flex-col items-center justify-center bg-bg overflow-hidden pt-40 pb-28 px-6 text-center">
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <svg
@@ -116,10 +116,10 @@ function AboutHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#e9deb5]/60 border border-[#e9deb5] mb-8"
+          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-accent1/60 border border-accent1 mb-8"
         >
-          <span className="w-2 h-2 rounded-full bg-[#5e4075] animate-pulse" />
-          <span className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase">Our Institute</span>
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-[14px] tracking-[0.25em] text-muted uppercase">Our Institute</span>
         </motion.div>
 
         {/* Headline */}
@@ -127,10 +127,10 @@ function AboutHero() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.25 }}
-          className="text-5xl md:text-6xl text-[#5e4075] leading-tight mb-6"
+          className="text-5xl md:text-6xl text-primary leading-tight mb-6"
         >
           Built on Passion.<br />
-          <span className="text-[#8b6fa0] italic">Driven by Purpose.</span>
+          <span className="text-muted italic">Driven by Purpose.</span>
         </motion.h1>
 
         {/* Description */}
@@ -138,7 +138,7 @@ function AboutHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-base text-[#8b6fa0] max-w-2xl mx-auto mb-12 leading-relaxed"
+          className="text-base text-muted max-w-2xl mx-auto mb-12 leading-relaxed"
         >
           Chemistry@OCTET was founded with a single belief — that every student deserves to
           understand chemistry, not just memorise it.
@@ -156,9 +156,9 @@ function AboutHero() {
             { value: '500+', label: 'Students Enrolled'  },
             { value: '2010', label: 'Year Founded'        },
           ].map((s) => (
-            <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-[#d4c5e2]/60 flex items-center gap-2.5">
-              <span className="text-xl font-mono text-[#5e4075]">{s.value}</span>
-              <span className="text-[14px] text-[#8b6fa0]">{s.label}</span>
+            <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-accent3/60 flex items-center gap-2.5">
+              <span className="text-xl font-mono text-primary">{s.value}</span>
+              <span className="text-[14px] text-muted">{s.label}</span>
             </div>
           ))}
         </motion.div>
@@ -180,7 +180,7 @@ function OurStory() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5 }}
-              className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+              className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
             >
               How It Began
             </motion.p>
@@ -189,7 +189,7 @@ function OurStory() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-8"
+              className="text-3xl md:text-4xl text-primary leading-tight mb-8"
             >
               A Classroom That Changed Everything
             </motion.h2>
@@ -205,7 +205,7 @@ function OurStory() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.5, delay: 0.15 + i * 0.12 }}
-                className="text-base text-[#8b6fa0] leading-relaxed mb-5 last:mb-0"
+                className="text-base text-muted leading-relaxed mb-5 last:mb-0"
               >
                 {para}
               </motion.p>
@@ -219,14 +219,14 @@ function OurStory() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5 }}
-              className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-8"
+              className="text-[14px] tracking-[0.25em] text-muted uppercase mb-8"
             >
               Our Milestones
             </motion.p>
 
             <div className="relative">
               {/* Vertical line */}
-              <div className="absolute left-[38px] top-5 bottom-5 w-px bg-[#d4c5e2] hidden sm:block" />
+              <div className="absolute left-9.5 top-5 bottom-5 w-px bg-accent3 hidden sm:block" />
 
               <div className="space-y-6">
                 {milestones.map((m, i) => (
@@ -238,11 +238,11 @@ function OurStory() {
                     transition={{ duration: 0.5, delay: i * 0.12 }}
                     className="flex items-start gap-5"
                   >
-                    <span className="flex-shrink-0 px-3 py-1.5 text-[14px] rounded-full bg-[#e9deb5] text-[#5e4075] font-mono z-10">
+                    <span className="shrink-0 px-3 py-1.5 text-[14px] rounded-full bg-accent1 text-primary font-mono z-10">
                       {m.year}
                     </span>
                     <div className="flex-1 pt-1.5 pb-2">
-                      <p className="text-[15px] text-[#8b6fa0] leading-relaxed">{m.text}</p>
+                      <p className="text-[15px] text-muted leading-relaxed">{m.text}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -262,7 +262,7 @@ function OurStory() {
 
 function Founder() {
   return (
-    <section id="founder" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="founder" className="py-24 px-6 bg-bg">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
@@ -273,7 +273,7 @@ function Founder() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.5 }}
-              className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-10 self-start"
+              className="text-[14px] tracking-[0.25em] text-muted uppercase mb-10 self-start"
             >
               The Founder
             </motion.p>
@@ -302,10 +302,10 @@ function Founder() {
                   />
                 </svg>
                 {/* Cream gap ring */}
-                <div className="w-[220px] h-[220px] rounded-full border-4 border-[#e9deb5] flex items-center justify-center bg-[#f8f9ed]">
+                <div className="w-55 h-55 rounded-full border-4 border-accent1 flex items-center justify-center bg-bg">
                   {/* Purple avatar circle */}
                   <div
-                    className="w-[196px] h-[196px] rounded-full flex items-center justify-center"
+                    className="w-49 h-49 rounded-full flex items-center justify-center"
                     style={{
                       background: 'radial-gradient(circle at 35% 35%, #7a5498 0%, #5e4075 55%, #3d2652 100%)',
                     }}
@@ -316,15 +316,15 @@ function Founder() {
               </div>
 
               {/* Name + role */}
-              <h3 className="text-xl text-[#5e4075] mt-6 mb-1">Mr. A. Raju</h3>
-              <p className="text-[15px] text-[#8b6fa0]">Founder &amp; Lead Educator</p>
+              <h3 className="text-xl text-primary mt-6 mb-1">Mr. A. Raju</h3>
+              <p className="text-[15px] text-muted">Founder &amp; Lead Educator</p>
 
               {/* Credential badges */}
               <div className="flex flex-wrap justify-center gap-2 mt-5">
                 {credentials.map((c) => (
                   <span
                     key={c}
-                    className="px-4 py-2 rounded-full bg-white border border-[#d4c5e2]/60 text-[14px] text-[#8b6fa0]"
+                    className="px-4 py-2 rounded-full bg-white border border-accent3/60 text-[14px] text-muted"
                   >
                     {c}
                   </span>
@@ -340,7 +340,7 @@ function Founder() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-8"
+              className="text-3xl md:text-4xl text-primary leading-tight mb-8"
             >
               The Man Behind<br />Chemistry@OCTET
             </motion.h2>
@@ -356,7 +356,7 @@ function Founder() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.5, delay: 0.15 + i * 0.12 }}
-                className="text-base text-[#8b6fa0] leading-relaxed mb-5 last:mb-0"
+                className="text-base text-muted leading-relaxed mb-5 last:mb-0"
               >
                 {para}
               </motion.p>
@@ -368,13 +368,13 @@ function Founder() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="border-l-4 border-[#e9deb5] pl-6 py-2 mt-10"
+              className="border-l-4 border-accent1 pl-6 py-2 mt-10"
             >
-              <p className="text-lg text-[#5e4075] leading-relaxed italic mb-3">
+              <p className="text-lg text-primary leading-relaxed italic mb-3">
                 &ldquo;Chemistry is not a collection of facts. It is a language — and I want every
                 student to become fluent in it.&rdquo;
               </p>
-              <cite className="text-[14px] text-[#8b6fa0] not-italic">
+              <cite className="text-[14px] text-muted not-italic">
                 — Mr. A. Raju, Founder
               </cite>
             </motion.blockquote>
@@ -395,7 +395,7 @@ function VisionMission() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
           >
             Our Purpose
           </motion.p>
@@ -404,7 +404,7 @@ function VisionMission() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-4xl text-[#5e4075] leading-tight"
+            className="text-3xl md:text-4xl text-primary leading-tight"
           >
             What Drives Us Every Day
           </motion.h2>
@@ -419,7 +419,7 @@ function VisionMission() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="relative bg-[#5e4075] rounded-2xl p-10 overflow-hidden"
+            className="relative bg-primary rounded-2xl p-10 overflow-hidden"
           >
             {/* Decorative SVG */}
             <div className="absolute top-4 right-4" style={{ opacity: 0.15 }}>
@@ -446,19 +446,19 @@ function VisionMission() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative bg-[#e9deb5]/40 border border-[#e9deb5] rounded-2xl p-10 overflow-hidden"
+            className="relative bg-accent1/40 border border-accent1 rounded-2xl p-10 overflow-hidden"
           >
             <div className="absolute top-4 right-4" style={{ opacity: 0.12 }}>
               <FlaskSVG width={110} height={110} color="#5e4075" />
             </div>
             <div className="relative z-10">
-              <p className="text-[14px] tracking-[0.2em] text-[#8b6fa0] uppercase mb-5">
+              <p className="text-[14px] tracking-[0.2em] text-muted uppercase mb-5">
                 Mission
               </p>
-              <h3 className="text-2xl text-[#5e4075] leading-snug mb-5">
+              <h3 className="text-2xl text-primary leading-snug mb-5">
                 Conceptual Chemistry for Every Student.
               </h3>
-              <p className="text-[15px] text-[#8b6fa0] leading-relaxed">
+              <p className="text-[15px] text-muted leading-relaxed">
                 To make chemistry education accessible, engaging, and genuinely effective — for JEE,
                 NEET, CBSE, and TN Board students — through patient teaching, structured resources,
                 and a commitment to understanding over memorisation.
@@ -475,13 +475,13 @@ function VisionMission() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="flex items-center justify-center gap-3 flex-wrap"
         >
-          <span className="text-[14px] text-[#8b6fa0] mr-2">Core Values:</span>
+          <span className="text-[14px] text-muted mr-2">Core Values:</span>
           {values.map((v) => (
             <span
               key={v}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#f8f9ed] border border-[#d4c5e2]/60 text-[14px] text-[#8b6fa0]"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-bg border border-accent3/60 text-[14px] text-muted"
             >
-              <IconCheck className="w-3.5 h-3.5 text-[#5e4075]" />
+              <IconCheck className="w-3.5 h-3.5 text-primary" />
               {v}
             </span>
           ))}
@@ -493,7 +493,7 @@ function VisionMission() {
 
 function Gallery() {
   return (
-    <section id="gallery" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="gallery" className="py-24 px-6 bg-bg">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-14">
           <motion.p
@@ -501,7 +501,7 @@ function Gallery() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
           >
             Life at OCTET
           </motion.p>
@@ -510,7 +510,7 @@ function Gallery() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-5"
+            className="text-3xl md:text-4xl text-primary leading-tight mb-5"
           >
             Moments from Our Classrooms
           </motion.h2>
@@ -519,7 +519,7 @@ function Gallery() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-[14px] text-[#8b6fa0] italic"
+            className="text-[14px] text-muted italic"
           >
             Photos coming soon — this space will showcase real moments from our classes, events, and student milestones.
           </motion.p>
@@ -534,7 +534,7 @@ function Gallery() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true, margin: '-40px' }}
               transition={{ duration: 0.45, delay: i * 0.08 }}
-              className="relative rounded-2xl overflow-hidden min-h-[200px] flex flex-col items-center justify-center"
+              className="relative rounded-2xl overflow-hidden min-h-50 flex flex-col items-center justify-center"
               style={{ backgroundColor: card.accent }}
             >
               {/* Background SVG / icon */}
@@ -542,19 +542,19 @@ function Gallery() {
                 {card.Svg ? (
                   <card.Svg width={90} height={90} color="#5e4075" />
                 ) : card.Icon ? (
-                  <card.Icon className="w-20 h-20 text-[#5e4075]" />
+                  <card.Icon className="w-20 h-20 text-primary" />
                 ) : null}
               </div>
 
               {/* Label overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#5e4075]/25 to-transparent">
-                <p className="text-[14px] text-[#5e4075]">{card.label}</p>
-                <p className="text-[14px] text-[#8b6fa0]/80 italic">{card.sub}</p>
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-linear-to-t from-primary/25 to-transparent">
+                <p className="text-[14px] text-primary">{card.label}</p>
+                <p className="text-[14px] text-muted/80 italic">{card.sub}</p>
               </div>
 
               {/* "Photo coming soon" badge */}
               <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/50 backdrop-blur-sm">
-                <span className="text-[14px] text-[#8b6fa0]">Coming soon</span>
+                <span className="text-[14px] text-muted">Coming soon</span>
               </div>
             </motion.div>
           ))}
@@ -565,7 +565,7 @@ function Gallery() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="text-center text-[14px] text-[#8b6fa0] italic mt-10"
+          className="text-center text-[14px] text-muted italic mt-10"
         >
           Real photographs will be added as the gallery grows.
         </motion.p>
@@ -583,7 +583,7 @@ function AboutCTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.6 }}
-          className="relative bg-[#e9deb5]/30 border border-[#e9deb5] rounded-3xl p-16 max-w-3xl mx-auto text-center overflow-hidden"
+          className="relative bg-accent1/30 border border-accent1 rounded-3xl p-16 max-w-3xl mx-auto text-center overflow-hidden"
         >
           <div className="absolute top-4 right-4" style={{ opacity: 0.13 }}>
             <AtomSVG width={110} height={110} color="#5e4075" />
@@ -593,23 +593,23 @@ function AboutCTA() {
           </div>
 
           <div className="relative z-10">
-            <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-4">Join Our Story</p>
-            <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-4">
+            <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-4">Join Our Story</p>
+            <h2 className="text-3xl md:text-4xl text-primary leading-tight mb-4">
               Become Part of Chemistry@OCTET
             </h2>
-            <p className="text-base text-[#8b6fa0] mb-10 max-w-md mx-auto">
+            <p className="text-base text-muted mb-10 max-w-md mx-auto">
               The same passion that built this institute is poured into every class, every note, and every session.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <Link
                 href="/register"
-                className="px-8 py-3.5 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)]"
+                className="px-8 py-3.5 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)]"
               >
                 Enroll Now
               </Link>
               <Link
                 href="/learn"
-                className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:bg-[#e9deb5]/40 transition-all duration-200"
+                className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:bg-accent1/40 transition-all duration-200"
               >
                 How We Teach
               </Link>
@@ -625,7 +625,7 @@ function AboutCTA() {
 
 export default function AboutPage() {
   return (
-    <main className="bg-[#f8f9ed] min-h-screen">
+    <main className="bg-bg min-h-screen">
       <Navbar />
       <AboutHero />
       <OurStory />

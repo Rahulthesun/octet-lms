@@ -27,8 +27,8 @@ function AttendanceRing({ percentage, label, color }: { percentage: number; labe
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl text-[#5e4075] font-mono">{percentage}%</span>
-          <span className="text-[14px] text-[#8b6fa0]">{label}</span>
+          <span className="text-2xl text-primary font-mono">{percentage}%</span>
+          <span className="text-[14px] text-muted">{label}</span>
         </div>
       </div>
     </div>
@@ -41,8 +41,8 @@ export default function AttendancePage() {
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-2xl text-[#5e4075] mb-1">Attendance</h1>
-        <p className="text-[#8b6fa0] text-[14px]">Track your online and offline class attendance</p>
+        <h1 className="text-2xl text-primary mb-1">Attendance</h1>
+        <p className="text-muted text-[14px]">Track your online and offline class attendance</p>
       </motion.div>
 
       {/* Overview cards */}
@@ -56,24 +56,24 @@ export default function AttendancePage() {
           <div className="flex items-center gap-6">
             <AttendanceRing percentage={attendance.online.percentage} label="Online" color="#5e4075" />
             <div className="flex-1">
-              <h3 className="text-[#5e4075] text-base mb-4">Online Classes</h3>
+              <h3 className="text-primary text-base mb-4">Online Classes</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Total Classes</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.online.total}</span>
+                  <span className="text-muted text-base">Total Classes</span>
+                  <span className="text-primary text-base font-mono">{attendance.online.total}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Attended</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.online.attended}</span>
+                  <span className="text-muted text-base">Attended</span>
+                  <span className="text-primary text-base font-mono">{attendance.online.attended}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Absent</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.online.total - attendance.online.attended}</span>
+                  <span className="text-muted text-base">Absent</span>
+                  <span className="text-primary text-base font-mono">{attendance.online.total - attendance.online.attended}</span>
                 </div>
               </div>
-              <div className="mt-4 h-2 bg-[#e9deb5]/50 rounded-full overflow-hidden">
+              <div className="mt-4 h-2 bg-accent1/50 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#5e4075] rounded-full transition-all duration-1000"
+                  className="h-full bg-primary rounded-full transition-all duration-1000"
                   style={{ width: `${attendance.online.percentage}%` }}
                 />
               </div>
@@ -90,24 +90,24 @@ export default function AttendancePage() {
           <div className="flex items-center gap-6">
             <AttendanceRing percentage={attendance.offline.percentage} label="Offline" color="#8b6fa0" />
             <div className="flex-1">
-              <h3 className="text-[#5e4075] text-base mb-4">Offline Classes</h3>
+              <h3 className="text-primary text-base mb-4">Offline Classes</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Total Classes</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.offline.total}</span>
+                  <span className="text-muted text-base">Total Classes</span>
+                  <span className="text-primary text-base font-mono">{attendance.offline.total}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Attended</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.offline.attended}</span>
+                  <span className="text-muted text-base">Attended</span>
+                  <span className="text-primary text-base font-mono">{attendance.offline.attended}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8b6fa0] text-base">Absent</span>
-                  <span className="text-[#5e4075] text-base font-mono">{attendance.offline.total - attendance.offline.attended}</span>
+                  <span className="text-muted text-base">Absent</span>
+                  <span className="text-primary text-base font-mono">{attendance.offline.total - attendance.offline.attended}</span>
                 </div>
               </div>
-              <div className="mt-4 h-2 bg-[#e9deb5]/50 rounded-full overflow-hidden">
+              <div className="mt-4 h-2 bg-accent1/50 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#8b6fa0] rounded-full transition-all duration-1000"
+                  className="h-full bg-muted rounded-full transition-all duration-1000"
                   style={{ width: `${attendance.offline.percentage}%` }}
                 />
               </div>
@@ -124,15 +124,15 @@ export default function AttendancePage() {
         className="bg-white rounded-2xl p-6 border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] mb-6"
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-[#5e4075] text-base">Monthly Attendance (%)</h2>
+          <h2 className="text-primary text-base">Monthly Attendance (%)</h2>
           <div className="flex items-center gap-4 text-[14px]">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#5e4075]" />
-              <span className="text-[#8b6fa0]">Online</span>
+              <div className="w-3 h-3 rounded-sm bg-primary" />
+              <span className="text-muted">Online</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#8b6fa0]" />
-              <span className="text-[#8b6fa0]">Offline</span>
+              <div className="w-3 h-3 rounded-sm bg-muted" />
+              <span className="text-muted">Offline</span>
             </div>
           </div>
         </div>
@@ -161,11 +161,11 @@ export default function AttendancePage() {
       >
         <button
           onClick={() => setShowHistory(!showHistory)}
-          className="w-full flex items-center justify-between p-5 hover:bg-[#e9deb5]/10 transition-colors"
+          className="w-full flex items-center justify-between p-5 hover:bg-accent1/10 transition-colors"
         >
-          <h2 className="text-[#5e4075] text-base">Attendance History</h2>
+          <h2 className="text-primary text-base">Attendance History</h2>
           <svg
-            className={`w-5 h-5 text-[#8b6fa0] transition-transform duration-200 ${showHistory ? 'rotate-180' : ''}`}
+            className={`w-5 h-5 text-muted transition-transform duration-200 ${showHistory ? 'rotate-180' : ''}`}
             viewBox="0 0 20 20" fill="none"
           >
             <path d="M 5,8 L 10,13 L 15,8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -177,7 +177,7 @@ export default function AttendancePage() {
             {attendance.history.map((record) => (
               <div key={record.id} className="flex items-center gap-4 px-5 py-3.5">
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                  record.status === 'present' ? 'bg-[#daeae4]/60 text-[#3d7a5e]' : 'bg-[#d4c5e2]/60 text-[#c06060]'
+                  record.status === 'present' ? 'bg-accent2/60 text-[#3d7a5e]' : 'bg-accent3/60 text-[#c06060]'
                 }`}>
                   {record.status === 'present' ? (
                     <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
@@ -192,22 +192,22 @@ export default function AttendancePage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-[#5e4075] text-[15px]">
+                  <p className="text-primary text-[15px]">
                     Arjun Sharma was marked{' '}
                     <span className={record.status === 'present' ? 'text-[#3d7a5e]' : 'text-[#7a3d3d]'}>
                       {record.status}
                     </span>{' '}
                     for{' '}
-                    <span className="text-[#8b6fa0]">{record.type}</span> class
+                    <span className="text-muted">{record.type}</span> class
                   </p>
-                  <p className="text-[#c8b8d8] text-[14px] font-mono mt-0.5">
+                  <p className="text-border text-[14px] font-mono mt-0.5">
                     {record.date} at {record.time}
                   </p>
                 </div>
                 <span className={`text-[14px] px-3 py-1.5 rounded-full ${
                   record.type === 'online'
-                    ? 'bg-[#e9deb5]/60 text-[#5e4075]'
-                    : 'bg-[#daeae4]/60 text-[#3d7a5e]'
+                    ? 'bg-accent1/60 text-primary'
+                    : 'bg-accent2/60 text-[#3d7a5e]'
                 }`}>
                   {record.type}
                 </span>

@@ -7,7 +7,7 @@ export default function VideoSection() {
   const [playing, setPlaying] = useState(false)
 
   return (
-    <section id="video" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="video" className="py-24 px-6 bg-bg">
       <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -16,13 +16,13 @@ export default function VideoSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-14"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">See It in Action</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4">
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">See It in Action</p>
+          <h2 className="text-3xl md:text-4xl text-primary mb-4">
             Watch How We Teach Chemistry
             <br />
-            <span className="text-[#8b6fa0]">Differently</span>
+            <span className="text-muted">Differently</span>
           </h2>
-          <p className="text-[#8b6fa0] text-base max-w-md mx-auto">
+          <p className="text-muted text-base max-w-md mx-auto">
             A 3-minute demo of a live lecture. No memorisation, pure understanding.
           </p>
         </motion.div>
@@ -42,10 +42,10 @@ export default function VideoSection() {
             <path d="M 56,8 L 56,56 L 8,56" stroke="#daeae4" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
 
-          <div className="relative rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(94,64,117,0.18)] border border-[#d4c5e2]/50">
+          <div className="relative rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(94,64,117,0.18)] border border-accent3/50">
             {!playing ? (
               <div
-                className="relative aspect-video bg-linear-to-br from-[#5e4075] to-[#3d2652] flex items-center justify-center cursor-pointer group"
+                className="relative aspect-video bg-linear-to-br from-primary to-[#3d2652] flex items-center justify-center cursor-pointer group"
                 onClick={() => setPlaying(true)}
               >
                 <div className="absolute inset-0 opacity-15">
@@ -65,7 +65,7 @@ export default function VideoSection() {
                   whileTap={{ scale: 0.96 }}
                   className="relative z-10 flex flex-col items-center gap-4"
                 >
-                  <div className="w-20 h-20 rounded-full bg-[#f8f9ed]/90 flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.3)] group-hover:bg-white transition-colors duration-200">
+                  <div className="w-20 h-20 rounded-full bg-bg/90 flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.3)] group-hover:bg-white transition-colors duration-200">
                     <svg className="w-8 h-8 ml-1" viewBox="0 0 32 32" fill="none">
                       <path d="M 10,7 L 26,16 L 10,25 Z" fill="#5e4075" />
                     </svg>
@@ -107,8 +107,8 @@ export default function VideoSection() {
             { num: '92%', label: 'Score 85+ in Boards' },
           ].map(({ num, label }) => (
             <div key={label} className="text-center">
-              <p className="text-3xl md:text-4xl text-[#5e4075] font-mono">{num}</p>
-              <p className="text-[#8b6fa0] text-base mt-1">{label}</p>
+              <p className="text-3xl md:text-4xl text-primary font-mono">{num}</p>
+              <p className="text-muted text-base mt-1">{label}</p>
             </div>
           ))}
         </motion.div>

@@ -338,7 +338,7 @@ const tabs = [
 function SyllabusTab() {
   return (
     <div>
-      <p className="text-base text-[#8b6fa0] leading-relaxed mb-8 max-w-2xl">
+      <p className="text-base text-muted leading-relaxed mb-8 max-w-2xl">
         Curriculum changes across NCERT, CBSE, TN State Board, JEE and NEET — explained so you know
         exactly what has changed and how it affects your preparation this year.
       </p>
@@ -350,26 +350,26 @@ function SyllabusTab() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-20px' }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.2) }}
-            className="bg-white border border-[#d4c5e2]/60 rounded-2xl p-7 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
+            className="bg-white border border-accent3/60 rounded-2xl p-7 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
           >
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className={`px-3 py-1.5 rounded-full text-[14px] ${typeStyles[update.type]}`}>
                 {update.type}
               </span>
-              <span className="px-3 py-1.5 rounded-full text-[14px] bg-[#f8f9ed] border border-[#d4c5e2]/60 text-[#8b6fa0]">
+              <span className="px-3 py-1.5 rounded-full text-[14px] bg-bg border border-accent3/60 text-muted">
                 {update.board}
               </span>
-              <span className="px-3 py-1.5 rounded-full text-[14px] bg-[#f8f9ed] border border-[#d4c5e2]/60 text-[#8b6fa0]">
+              <span className="px-3 py-1.5 rounded-full text-[14px] bg-bg border border-accent3/60 text-muted">
                 {update.grade}
               </span>
             </div>
-            <h3 className="text-xl text-[#5e4075] leading-snug mb-3">{update.title}</h3>
-            <p className="text-[15px] text-[#8b6fa0] leading-relaxed mb-4">{update.description}</p>
-            <p className="text-[14px] text-[#8b6fa0]/60">Updated: {update.date}</p>
+            <h3 className="text-xl text-primary leading-snug mb-3">{update.title}</h3>
+            <p className="text-[15px] text-muted leading-relaxed mb-4">{update.description}</p>
+            <p className="text-[14px] text-muted/60">Updated: {update.date}</p>
           </motion.div>
         ))}
       </div>
-      <p className="text-[14px] text-[#8b6fa0]/60 italic mt-8 text-center">
+      <p className="text-[14px] text-muted/60 italic mt-8 text-center">
         Syllabus information is sourced from official board notifications and is updated as new announcements are made.
       </p>
     </div>
@@ -379,7 +379,7 @@ function SyllabusTab() {
 function BlogTab() {
   return (
     <div>
-      <p className="text-base text-[#8b6fa0] leading-relaxed mb-8 max-w-2xl">
+      <p className="text-base text-muted leading-relaxed mb-8 max-w-2xl">
         In-depth chemistry articles, exam strategies and study guides — written to help you understand
         concepts deeply and perform better in every exam you take.
       </p>
@@ -391,26 +391,26 @@ function BlogTab() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-20px' }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.2) }}
-            className="bg-white border border-[#d4c5e2]/60 rounded-2xl p-7 flex flex-col hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
+            className="bg-white border border-accent3/60 rounded-2xl p-7 flex flex-col hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
           >
             <span
-              className="inline-block self-start px-3 py-1.5 rounded-full text-[14px] text-[#5e4075] mb-4"
+              className="inline-block self-start px-3 py-1.5 rounded-full text-[14px] text-primary mb-4"
               style={{ backgroundColor: article.categoryBg }}
             >
               {article.category}
             </span>
-            <h3 className="text-xl text-[#5e4075] leading-snug mb-3 flex-1">
+            <h3 className="text-xl text-primary leading-snug mb-3 flex-1">
               {article.title}
             </h3>
-            <p className="text-[15px] text-[#8b6fa0] leading-relaxed mb-5">{article.excerpt}</p>
-            <div className="flex items-center justify-between pt-4 border-t border-[#e9deb5]/60 mt-auto">
-              <span className="text-[14px] text-[#8b6fa0]/70">{article.readTime}</span>
-              <span className="text-[14px] text-[#8b6fa0]/55 italic">Coming soon</span>
+            <p className="text-[15px] text-muted leading-relaxed mb-5">{article.excerpt}</p>
+            <div className="flex items-center justify-between pt-4 border-t border-accent1/60 mt-auto">
+              <span className="text-[14px] text-muted/70">{article.readTime}</span>
+              <span className="text-[14px] text-muted/55 italic">Coming soon</span>
             </div>
           </motion.div>
         ))}
       </div>
-      <p className="text-[14px] text-[#8b6fa0]/60 italic mt-8 text-center">
+      <p className="text-[14px] text-muted/60 italic mt-8 text-center">
         Articles are published regularly. Check back for new content or reach out to suggest a topic.
       </p>
     </div>
@@ -420,7 +420,7 @@ function BlogTab() {
 function ExamsTab() {
   return (
     <div>
-      <p className="text-base text-[#8b6fa0] leading-relaxed mb-8 max-w-2xl">
+      <p className="text-base text-muted leading-relaxed mb-8 max-w-2xl">
         Key dates for board exams, JEE and NEET — registration windows, exam dates and result timelines
         all in one place. Always verify on the official board or NTA website before acting.
       </p>
@@ -441,23 +441,23 @@ function ExamsTab() {
               style={{ backgroundColor: group.accentBg }}
             >
               <div>
-                <h3 className="text-xl text-[#5e4075]">{group.exam}</h3>
-                <p className="text-[14px] text-[#8b6fa0] mt-0.5">{group.board}</p>
+                <h3 className="text-xl text-primary">{group.exam}</h3>
+                <p className="text-[14px] text-muted mt-0.5">{group.board}</p>
               </div>
             </div>
             {/* Events */}
-            <div className="bg-white divide-y divide-[#e9deb5]/60">
+            <div className="bg-white divide-y divide-accent1/60">
               {group.events.map((event, j) => (
                 <div
                   key={j}
                   className="px-7 py-4 flex items-center justify-between gap-4 flex-wrap"
                 >
-                  <span className="text-[15px] text-[#5e4075] flex-1 min-w-[160px]">
+                  <span className="text-[15px] text-primary flex-1 min-w-40">
                     {event.event}
                   </span>
-                  <span className="text-[15px] text-[#8b6fa0]">{event.date}</span>
+                  <span className="text-[15px] text-muted">{event.date}</span>
                   <span
-                    className={`px-3 py-1.5 rounded-full text-[14px] flex-shrink-0 ${statusStyles[event.status]}`}
+                    className={`px-3 py-1.5 rounded-full text-[14px] shrink-0 ${statusStyles[event.status]}`}
                   >
                     {event.status}
                   </span>
@@ -467,7 +467,7 @@ function ExamsTab() {
           </motion.div>
         ))}
       </div>
-      <p className="text-[14px] text-[#8b6fa0]/60 italic mt-8 text-center">
+      <p className="text-[14px] text-muted/60 italic mt-8 text-center">
         Dates marked "Tentative" are estimated from previous year patterns. Verify on the official board or NTA website.
       </p>
     </div>
@@ -477,7 +477,7 @@ function ExamsTab() {
 function NotificationsTab() {
   return (
     <div>
-      <p className="text-base text-[#8b6fa0] leading-relaxed mb-8 max-w-2xl">
+      <p className="text-base text-muted leading-relaxed mb-8 max-w-2xl">
         The latest on exam notifications, registration windows, new batches at Chemistry@OCTET and everything
         else a chemistry student needs to know — in one feed.
       </p>
@@ -489,34 +489,34 @@ function NotificationsTab() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-20px' }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.2) }}
-            className="bg-white border border-[#d4c5e2]/60 rounded-2xl px-7 py-5 hover:shadow-[0_4px_20px_rgba(94,64,117,0.07)] transition-shadow duration-300"
+            className="bg-white border border-accent3/60 rounded-2xl px-7 py-5 hover:shadow-[0_4px_20px_rgba(94,64,117,0.07)] transition-shadow duration-300"
           >
             <div className="flex items-start gap-5">
               {/* Date column — desktop */}
-              <div className="hidden sm:flex flex-col items-end flex-shrink-0 pt-0.5" style={{ minWidth: '100px' }}>
-                <span className="text-[14px] text-[#8b6fa0]/65 leading-snug text-right">{item.date}</span>
+              <div className="hidden sm:flex flex-col items-end shrink-0 pt-0.5" style={{ minWidth: '100px' }}>
+                <span className="text-[14px] text-muted/65 leading-snug text-right">{item.date}</span>
               </div>
               {/* Divider */}
-              <div className="hidden sm:block w-px self-stretch bg-[#d4c5e2] flex-shrink-0" />
+              <div className="hidden sm:block w-px self-stretch bg-accent3 shrink-0" />
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span
-                    className="px-3 py-1 rounded-full text-[14px] text-[#5e4075] flex-shrink-0"
+                    className="px-3 py-1 rounded-full text-[14px] text-primary shrink-0"
                     style={{ backgroundColor: item.categoryBg }}
                   >
                     {item.category}
                   </span>
                   {item.isNew && (
-                    <span className="px-2.5 py-1 rounded-full text-[14px] bg-[#5e4075] text-white flex-shrink-0">
+                    <span className="px-2.5 py-1 rounded-full text-[14px] bg-primary text-white shrink-0">
                       New
                     </span>
                   )}
                   {/* Date — mobile only */}
-                  <span className="text-[14px] text-[#8b6fa0]/65 sm:hidden">{item.date}</span>
+                  <span className="text-[14px] text-muted/65 sm:hidden">{item.date}</span>
                 </div>
-                <h3 className="text-base text-[#5e4075] mb-1.5">{item.title}</h3>
-                <p className="text-[15px] text-[#8b6fa0] leading-relaxed">{item.description}</p>
+                <h3 className="text-base text-primary mb-1.5">{item.title}</h3>
+                <p className="text-[15px] text-muted leading-relaxed">{item.description}</p>
               </div>
             </div>
           </motion.div>
@@ -554,11 +554,11 @@ export default function ResourcesPage() {
   }
 
   return (
-    <main className="bg-[#f8f9ed] min-h-screen">
+    <main className="bg-bg min-h-screen">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-[#f8f9ed]">
+      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
         <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
           <MicroscopeSVG width={180} height={180} color="#5e4075" />
         </div>
@@ -576,29 +576,29 @@ export default function ResourcesPage() {
             transition={{ duration: 0.5 }}
             className="flex items-center justify-center gap-2.5 mb-5"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
+            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
               Resources &amp; Guidance
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-[#5e4075] leading-tight mb-6"
+            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
           >
             Stay Informed.
             <br />
-            <span className="text-[#8b6fa0]">Stay Ahead.</span>
+            <span className="text-muted">Stay Ahead.</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-[#8b6fa0] max-w-2xl mx-auto leading-relaxed mb-10"
+            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
           >
             Your one-stop chemistry guidance centre — syllabus updates, study articles, exam schedules
             and important notifications, all in one place.
@@ -617,10 +617,10 @@ export default function ResourcesPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="px-6 py-3.5 bg-white border border-[#e9deb5] rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
+                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
               >
-                <div className="text-xl text-[#5e4075]">{s.value}</div>
-                <div className="text-[14px] text-[#8b6fa0]">{s.label}</div>
+                <div className="text-xl text-primary">{s.value}</div>
+                <div className="text-[14px] text-muted">{s.label}</div>
               </div>
             ))}
           </motion.div>
@@ -644,8 +644,8 @@ export default function ResourcesPage() {
                 onClick={() => handleTabChange(id)}
                 className={`flex items-center gap-2 px-6 py-3 rounded-full text-base transition-all duration-200 ${
                   activeTab === id
-                    ? 'bg-[#5e4075] text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
-                    : 'bg-white border border-[#d4c5e2] text-[#8b6fa0] hover:border-[#5e4075]/40 hover:text-[#5e4075]'
+                    ? 'bg-primary text-white shadow-[0_2px_12px_rgba(94,64,117,0.25)]'
+                    : 'bg-white border border-accent3 text-muted hover:border-primary/40 hover:text-primary'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -676,27 +676,27 @@ export default function ResourcesPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.5 }}
-          className="max-w-3xl mx-auto text-center bg-[#e9deb5]/30 border border-[#e9deb5] rounded-3xl p-12 relative overflow-hidden"
+          className="max-w-3xl mx-auto text-center bg-accent1/30 border border-accent1 rounded-3xl p-12 relative overflow-hidden"
         >
           <div className="absolute top-4 right-6 opacity-[0.08] pointer-events-none">
             <FlaskSVG width={120} height={120} color="#5e4075" />
           </div>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4 relative">
+          <h2 className="text-3xl md:text-4xl text-primary mb-4 relative">
             Have a Specific Question?
           </h2>
-          <p className="text-base text-[#8b6fa0] mb-8 relative">
+          <p className="text-base text-muted mb-8 relative">
             Reach out to us directly — we are happy to guide you on courses, exams, or anything chemistry-related.
           </p>
           <div className="flex flex-wrap gap-4 justify-center relative">
             <Link
               href="/register"
-              className="px-8 py-3.5 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
+              className="px-8 py-3.5 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
             >
               Enroll Now
             </Link>
             <a
               href="/#footer"
-              className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:border-[#5e4075]/60 transition-all duration-200"
+              className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:border-primary/60 transition-all duration-200"
             >
               Contact Us
             </a>

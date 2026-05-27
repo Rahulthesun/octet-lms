@@ -172,7 +172,7 @@ function ResultsCarousel() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="text-[14px] tracking-[0.25em] text-[#e9deb5]/60 uppercase mb-3"
+            className="text-[14px] tracking-[0.25em] text-accent1/60 uppercase mb-3"
           >
             Top Results
           </motion.p>
@@ -201,9 +201,9 @@ function ResultsCarousel() {
             >
               <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 p-8 md:p-10 rounded-3xl bg-white/[0.07] border border-white/10">
                 {/* Initials avatar */}
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <div
-                    className="w-24 h-24 rounded-full flex items-center justify-center text-2xl font-mono text-[#5e4075]"
+                    className="w-24 h-24 rounded-full flex items-center justify-center text-2xl font-mono text-primary"
                     style={{ backgroundColor: slide.accentBg }}
                   >
                     {slide.initials}
@@ -211,7 +211,7 @@ function ResultsCarousel() {
                 </div>
                 {/* Content */}
                 <div className="flex-1 text-center md:text-left">
-                  <p className="text-[14px] tracking-[0.15em] text-[#e9deb5]/55 uppercase mb-1.5">
+                  <p className="text-[14px] tracking-[0.15em] text-accent1/55 uppercase mb-1.5">
                     {slide.exam} &middot; {slide.year}
                   </p>
                   <h3 className="text-2xl md:text-3xl text-white mb-3">{slide.name}</h3>
@@ -250,7 +250,7 @@ function ResultsCarousel() {
                 aria-label={`Go to slide ${i + 1}`}
                 className={`rounded-full transition-all duration-300 ${
                   i === current
-                    ? 'w-6 h-1.5 bg-[#e9deb5]'
+                    ? 'w-6 h-1.5 bg-accent1'
                     : 'w-1.5 h-1.5 bg-white/25 hover:bg-white/50'
                 }`}
               />
@@ -294,11 +294,11 @@ function ResultsSummary() {
           transition={{ duration: 0.5 }}
           className="text-center mb-14"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">Our Numbers</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-4">
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">Our Numbers</p>
+          <h2 className="text-3xl md:text-4xl text-primary leading-tight mb-4">
             Results That Speak for Themselves
           </h2>
-          <p className="text-base text-[#8b6fa0] max-w-xl mx-auto">
+          <p className="text-base text-muted max-w-xl mx-auto">
             Five years of consistent performance across board exams, JEE and NEET.
           </p>
         </motion.div>
@@ -312,10 +312,10 @@ function ResultsSummary() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-20px' }}
               transition={{ duration: 0.4, delay: i * 0.06 }}
-              className="bg-[#f8f9ed] border border-[#d4c5e2]/60 rounded-2xl p-7 text-center hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(94,64,117,0.09)] transition-all duration-300"
+              className="bg-bg border border-accent3/60 rounded-2xl p-7 text-center hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(94,64,117,0.09)] transition-all duration-300"
             >
-              <div className="text-4xl text-[#5e4075] mb-2">{stat.value}</div>
-              <div className="text-base text-[#8b6fa0]">{stat.label}</div>
+              <div className="text-4xl text-primary mb-2">{stat.value}</div>
+              <div className="text-base text-muted">{stat.label}</div>
             </motion.div>
           ))}
         </div>
@@ -329,10 +329,10 @@ function ResultsSummary() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="bg-[#f8f9ed] border border-[#d4c5e2]/60 rounded-2xl p-8"
+            className="bg-bg border border-accent3/60 rounded-2xl p-8"
           >
-            <p className="text-[14px] tracking-[0.1em] text-[#8b6fa0] uppercase mb-1">Year-wise Performance</p>
-            <h3 className="text-xl text-[#5e4075] mb-8 leading-snug">
+            <p className="text-[14px] tracking-widest text-muted uppercase mb-1">Year-wise Performance</p>
+            <h3 className="text-xl text-primary mb-8 leading-snug">
               Avg. Chemistry Score — Board Exams
             </h3>
 
@@ -342,7 +342,7 @@ function ResultsSummary() {
                 const barH = Math.round((bar.value / maxBoard) * BAR_H)
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-[14px] text-[#5e4075]">{bar.value}%</span>
+                    <span className="text-[14px] text-primary">{bar.value}%</span>
                     <div className="w-full flex items-end" style={{ height: `${BAR_H}px` }}>
                       <motion.div
                         className="w-full rounded-t-xl"
@@ -353,13 +353,13 @@ function ResultsSummary() {
                         transition={{ duration: 0.7, delay: i * 0.1, ease: 'easeOut' }}
                       />
                     </div>
-                    <span className="text-[14px] text-[#8b6fa0]">{bar.year}</span>
+                    <span className="text-[14px] text-muted">{bar.year}</span>
                   </div>
                 )
               })}
             </div>
 
-            <p className="text-[14px] text-[#8b6fa0]/60 italic mt-6">
+            <p className="text-[14px] text-muted/60 italic mt-6">
               Average across CBSE and TN Board students enrolled at Chemistry@OCTET.
             </p>
           </motion.div>
@@ -370,10 +370,10 @@ function ResultsSummary() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            className="bg-[#f8f9ed] border border-[#d4c5e2]/60 rounded-2xl p-8"
+            className="bg-bg border border-accent3/60 rounded-2xl p-8"
           >
-            <p className="text-[14px] tracking-[0.1em] text-[#8b6fa0] uppercase mb-1">Competitive Exams</p>
-            <h3 className="text-xl text-[#5e4075] mb-8 leading-snug">
+            <p className="text-[14px] tracking-widest text-muted uppercase mb-1">Competitive Exams</p>
+            <h3 className="text-xl text-primary mb-8 leading-snug">
               JEE &amp; NEET Qualifiers per Year
             </h3>
 
@@ -400,8 +400,8 @@ function ResultsSummary() {
                     />
                   </div>
                   <div className="text-center">
-                    <p className="text-[14px] text-[#5e4075]">{q.jee} / {q.neet}</p>
-                    <p className="text-[14px] text-[#8b6fa0]">{q.year}</p>
+                    <p className="text-[14px] text-primary">{q.jee} / {q.neet}</p>
+                    <p className="text-[14px] text-muted">{q.year}</p>
                   </div>
                 </div>
               ))}
@@ -411,15 +411,15 @@ function ResultsSummary() {
             <div className="flex gap-6 mt-5">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm" style={{ background: 'linear-gradient(to top, #5e4075, #8b6fa0)' }} />
-                <span className="text-[14px] text-[#8b6fa0]">JEE Qualifiers</span>
+                <span className="text-[14px] text-muted">JEE Qualifiers</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm" style={{ background: 'linear-gradient(to top, #2d7a5e, #5aaa8a)' }} />
-                <span className="text-[14px] text-[#8b6fa0]">NEET Qualifiers</span>
+                <span className="text-[14px] text-muted">NEET Qualifiers</span>
               </div>
             </div>
 
-            <p className="text-[14px] text-[#8b6fa0]/60 italic mt-3">
+            <p className="text-[14px] text-muted/60 italic mt-3">
               Students from Chemistry@OCTET who qualified JEE Mains or NEET UG each year.
             </p>
           </motion.div>
@@ -433,7 +433,7 @@ function ResultsSummary() {
 
 function ParentReviews() {
   return (
-    <section id="reviews" className="py-24 px-6 bg-[#f8f9ed]">
+    <section id="reviews" className="py-24 px-6 bg-bg">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -443,11 +443,11 @@ function ParentReviews() {
           transition={{ duration: 0.5 }}
           className="text-center mb-14"
         >
-          <p className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase mb-3">Parent Reviews</p>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] leading-tight mb-4">
+          <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">Parent Reviews</p>
+          <h2 className="text-3xl md:text-4xl text-primary leading-tight mb-4">
             Heard from the Families
           </h2>
-          <p className="text-base text-[#8b6fa0] max-w-xl mx-auto">
+          <p className="text-base text-muted max-w-xl mx-auto">
             The trust of parents is our most valued recognition. Here is what they have shared about their experience.
           </p>
         </motion.div>
@@ -461,19 +461,19 @@ function ParentReviews() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-20px' }}
               transition={{ duration: 0.4, delay: Math.min(i * 0.07, 0.28) }}
-              className="bg-white border border-[#d4c5e2]/60 rounded-2xl p-8 flex flex-col hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
+              className="bg-white border border-accent3/60 rounded-2xl p-8 flex flex-col hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(94,64,117,0.09)] transition-all duration-300"
             >
               <StarRow />
-              <p className="text-base text-[#8b6fa0] leading-relaxed italic mb-6 flex-1">
+              <p className="text-base text-muted leading-relaxed italic mb-6 flex-1">
                 &ldquo;{review.text}&rdquo;
               </p>
-              <div className="flex items-center gap-3 pt-5 border-t border-[#e9deb5]/70">
-                <div className="w-11 h-11 rounded-full bg-[#d4c5e2] flex items-center justify-center text-[14px] text-[#5e4075] font-mono flex-shrink-0">
+              <div className="flex items-center gap-3 pt-5 border-t border-accent1/70">
+                <div className="w-11 h-11 rounded-full bg-accent3 flex items-center justify-center text-[14px] text-primary font-mono shrink-0">
                   {review.initials}
                 </div>
                 <div>
-                  <p className="text-base text-[#5e4075]">{review.name}</p>
-                  <p className="text-[14px] text-[#8b6fa0]">{review.role}</p>
+                  <p className="text-base text-primary">{review.name}</p>
+                  <p className="text-[14px] text-muted">{review.role}</p>
                 </div>
               </div>
             </motion.div>
@@ -488,11 +488,11 @@ function ParentReviews() {
 
 export default function OutcomesPage() {
   return (
-    <main className="bg-[#f8f9ed] min-h-screen">
+    <main className="bg-bg min-h-screen">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-[#f8f9ed]">
+      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
         <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
           <TestTubeSVG width={180} height={180} color="#5e4075" />
         </div>
@@ -510,29 +510,29 @@ export default function OutcomesPage() {
             transition={{ duration: 0.5 }}
             className="flex items-center justify-center gap-2.5 mb-5"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-[#8b6fa0] uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
+            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
               Proven Outcomes
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8b6fa0] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-[#5e4075] leading-tight mb-6"
+            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
           >
             Our Students Succeed.
             <br />
-            <span className="text-[#8b6fa0]">Consistently.</span>
+            <span className="text-muted">Consistently.</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-[#8b6fa0] max-w-2xl mx-auto leading-relaxed mb-10"
+            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
           >
             Over 500 students have walked through Chemistry@OCTET and walked into their dream
             colleges and careers. The results below are real — and they speak for themselves.
@@ -551,10 +551,10 @@ export default function OutcomesPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="px-6 py-3.5 bg-white border border-[#e9deb5] rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
+                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
               >
-                <div className="text-xl text-[#5e4075]">{s.value}</div>
-                <div className="text-[14px] text-[#8b6fa0]">{s.label}</div>
+                <div className="text-xl text-primary">{s.value}</div>
+                <div className="text-[14px] text-muted">{s.label}</div>
               </div>
             ))}
           </motion.div>
@@ -572,27 +572,27 @@ export default function OutcomesPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
           transition={{ duration: 0.5 }}
-          className="max-w-3xl mx-auto text-center bg-[#e9deb5]/30 border border-[#e9deb5] rounded-3xl p-12 relative overflow-hidden"
+          className="max-w-3xl mx-auto text-center bg-accent1/30 border border-accent1 rounded-3xl p-12 relative overflow-hidden"
         >
           <div className="absolute top-4 right-6 opacity-[0.08] pointer-events-none">
             <FlaskSVG width={120} height={120} color="#5e4075" />
           </div>
-          <h2 className="text-3xl md:text-4xl text-[#5e4075] mb-4 relative">
+          <h2 className="text-3xl md:text-4xl text-primary mb-4 relative">
             Be the Next Success Story.
           </h2>
-          <p className="text-base text-[#8b6fa0] mb-8 relative">
+          <p className="text-base text-muted mb-8 relative">
             Join Chemistry@OCTET and give yourself — or your child — the best possible foundation in chemistry.
           </p>
           <div className="flex flex-wrap gap-4 justify-center relative">
             <Link
               href="/register"
-              className="px-8 py-3.5 bg-[#5e4075] text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
+              className="px-8 py-3.5 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_2px_12px_rgba(94,64,117,0.25)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.35)] hover:-translate-y-0.5"
             >
               Enroll Now
             </Link>
             <Link
               href="/courses"
-              className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:border-[#5e4075]/60 transition-all duration-200"
+              className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:border-primary/60 transition-all duration-200"
             >
               View Courses
             </Link>

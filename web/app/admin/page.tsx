@@ -86,7 +86,7 @@ function StorageBar() {
     <div className="bg-white shadow-sm px-6 py-4">
       <div className="flex items-center justify-between mb-2">
         <span className="text-base text-gray-600">Video Storage</span>
-        <span className="text-base font-inter font-bold text-[#5e4075]">
+        <span className="text-base font-inter font-bold text-primary">
           {used} GB <span className="font-normal text-gray-400">/ {total} GB</span>
         </span>
       </div>
@@ -95,7 +95,7 @@ function StorageBar() {
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.9, ease: 'easeOut' }}
-          className="h-full bg-[#5e4075] rounded-full"
+          className="h-full bg-primary rounded-full"
         />
       </div>
       <p className="text-sm text-gray-400 mt-1.5">{(total - used).toFixed(1)} GB free</p>
@@ -157,7 +157,7 @@ export default function AdminDashboard() {
                 {icon}
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#5e4075] transition-colors">
+                <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary transition-colors">
                   {label}
                 </h3>
                 <p className="text-sm text-gray-500 mt-1 leading-snug">{desc}</p>

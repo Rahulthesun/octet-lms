@@ -29,10 +29,10 @@ export default function Hero() {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-[#e9deb5]/60 border border-[#e9deb5]"
+          className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-accent1/60 border border-accent1"
         >
-          <span className="w-2 h-2 rounded-full bg-[#5e4075] animate-pulse shrink-0" />
-          <span className="text-base text-[#5e4075]">Now Enrolling — 11th & 12th Grade</span>
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
+          <span className="text-base text-primary">Now Enrolling — 11th & 12th Grade</span>
         </motion.div>
 
         {/* Headline — 3 lines */}
@@ -40,7 +40,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.25 }}
-          className="text-5xl md:text-6xl text-[#5e4075] leading-tight tracking-tight"
+          className="text-5xl md:text-6xl text-primary leading-tight tracking-tight"
         >
           {/* Line 1 with yellow underline on "Isn't Hard." */}
           <span className="block pb-1">
@@ -57,7 +57,7 @@ export default function Hero() {
           {/* Line 3 — "Taught Right." italic bold purple with oval, "Until Now." normal */}
           <span className="block">
             <span className="relative inline-block">
-              <span className="italic font-semi-bold text-[#8b6fa0]">Taught Right.</span>
+              <span className="italic font-semi-bold text-muted">Taught Right.</span>
               {/* Oval whose ends cross at the right side — same yellow as the underline */}
               <svg
                 className="absolute pointer-events-none"
@@ -84,7 +84,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4 }}
-          className="text-[#8b6fa0] text-base md:text-lg leading-relaxed max-w-xl"
+          className="text-muted text-base md:text-lg leading-relaxed max-w-xl"
         >
           We transform chemistry from a subject of dread into the science your child can&apos;t stop thinking about.
         </motion.p>
@@ -98,13 +98,13 @@ export default function Hero() {
         >
           <Link
             href="/register"
-            className="px-8 py-3 bg-[#5e4075] text-white text-base rounded-xl shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:bg-[#3d2652] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)] hover:-translate-y-0.5 transition-all duration-200"
+            className="px-8 py-3 bg-primary text-white text-base rounded-xl shadow-[0_4px_20px_rgba(94,64,117,0.3)] hover:bg-[#3d2652] hover:shadow-[0_6px_28px_rgba(94,64,117,0.4)] hover:-translate-y-0.5 transition-all duration-200"
           >
             Start Learning Today
           </Link>
           <a
             href="#video"
-            className="px-8 py-3 border border-[#5e4075]/30 text-[#5e4075] text-base rounded-xl hover:bg-[#e9deb5]/40 transition-all duration-200 flex items-center gap-2.5"
+            className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:bg-accent1/40 transition-all duration-200 flex items-center gap-2.5"
           >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="none">
               <circle cx="10" cy="10" r="9" stroke="#5e4075" strokeWidth="1.5" />
@@ -119,7 +119,7 @@ export default function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.7, delay: 0.7 }}
-          className="text-[#8b6fa0] text-[14px] tracking-[0.25em] uppercase"
+          className="text-muted text-[14px] tracking-[0.25em] uppercase"
         >
           ✦ Spread True Science ✦
         </motion.p>

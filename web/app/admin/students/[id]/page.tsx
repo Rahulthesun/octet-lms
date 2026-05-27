@@ -114,7 +114,7 @@ export default function StudentDetailPage() {
     <div className="p-8">
       {/* Back */}
       <Link href="/admin/students"
-        className="inline-flex items-center gap-2 text-base text-gray-500 hover:text-[#5e4075] transition-colors mb-6">
+        className="inline-flex items-center gap-2 text-base text-gray-500 hover:text-primary transition-colors mb-6">
         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
           <path d="M 10,3 L 5,8 L 10,13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -127,13 +127,13 @@ export default function StudentDetailPage() {
         className="bg-white shadow-sm p-6 mb-6"
       >
         <div className="flex flex-col sm:flex-row items-start gap-5">
-          <div className="w-16 h-16 bg-gray-100 flex items-center justify-center text-[#5e4075] text-2xl shrink-0">
+          <div className="w-16 h-16 bg-gray-100 flex items-center justify-center text-primary text-2xl shrink-0">
             {student.name.charAt(0)}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-2xl text-[#5e4075]">{student.name}</h1>
+              <h1 className="text-2xl text-primary">{student.name}</h1>
               <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600">{student.grade}</span>
               <span className={`text-sm border border-gray-200 px-2 py-0.5 ${blocked ? 'text-gray-500 line-through' : 'text-gray-600'}`}>
                 {blocked ? 'Blocked' : 'Active'}
@@ -151,7 +151,7 @@ export default function StudentDetailPage() {
             </button>
             <button
               onClick={() => setEditing(!editing)}
-              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-[#5e4075] text-base hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-primary text-base hover:bg-gray-50 transition-colors"
             >
               <IconPencil className="w-4 h-4" />
               Edit
@@ -166,7 +166,7 @@ export default function StudentDetailPage() {
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
           className="bg-white shadow-sm p-5"
         >
-          <h2 className="text-base text-[#5e4075] mb-4">Personal Information</h2>
+          <h2 className="text-base text-primary mb-4">Personal Information</h2>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             {/* Left: Phone, Email */}
             <div className="space-y-4">
@@ -178,9 +178,9 @@ export default function StudentDetailPage() {
                   <label className="text-sm text-gray-400 block mb-1">{label}</label>
                   {editing ? (
                     <input type="text" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-2 text-base text-[#5e4075] outline-none focus:border-gray-400" />
+                      className="w-full border border-gray-200 px-3 py-2 text-base text-primary outline-none focus:border-gray-400" />
                   ) : (
-                    <p className="text-base text-[#5e4075]">{form[key] || '—'}</p>
+                    <p className="text-base text-primary">{form[key] || '—'}</p>
                   )}
                 </div>
               ))}
@@ -195,9 +195,9 @@ export default function StudentDetailPage() {
                   <label className="text-sm text-gray-400 block mb-1">{label}</label>
                   {editing ? (
                     <input type="text" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-2 text-base text-[#5e4075] outline-none focus:border-gray-400" />
+                      className="w-full border border-gray-200 px-3 py-2 text-base text-primary outline-none focus:border-gray-400" />
                   ) : (
-                    <p className="text-base text-[#5e4075]">{form[key] || '—'}</p>
+                    <p className="text-base text-primary">{form[key] || '—'}</p>
                   )}
                 </div>
               ))}
@@ -210,7 +210,7 @@ export default function StudentDetailPage() {
                 Cancel
               </button>
               <button onClick={handleSave}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5e4075] text-white text-base hover:bg-[#3d2652] transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors">
                 <IconCheck className="w-4 h-4" />
                 Save Changes
               </button>
@@ -229,25 +229,25 @@ export default function StudentDetailPage() {
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
           className="bg-white shadow-sm p-6"
         >
-          <h2 className="text-base text-[#5e4075] mb-5">Attendance</h2>
+          <h2 className="text-base text-primary mb-5">Attendance</h2>
           <div className="space-y-5">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-base text-gray-600">Online Classes</span>
-                <span className="text-base font-inter text-[#5e4075]">{student.onlineAtt}%</span>
+                <span className="text-base font-inter text-primary">{student.onlineAtt}%</span>
               </div>
               <div className="h-2 bg-gray-100 overflow-hidden">
-                <div className="h-full bg-[#5e4075] transition-all" style={{ width: `${student.onlineAtt}%` }} />
+                <div className="h-full bg-primary transition-all" style={{ width: `${student.onlineAtt}%` }} />
               </div>
             </div>
             {student.offlineAtt !== null ? (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-base text-gray-600">Offline Classes</span>
-                  <span className="text-base font-inter text-[#5e4075]">{student.offlineAtt}%</span>
+                  <span className="text-base font-inter text-primary">{student.offlineAtt}%</span>
                 </div>
                 <div className="h-2 bg-gray-100 overflow-hidden">
-                  <div className="h-full bg-[#5e4075] transition-all" style={{ width: `${student.offlineAtt}%` }} />
+                  <div className="h-full bg-primary transition-all" style={{ width: `${student.offlineAtt}%` }} />
                 </div>
               </div>
             ) : (
@@ -263,7 +263,7 @@ export default function StudentDetailPage() {
         className="bg-white shadow-sm overflow-hidden"
       >
         <div className="px-5 py-4 border-b border-gray-200">
-          <h2 className="text-base text-[#5e4075]">Test History</h2>
+          <h2 className="text-base text-primary">Test History</h2>
         </div>
         {tests.length === 0 ? (
           <div className="px-5 py-8 text-base text-gray-400 text-center">No test records available.</div>
@@ -288,7 +288,7 @@ export default function StudentDetailPage() {
                     {t.marks !== null ? t.marks : '—'}
                   </span>
                   <span className="text-base font-inter text-gray-500 text-right self-center">{t.maxMarks}</span>
-                  <span className="text-base font-inter font-bold text-[#5e4075] text-right self-center">
+                  <span className="text-base font-inter font-bold text-primary text-right self-center">
                     {t.marks !== null ? `${Math.round((t.marks / t.maxMarks) * 100)}%` : '—'}
                   </span>
                 </div>
