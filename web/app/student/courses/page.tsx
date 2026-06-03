@@ -176,10 +176,10 @@ export default function CoursesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search courses, chapters, or topics..."
-            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all"
+            className="w-full pl-11 pr-4 py-3 rounded-full border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all"
           />
         </div>
-        <div className="flex items-center gap-1 bg-[#f0e8f8] rounded-xl p-1 border border-[#e2d5f0]">
+        <div className="flex items-center gap-1 bg-[#f0e8f8] rounded-full p-1 border border-[#e2d5f0]">
           {(['grid', 'list'] as const).map((v) => (
             <button
               key={v}

@@ -2448,7 +2448,7 @@ export default function ContentPage() {
             onClick={() => setDeleteTarget(null)}
           >
             <motion.div
-              className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4"
+              className="bg-white shadow-xl p-6 max-w-sm w-full mx-4"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
