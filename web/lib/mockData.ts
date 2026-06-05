@@ -13,6 +13,7 @@ export const courses = [
     id: 'c1',
     title: 'Physical Chemistry',
     grade: '11',
+    subject: 'physical' as const,
     chapters: [
       {
         id: 'ch1',
@@ -72,6 +73,7 @@ export const courses = [
     id: 'c2',
     title: 'Organic Chemistry',
     grade: '11',
+    subject: 'organic' as const,
     chapters: [
       {
         id: 'ch5',
@@ -103,6 +105,7 @@ export const courses = [
     id: 'c3',
     title: 'Inorganic Chemistry',
     grade: '11',
+    subject: 'inorganic' as const,
     chapters: [
       {
         id: 'ch7',
@@ -121,6 +124,7 @@ export const courses = [
     id: 'c4',
     title: 'Electrochemistry',
     grade: '12',
+    subject: 'physical' as const,
     chapters: [
       {
         id: 'ch8',
@@ -139,6 +143,7 @@ export const courses = [
     id: 'c5',
     title: 'Aldehydes & Ketones',
     grade: '12',
+    subject: 'organic' as const,
     chapters: [
       {
         id: 'ch9',
@@ -489,3 +494,78 @@ export const landingCourses = [
     chapters: 13,
   },
 ]
+
+// ─── Student portal: grouped by the three required subdivisions ──────────────
+// Physical / Organic / Inorganic only. Derived from `courses` above so content
+// stays in sync. Extra grade-12 courses are folded into their parent subject.
+
+type CourseChapter = (typeof courses)[number]['chapters'][number]
+
+export type VideoTopic = { id: string; title: string; duration: string; watched: boolean }
+export type VideoChapter = { id: string; title: string; topics: VideoTopic[] }
+export type VideoSubject = {
+  id: 'physical' | 'organic' | 'inorganic'
+  title: string
+  chapters: VideoChapter[]
+}
+
+const toVideoChapter = (ch: CourseChapter): VideoChapter => ({
+  id: ch.id,
+  title: ch.title,
+  topics: ch.subtopics.map((t) => ({
+    id: t.id,
+    title: t.title,
+    duration: t.duration,
+    watched: t.watched,
+  })),
+})
+
+// Subjects shown to the student, scoped to THEIR grade. An 11th-grader only
+// sees grade-11 chapters (grade-12 courses are excluded).
+const SUBJECT_META = [
+  { id: 'physical', title: 'Physical Chemistry' },
+  { id: 'organic', title: 'Organic Chemistry' },
+  { id: 'inorganic', title: 'Inorganic Chemistry' },
+] as const
+
+const gradeCourses = courses.filter((c) => c.grade === student.grade)
+
+export const videoSubjects: VideoSubject[] = SUBJECT_META.map((s) => ({
+  id: s.id,
+  title: s.title,
+  chapters: gradeCourses
+    .filter((c) => c.subject === s.id)
+    .flatMap((c) => c.chapters)
+    .map(toVideoChapter),
+})).filter((s) => s.chapters.length > 0)
+
+export type NoteClass = { id: string; label: string; title: string; pages: number; size: string }
+export type NoteChapter = { id: string; title: string; classes: NoteClass[] }
+export type NoteSubject = {
+  id: 'physical' | 'organic' | 'inorganic'
+  title: string
+  chapters: NoteChapter[]
+}
+
+const pdfSizes = ['1.2 MB', '0.9 MB', '2.4 MB', '1.8 MB']
+
+const toNoteChapter = (ch: CourseChapter): NoteChapter => ({
+  id: ch.id,
+  title: ch.title,
+  classes: ch.subtopics.slice(0, 4).map((t, i) => ({
+    id: `${ch.id}-pdf-${i + 1}`,
+    label: `Class ${i + 1}`,
+    title: t.title,
+    pages: 6 + ((i * 5 + ch.subtopics.length) % 12),
+    size: pdfSizes[i % pdfSizes.length],
+  })),
+})
+
+export const noteSubjects: NoteSubject[] = SUBJECT_META.map((s) => ({
+  id: s.id,
+  title: s.title,
+  chapters: gradeCourses
+    .filter((c) => c.subject === s.id)
+    .flatMap((c) => c.chapters)
+    .map(toNoteChapter),
+})).filter((s) => s.chapters.length > 0)

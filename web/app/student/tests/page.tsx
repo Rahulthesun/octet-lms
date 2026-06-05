@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { tests, notes } from '@/lib/mockData'
+import { motion } from 'framer-motion'
+import { tests } from '@/lib/mockData'
 import { IconClipboard, IconRuler, IconBook } from '@/components/ui/SvgIcons'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -10,9 +10,18 @@ const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 type Test = typeof tests[0]
 
-function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
+const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
+
+// Status accents (multi-color)
+const STATUS: Record<string, { label: string; text: string; bar: string; chip: string; dot: string }> = {
+  completed: { label: 'Completed', text: 'text-emerald-600', bar: 'border-l-emerald-500', chip: 'bg-emerald-50 text-emerald-700', dot: '#059669' },
+  upcoming: { label: 'Upcoming', text: 'text-amber-600', bar: 'border-l-amber-500', chip: 'bg-amber-50 text-amber-700', dot: '#d97706' },
+  missed: { label: 'Missed', text: 'text-rose-600', bar: 'border-l-rose-500', chip: 'bg-rose-50 text-rose-700', dot: '#e11d48' },
+}
+
+function TestCalendar({ selectedDate, onSelectDate }: { selectedDate: string | null; onSelectDate: (d: string) => void }) {
   const today = new Date(2024, 11, 10) // Dec 10, 2024
-  const [current, setCurrent] = useState({ year: 2024, month: 11 }) // Dec
+  const [current, setCurrent] = useState({ year: 2024, month: 11 })
 
   const firstDay = new Date(current.year, current.month, 1).getDay()
   const daysInMonth = new Date(current.year, current.month + 1, 0).getDate()
@@ -20,95 +29,62 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
   const testDates: Record<string, Test> = {}
   tests.forEach((t) => {
     const [y, m, d] = t.date.split('-').map(Number)
-    if (y === current.year && m - 1 === current.month) {
-      testDates[d.toString()] = t
-    }
+    if (y === current.year && m - 1 === current.month) testDates[d.toString()] = t
   })
 
-  const statusColor: Record<string, string> = {
-    completed: '#5e4075',
-    upcoming: '#e9ae40',
-    missed: '#c06060',
-  }
-
   return (
-    <div className="bg-white rounded-2xl border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] p-5">
-      {/* Month navigation */}
+    <div className={`${card} p-5`}>
       <div className="flex items-center justify-between mb-5">
         <button
-          onClick={() => setCurrent((c) => {
-            const m = c.month === 0 ? 11 : c.month - 1
-            const y = c.month === 0 ? c.year - 1 : c.year
-            return { year: y, month: m }
-          })}
-          className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-primary transition-colors"
+          onClick={() => setCurrent((c) => ({ year: c.month === 0 ? c.year - 1 : c.year, month: c.month === 0 ? 11 : c.month - 1 }))}
+          className="w-8 h-8 rounded-md hover:bg-accent1/60 flex items-center justify-center text-muted hover:text-brand transition-colors"
         >
           ←
         </button>
-        <h3 className="text-primary text-[15px]">{MONTHS[current.month]} {current.year}</h3>
+        <h3 className="text-primary text-[15px] font-data">{MONTHS[current.month]} {current.year}</h3>
         <button
-          onClick={() => setCurrent((c) => {
-            const m = c.month === 11 ? 0 : c.month + 1
-            const y = c.month === 11 ? c.year + 1 : c.year
-            return { year: y, month: m }
-          })}
-          className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-primary transition-colors"
+          onClick={() => setCurrent((c) => ({ year: c.month === 11 ? c.year + 1 : c.year, month: c.month === 11 ? 0 : c.month + 1 }))}
+          className="w-8 h-8 rounded-md hover:bg-accent1/60 flex items-center justify-center text-muted hover:text-brand transition-colors"
         >
           →
         </button>
       </div>
 
-      {/* Day headers */}
       <div className="grid grid-cols-7 mb-2">
         {DAYS.map((d) => (
-          <div key={d} className="text-center text-[14px] text-muted py-1">{d}</div>
+          <div key={d} className="text-center text-[13px] text-muted py-1">{d}</div>
         ))}
       </div>
 
-      {/* Dates */}
       <div className="grid grid-cols-7 gap-0.5">
-        {Array.from({ length: firstDay }).map((_, i) => (
-          <div key={`empty-${i}`} />
-        ))}
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1
           const test = testDates[day.toString()]
           const isToday = current.year === today.getFullYear() && current.month === today.getMonth() && day === today.getDate()
-
+          const isSel = test && test.date === selectedDate
           return (
             <button
               key={day}
               onClick={() => test && onSelectDate(test.date)}
-              className={`relative aspect-square flex flex-col items-center justify-center rounded-xl text-[15px] transition-all duration-150 ${
-                test
-                  ? 'hover:bg-accent1/30 cursor-pointer'
-                  : 'cursor-default'
-              } ${isToday ? 'ring-1 ring-primary/30' : ''}`}
+              className={`relative aspect-square flex items-center justify-center rounded-md text-[14px] font-data transition-all duration-150 ${
+                test ? 'hover:bg-accent1/60 cursor-pointer' : 'cursor-default'
+              } ${isSel ? 'bg-brand text-white' : isToday ? 'ring-1 ring-brand/40' : ''}`}
             >
-              <span className={`leading-none ${test ? 'text-primary' : 'text-muted'} ${isToday ? 'text-primary' : ''}`}>
-                {day}
-              </span>
-              {test && (
-                <div
-                  className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: statusColor[test.status] }}
-                />
+              <span className={isSel ? 'text-white' : test ? 'text-primary' : 'text-muted'}>{day}</span>
+              {test && !isSel && (
+                <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS[test.status].dot }} />
               )}
             </button>
           )
         })}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-5 mt-5 pt-4 border-t border-[#e2d5f0]">
-        {[
-          { label: 'Completed', color: '#5e4075' },
-          { label: 'Upcoming', color: '#e9ae40' },
-          { label: 'Missed', color: '#c06060' },
-        ].map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-[14px] text-muted">{label}</span>
+      <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[#F4F1F8]">
+        {(['completed', 'upcoming', 'missed'] as const).map((k) => (
+          <div key={k} className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS[k].dot }} />
+            <span className="text-[13px] text-muted">{STATUS[k].label}</span>
           </div>
         ))}
       </div>
@@ -116,13 +92,17 @@ function TestCalendar({ onSelectDate }: { onSelectDate: (d: string) => void }) {
   )
 }
 
+function MetaItem({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-muted text-[13px] mb-0.5">{label}</p>
+      <p className="text-primary text-[15px] font-data truncate">{value}</p>
+    </div>
+  )
+}
+
 function TestCard({ test }: { test: Test }) {
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    completed: { label: 'Completed', color: '#5e4075' },
-    upcoming: { label: 'Upcoming', color: '#7a5c00' },
-    missed: { label: 'Missed', color: '#7a3d3d' },
-  }
-  const config = statusConfig[test.status]
+  const st = STATUS[test.status]
 
   const studyMaterialIcon = (type: string) => {
     if (type === 'Cheat Sheet') return <IconClipboard className="w-5 h-5" />
@@ -131,78 +111,49 @@ function TestCard({ test }: { test: Test }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] p-6">
+    <div className={`${card} border-l-4 ${st.bar} p-5`}>
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-3">
-            <span className={`flex items-center gap-1.5 text-[14px] px-3 py-1.5 rounded-full ${
-              test.type === 'online' ? 'bg-accent1/60 text-primary' : 'bg-accent2/60 text-[#3d7a5e]'
-            }`}>
-              {test.type === 'online' ? (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                  <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" />
-                  <ellipse cx="7" cy="7" rx="2.5" ry="6" stroke="currentColor" strokeWidth="1.1" />
-                  <path d="M 1.5,5 L 12.5,5 M 1.5,9 L 12.5,9" stroke="currentColor" strokeWidth="1.1" />
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                  <path d="M 1,13 L 13,13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  <path d="M 2,13 L 2,6 L 7,2 L 12,6 L 12,13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  <rect x="5" y="9" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1" />
-                </svg>
-              )}
-              {test.type === 'online' ? 'Online' : 'Offline'}
-            </span>
-            <span className="text-[14px] px-3 py-1.5 rounded-full" style={{ color: config.color }}>
-              {config.label}
-            </span>
-          </div>
-          <h3 className="text-primary text-[15px] leading-snug">{test.title}</h3>
+        <div className="min-w-0">
+          <h3 className="text-primary text-base leading-snug mb-1.5">{test.title}</h3>
+          <span className={`inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md ${
+            test.type === 'online' ? 'bg-[#F1EEF5] text-brand' : 'bg-slate-100 text-slate-600'
+          }`}>
+            {test.type === 'online' ? 'Online' : 'Offline'} · {test.duration}
+          </span>
         </div>
+        <span className={`shrink-0 text-[13px] px-2.5 py-1 rounded-md ${st.chip}`}>{st.label}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <p className="text-muted text-[14px]">Date</p>
-          <p className="text-primary text-[15px]">{test.date}</p>
-        </div>
-        <div>
-          <p className="text-muted text-[14px]">Time</p>
-          <p className="text-primary text-[15px]">{test.time}</p>
-        </div>
-        <div>
-          <p className="text-muted text-[14px]">Duration</p>
-          <p className="text-primary text-[15px]">{test.duration}</p>
-        </div>
-        <div>
-          <p className="text-muted text-[14px]">Total Marks</p>
-          <p className="text-primary text-[15px] font-mono">{test.totalMarks}</p>
-        </div>
+      {/* Meta line */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-1">
+        <MetaItem label="Date" value={test.date} />
+        <MetaItem label="Time" value={test.time} />
+        <MetaItem label="Duration" value={test.duration} />
+        <MetaItem label="Total Marks" value={test.totalMarks} />
       </div>
 
+      {/* Conditional block */}
       {test.status === 'completed' && test.marksObtained !== null && (
-        <div className="pt-4 border-t border-[#e2d5f0]">
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-muted text-[14px]">Score</span>
-            <span className="text-primary text-[15px] font-mono">{test.marksObtained}/{test.totalMarks} ({test.percentage}%)</span>
+            <span className="text-primary text-[15px] font-data">{test.marksObtained}/{test.totalMarks} ({test.percentage}%)</span>
           </div>
-          <div className="h-2 bg-accent1/50 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full"
-              style={{ width: `${test.percentage}%` }}
-            />
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${test.percentage}%` }} />
           </div>
-          <p className="text-muted text-[14px] mt-2">Rank {test.rank} out of {test.totalStudents} students</p>
+          <p className="text-muted text-[14px] mt-2">Rank <span className="font-data">{test.rank}</span> out of <span className="font-data">{test.totalStudents}</span> students</p>
         </div>
       )}
 
       {test.status === 'upcoming' && test.studyMaterials && test.studyMaterials.length > 0 && (
-        <div className="pt-4 border-t border-[#e2d5f0]">
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
           <p className="text-primary text-[15px] mb-3">Study Materials for this Test</p>
           <div className="space-y-2">
             {test.studyMaterials.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 bg-accent1/20 rounded-xl">
-                <span className="text-primary">{studyMaterialIcon(m.type)}</span>
+              <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-md">
+                <span className="text-amber-600">{studyMaterialIcon(m.type)}</span>
                 <div>
                   <p className="text-primary text-[15px]">{m.title}</p>
                   <p className="text-muted text-[14px]">{m.type}</p>
@@ -214,8 +165,8 @@ function TestCard({ test }: { test: Test }) {
       )}
 
       {test.status === 'missed' && (
-        <div className="pt-4 border-t border-[#e2d5f0]">
-          <p className="text-[#c06060] text-[15px]">You missed this test. Contact your instructor if you need to reschedule.</p>
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
+          <p className="text-rose-600 text-[15px]">You missed this test. Contact your instructor if you need to reschedule.</p>
         </div>
       )}
     </div>
@@ -232,54 +183,48 @@ export default function TestsPage() {
     ? tests
     : tests.filter((t) => t.status === filter)
 
+  const summary = [
+    { label: 'Total Tests', val: tests.length, color: 'text-slate-700' },
+    { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: 'text-emerald-600' },
+    { label: 'Upcoming', val: tests.filter((t) => t.status === 'upcoming').length, color: 'text-amber-600' },
+    { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: 'text-rose-600' },
+  ]
+
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-2xl text-primary mb-1">Tests</h1>
-        <p className="text-muted text-[15px]">Track your upcoming, completed, and missed tests</p>
+        <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
+        <p className="text-muted text-base">Track your upcoming, completed, and missed tests</p>
+      </motion.div>
+
+      {/* Summary tiles */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+      >
+        {summary.map(({ label, val, color }) => (
+          <div key={label} className={`${card} p-5`}>
+            <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
+            <p className="text-muted text-sm">{label}</p>
+          </div>
+        ))}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar */}
-        <div className="lg:col-span-1 space-y-4">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-            <TestCalendar onSelectDate={(d) => setSelectedDate(d === selectedDate ? null : d)} />
-          </motion.div>
-
-          {/* Summary stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="bg-white rounded-2xl border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] p-5"
-          >
-            <h3 className="text-primary text-base mb-4">Test Summary</h3>
-            {[
-              { label: 'Total Tests', val: tests.length, color: '#5e4075' },
-              { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: '#5e4075' },
-              { label: 'Upcoming', val: tests.filter((t) => t.status === 'upcoming').length, color: '#e9ae40' },
-              { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: '#c06060' },
-            ].map(({ label, val, color }) => (
-              <div key={label} className="flex items-center justify-between py-2.5 border-b border-[#f0e8f8] last:border-0">
-                <span className="text-muted text-[15px]">{label}</span>
-                <span className="text-[15px] font-mono" style={{ color }}>{val}</span>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-
         {/* Test list */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 order-2 lg:order-1">
           {/* Filter tabs */}
-          <div className="flex items-center gap-2 mb-5">
+          <div className="flex flex-wrap items-center gap-2 mb-5">
             {(['all', 'upcoming', 'completed', 'missed'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelectedDate(null) }}
-                className={`px-4 py-2.5 rounded-xl text-[15px] capitalize transition-all duration-150 ${
+                className={`px-4 py-2 rounded-md text-[15px] capitalize transition-all duration-150 ${
                   filter === f && !selectedDate
-                    ? 'bg-primary text-bg'
-                    : 'bg-accent1/40 text-primary hover:bg-accent1/70'
+                    ? 'bg-brand text-white'
+                    : 'bg-white border border-border text-primary hover:bg-accent1/50'
                 }`}
               >
                 {f}
@@ -288,9 +233,9 @@ export default function TestsPage() {
             {selectedDate && (
               <button
                 onClick={() => setSelectedDate(null)}
-                className="ml-auto flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[15px] text-muted hover:text-primary hover:bg-accent1/40 transition-all"
+                className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-md text-[15px] text-muted hover:text-brand hover:bg-accent1/50 transition-all"
               >
-                Clear date filter
+                Clear date
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
                   <path d="M 3,3 L 11,11 M 11,3 L 3,11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
@@ -304,7 +249,7 @@ export default function TestsPage() {
                 key={test.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.06 }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
               >
                 <TestCard test={test} />
               </motion.div>
@@ -315,6 +260,18 @@ export default function TestsPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Calendar (sticky) */}
+        <div className="lg:col-span-1 order-1 lg:order-2">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="lg:sticky lg:top-6"
+          >
+            <TestCalendar selectedDate={selectedDate} onSelectDate={(d) => setSelectedDate(d === selectedDate ? null : d)} />
+          </motion.div>
         </div>
       </div>
     </div>

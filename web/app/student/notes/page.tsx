@@ -1,85 +1,126 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { notes } from '@/lib/mockData'
+import { noteSubjects } from '@/lib/mockData'
+import type { NoteChapter, NoteClass } from '@/lib/mockData'
 
-const categories = ['All', 'Lecture Notes', 'Cheat Sheet', 'Formula Sheet', 'Important Reactions']
+// Per-subject accent — dusty-plum family (on-theme, lightly differentiated)
+const SUBJECT_STYLE: Record<string, { text: string; border: string }> = {
+  physical: { text: 'text-[#7A6B96]', border: 'border-l-[#7A6B96]' },
+  organic: { text: 'text-[#8F7BA0]', border: 'border-l-[#8F7BA0]' },
+  inorganic: { text: 'text-[#635580]', border: 'border-l-[#635580]' },
+}
 
-function CategoryIcon({ category, className = 'w-6 h-6' }: { category: string; className?: string }) {
-  if (category === 'Lecture Notes') {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M 4,3 L 16,3 Q 20,3 20,7 L 20,21 Q 20,21 16,21 L 4,21 Q 4,21 4,17 L 4,3 Z" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M 8,9 L 16,9 M 8,13 L 16,13 M 8,17 L 12,17" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (category === 'Cheat Sheet') {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="3" width="12" height="17" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M 9,3 Q 9,1.5 10,1.5 Q 11,1.5 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M 7,9 L 13,9 M 7,12 L 13,12 M 7,15 L 10,15" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (category === 'Formula Sheet') {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M 3,18 L 5,6 L 9,14 L 13,6 L 15,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M 17,18 L 21,18 M 19,16 L 19,20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (category === 'Important Reactions') {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M 8,4 L 8,12 L 5,18 L 19,18 L 16,12 L 16,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M 7,4 L 17,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M 11,9 Q 12,8 13,9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    )
-  }
+// ─── Icons ───────────────────────────────────────────────────────────────────
+
+function PdfIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M 6,3 L 18,3 L 18,21 L 6,21 Z" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M 14,3 L 14,7 L 18,7" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M 9,12 L 15,12 M 9,15 L 15,15" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <path d="M 5,2 L 12,2 L 16,6 L 16,18 Q 16,18 15,18 L 5,18 Q 4,18 4,17 L 4,3 Q 4,2 5,2 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M 12,2 L 12,6 L 16,6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 7,11 L 13,11 M 7,14 L 11,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   )
 }
 
-function PDFViewer({ note, onClose }: { note: typeof notes[0]; onClose: () => void }) {
+function Chevron({ open, className = 'w-3.5 h-3.5' }: { open: boolean; className?: string }) {
+  return (
+    <svg className={`${className} transition-transform duration-200 ${open ? 'rotate-90' : ''}`} viewBox="0 0 16 16" fill="none">
+      <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ─── PDF viewer modal ────────────────────────────────────────────────────────
+
+// A single rendered "page" of the simulated PDF. Page 1 carries the title block.
+function PdfPage({ doc, chapterTitle, index }: { doc: NoteClass; chapterTitle: string; index: number }) {
+  const seed = (index + 1) * 7
+  return (
+    <div
+      className="relative bg-white shadow-[0_4px_24px_rgba(0,0,0,0.14)] rounded-sm w-full overflow-hidden"
+      style={{ aspectRatio: '1 / 1.414' }}
+    >
+      <div className="p-[8%] h-full flex flex-col">
+        {index === 0 && (
+          <div className="text-center mb-8 pb-6 border-b-2 border-brand/20">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <svg viewBox="0 0 36 36" fill="none" className="w-6 h-6">
+                <circle cx="18" cy="18" r="16" stroke="#7A6B96" strokeWidth="1.8" />
+                <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(60 18 18)" />
+                <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(-60 18 18)" />
+                <circle cx="18" cy="18" r="3" fill="#7A6B96" />
+              </svg>
+              <span className="text-primary text-[14px]">Chemistry@OCTET</span>
+            </div>
+            <h2 className="text-primary text-xl mb-1">{doc.title}</h2>
+            <p className="text-muted text-[14px]">{chapterTitle} · {doc.label}</p>
+          </div>
+        )}
+
+        <div className="flex-1 space-y-3">
+          {index === 0 && <p className="text-primary text-[15px] mb-2">1. Introduction</p>}
+          {index === 1 && <p className="text-primary text-[15px] mb-2">2. Key Concepts</p>}
+          {index === 2 && <p className="text-primary text-[15px] mb-2">3. Important Formulas</p>}
+          {Array.from({ length: 16 }).map((_, i) => (
+            <div key={i} className="h-2.5 rounded-full bg-accent1/70" style={{ width: `${55 + ((i * 13 + seed) % 42)}%` }} />
+          ))}
+        </div>
+
+        <div className="pt-4 mt-4 border-t border-accent1/60 flex items-center justify-between text-muted text-[12px]">
+          <span>{doc.title}</span>
+          <span className="font-data">Page {index + 1} of {doc.pages}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PDFViewer({ doc, chapterTitle, onClose }: { doc: NoteClass; chapterTitle: string; onClose: () => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = useState(1)
+  const [zoom, setZoom] = useState(100)
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const denom = el.scrollHeight - el.clientHeight
+    const ratio = denom > 0 ? el.scrollTop / denom : 0
+    setPage(Math.min(doc.pages, Math.max(1, Math.round(ratio * (doc.pages - 1)) + 1)))
+  }
+
+  const sheetWidth = Math.round((zoom / 100) * 720)
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+        exit={{ opacity: 0, scale: 0.94, y: 16 }}
         transition={{ duration: 0.25 }}
-        className="bg-bg rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-white rounded-lg w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* PDF Viewer Header */}
-        <div className="flex items-center justify-between p-5 border-b border-accent1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent1/60 flex items-center justify-center text-primary">
-              <CategoryIcon category={note.category} className="w-5 h-5" />
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-accent1 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-accent1/60 flex items-center justify-center text-brand shrink-0">
+              <PdfIcon className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-primary text-base">{note.title}</p>
-              <p className="text-muted text-[14px]">{note.pages} pages · {note.size}</p>
+            <div className="min-w-0">
+              <p className="text-primary text-base truncate">{doc.label} : {doc.title}</p>
+              <p className="text-muted text-[14px] font-data">{doc.pages} pages · {doc.size}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-4 py-2 text-[15px] text-primary hover:bg-accent1/40 rounded-lg transition-colors">
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-[15px] text-primary hover:bg-accent1/40 rounded-md transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
                 <path d="M 8,2 L 8,11 M 4,8 L 8,12 L 12,8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M 2,14 L 14,14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -88,7 +129,7 @@ function PDFViewer({ note, onClose }: { note: typeof notes[0]; onClose: () => vo
             </button>
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-primary transition-colors"
+              className="w-9 h-9 rounded-md hover:bg-accent1/40 flex items-center justify-center text-muted hover:text-brand transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
                 <path d="M 4,4 L 12,12 M 12,4 L 4,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -97,46 +138,30 @@ function PDFViewer({ note, onClose }: { note: typeof notes[0]; onClose: () => vo
           </div>
         </div>
 
-        {/* PDF Page navigation bar */}
-        <div className="flex items-center justify-center gap-4 py-2.5 border-b border-accent1/60 bg-[#f0ebe8]/30">
-          <button className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted text-[15px]">←</button>
-          <span className="text-primary text-[15px] font-mono">Page 1 / {note.pages}</span>
-          <button className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted text-[15px]">→</button>
+        {/* Page / zoom bar */}
+        <div className="flex items-center justify-center gap-4 py-2.5 border-b border-accent1/60 bg-accent1/20 shrink-0">
+          <span className="text-primary text-[15px] font-data">Page {page} / {doc.pages}</span>
           <div className="w-px h-5 bg-accent1" />
-          <button className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted text-[15px]">−</button>
-          <span className="text-primary text-[15px] font-mono">100%</span>
-          <button className="w-8 h-8 rounded-lg hover:bg-accent1/40 flex items-center justify-center text-muted text-[15px]">+</button>
+          <button
+            onClick={() => setZoom((z) => Math.max(60, z - 10))}
+            className="w-8 h-8 rounded-md hover:bg-accent1/50 flex items-center justify-center text-muted hover:text-brand text-[18px] leading-none"
+          >
+            −
+          </button>
+          <span className="text-primary text-[15px] font-data w-12 text-center">{zoom}%</span>
+          <button
+            onClick={() => setZoom((z) => Math.min(180, z + 10))}
+            className="w-8 h-8 rounded-md hover:bg-accent1/50 flex items-center justify-center text-muted hover:text-brand text-[18px] leading-none"
+          >
+            +
+          </button>
         </div>
 
-        {/* Simulated PDF content */}
-        <div className="flex-1 overflow-auto bg-[#e9e5e0] p-6">
-          <div className="max-w-2xl mx-auto bg-white shadow-[0_4px_20px_rgba(0,0,0,0.12)] rounded-sm p-10 min-h-full" style={{ aspectRatio: '1/1.414' }}>
-            {/* Header */}
-            <div className="text-center mb-8 pb-6 border-b-2 border-primary/20">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <svg viewBox="0 0 36 36" fill="none" className="w-6 h-6">
-                  <circle cx="18" cy="18" r="16" stroke="#5e4075" strokeWidth="1.8" />
-                  <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(60 18 18)" />
-                  <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(-60 18 18)" />
-                  <circle cx="18" cy="18" r="3" fill="#5e4075" />
-                </svg>
-                <span className="text-primary text-[14px]">Chemistry@OCTET</span>
-              </div>
-              <h2 className="text-primary text-xl mb-1">{note.title}</h2>
-              <p className="text-muted text-[14px]">{note.chapter} · {note.category}</p>
-            </div>
-
-            {/* Mock content lines */}
-            {Array.from({ length: 18 }).map((_, i) => (
-              <div key={i} className={`mb-3 ${i === 0 ? 'text-primary text-[15px]' : 'text-primary/70 text-[14px]'}`}>
-                {i === 0 && <p className="mb-2">1. Introduction</p>}
-                {i === 5 && <p className="text-primary text-[15px] mt-5 mb-2">2. Key Concepts</p>}
-                {i === 10 && <p className="text-primary text-[15px] mt-5 mb-2">3. Important Formulas</p>}
-                <div
-                  className="h-2.5 rounded-full bg-accent1/60"
-                  style={{ width: `${60 + ((i * 17 + 23) % 40)}%` }}
-                />
-              </div>
+        {/* Full document — every page, continuous scroll */}
+        <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-auto bg-[#edeaf2] px-4 sm:px-6 py-6">
+          <div className="mx-auto flex flex-col items-center gap-6" style={{ width: sheetWidth, maxWidth: '100%' }}>
+            {Array.from({ length: doc.pages }).map((_, i) => (
+              <PdfPage key={i} doc={doc} chapterTitle={chapterTitle} index={i} />
             ))}
           </div>
         </div>
@@ -145,86 +170,201 @@ function PDFViewer({ note, onClose }: { note: typeof notes[0]; onClose: () => vo
   )
 }
 
-export default function NotesPage() {
-  const [category, setCategory] = useState('All')
-  const [openNote, setOpenNote] = useState<typeof notes[0] | null>(null)
+// ─── Page ──────────────────────────────────────────────────────────────────
 
-  const filtered = category === 'All' ? notes : notes.filter((n) => n.category === category)
+export default function PdfNotesPage() {
+  const [search, setSearch] = useState('')
+  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set())
+  const [openChapters, setOpenChapters] = useState<Set<string>>(new Set())
+  const [openDoc, setOpenDoc] = useState<{ doc: NoteClass; chapterTitle: string } | null>(null)
+
+  const q = search.trim().toLowerCase()
+  const searching = q.length > 0
+
+  const filtered = useMemo(() => {
+    if (!searching) return noteSubjects
+    return noteSubjects
+      .map((subj) => {
+        const subjMatch = subj.title.toLowerCase().includes(q)
+        const chapters = subj.chapters.filter(
+          (ch) =>
+            subjMatch ||
+            ch.title.toLowerCase().includes(q) ||
+            ch.classes.some((c) => c.title.toLowerCase().includes(q)),
+        )
+        return { ...subj, chapters }
+      })
+      .filter((subj) => subj.chapters.length > 0)
+  }, [q, searching])
+
+  const isSubjectOpen = (id: string) => searching || openSubjects.has(id)
+  const isChapterOpen = (id: string) => searching || openChapters.has(id)
+
+  const toggleSubject = (id: string) =>
+    setOpenSubjects((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const toggleChapter = (id: string) =>
+    setOpenChapters((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const allOpen =
+    openSubjects.size === noteSubjects.length &&
+    openChapters.size === noteSubjects.reduce((n, s) => n + s.chapters.length, 0)
+
+  const expandAll = () => {
+    setOpenSubjects(new Set(noteSubjects.map((s) => s.id)))
+    setOpenChapters(new Set(noteSubjects.flatMap((s) => s.chapters.map((c) => c.id))))
+  }
+  const collapseAll = () => {
+    setOpenSubjects(new Set())
+    setOpenChapters(new Set())
+  }
 
   return (
     <>
-      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-          <h1 className="text-2xl text-primary mb-1">Notes & Materials</h1>
-          <p className="text-muted text-[15px]">Access all your study materials in one place</p>
+          <div className="flex items-center gap-3 mb-1">
+            <span className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center text-primary">
+              <PdfIcon className="w-5 h-5" />
+            </span>
+            <h1 className="text-3xl md:text-4xl text-primary">PDF Notes</h1>
+          </div>
+          <p className="text-muted text-base mt-1">Open class-wise PDF notes, organized by subject and chapter</p>
         </motion.div>
 
-        {/* Category filter */}
-        <div className="flex flex-wrap gap-2.5 mb-6">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[15px] transition-all duration-150 ${
-                category === cat
-                  ? 'bg-primary text-bg shadow-[0_2px_8px_rgba(94,64,117,0.2)]'
-                  : 'bg-accent1/40 text-primary hover:bg-accent1/70'
-              }`}
-            >
-              {cat !== 'All' && (
-                <span className="opacity-80">
-                  <CategoryIcon category={cat} className="w-4 h-4" />
-                </span>
+        {/* Search + expand toggle */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex-1 relative">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M 11,11 L 14.5,14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search subjects, chapters, or notes..."
+              className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-white text-primary text-base placeholder:text-border focus:outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 transition-all"
+            />
+          </div>
+          <button
+            onClick={() => (allOpen ? collapseAll() : expandAll())}
+            disabled={searching}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-3 rounded-md border border-border bg-white text-primary text-[15px] hover:bg-accent1/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              {allOpen ? (
+                <path d="M 4,9 L 8,5 L 12,9 M 4,13 L 8,9 L 12,13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              ) : (
+                <path d="M 4,3 L 8,7 L 12,3 M 4,7 L 8,11 L 12,7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               )}
-              {cat}
-            </button>
-          ))}
+            </svg>
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
         </div>
 
-        {/* Notes grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((note, i) => (
-            <motion.button
-              key={note.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.06 }}
-              onClick={() => setOpenNote(note)}
-              className="relative flex items-start gap-4 bg-white rounded-2xl p-6 border border-[#e2d5f0] shadow-[0_2px_12px_rgba(94,64,117,0.06)] hover:shadow-[0_4px_20px_rgba(94,64,117,0.1)] hover:border-[#c8a8d8] transition-all duration-200 text-left group"
-            >
-              {note.isNew && (
-                <div className="absolute top-4 right-4 px-2.5 py-1 bg-primary text-bg text-[14px] rounded-full">
-                  New
-                </div>
-              )}
+        {/* Subject accordions */}
+        <div className="space-y-4">
+          {filtered.map((subject) => {
+            const subjectOpen = isSubjectOpen(subject.id)
+            const s = SUBJECT_STYLE[subject.id] ?? SUBJECT_STYLE.physical
+            return (
+              <div
+                key={subject.id}
+                className={`bg-white rounded-lg border border-[#e2e5ec] border-l-4 ${s.border} shadow-[0_2px_12px_rgba(15,23,42,0.06)] overflow-hidden`}
+              >
+                <button
+                  onClick={() => toggleSubject(subject.id)}
+                  className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F4F1F8] transition-colors"
+                >
+                  <Chevron open={subjectOpen} className="w-4 h-4 text-muted shrink-0" />
+                  <span className={`${s.text} shrink-0`}><PdfIcon className="w-5 h-5" /></span>
+                  <span className="flex-1 text-primary text-base">{subject.title}</span>
+                  <span className="text-muted text-[14px] shrink-0 font-data">{subject.chapters.length} chapters</span>
+                </button>
 
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-accent1/60 to-accent2/60 flex items-center justify-center text-primary shrink-0">
-                <CategoryIcon category={note.category} className="w-6 h-6" />
+                <AnimatePresence initial={false}>
+                  {subjectOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-t border-[#F4F1F8] divide-y divide-[#F4F1F8]">
+                        {subject.chapters.map((chapter: NoteChapter, ci) => {
+                          const chapterOpen = isChapterOpen(chapter.id)
+                          return (
+                            <div key={chapter.id}>
+                              <button
+                                onClick={() => toggleChapter(chapter.id)}
+                                className="w-full flex items-center gap-3 pl-8 pr-5 py-3 text-left hover:bg-[#F4F1F8] transition-colors"
+                              >
+                                <Chevron open={chapterOpen} className="w-3.5 h-3.5 text-muted shrink-0" />
+                                <span className="text-primary/70 shrink-0"><PdfIcon className="w-4 h-4" /></span>
+                                <span className="text-muted text-[14px] w-16 shrink-0">Chap {ci + 1}</span>
+                                <span className="flex-1 text-primary/90 text-[15px] leading-snug">{chapter.title}</span>
+                                <span className="text-muted text-[14px] shrink-0">{chapter.classes.length} classes</span>
+                              </button>
+
+                              <AnimatePresence initial={false}>
+                                {chapterOpen && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                    className="overflow-hidden bg-[#FAF9FB]"
+                                  >
+                                    <div className="py-1">
+                                      {chapter.classes.map((doc) => (
+                                        <button
+                                          key={doc.id}
+                                          onClick={() => setOpenDoc({ doc, chapterTitle: chapter.title })}
+                                          className="w-full flex items-center gap-3 pl-16 pr-5 py-2.5 text-left hover:bg-[#F4F1F8] transition-colors group"
+                                        >
+                                          <span className="text-primary/60 shrink-0"><PdfIcon className="w-4 h-4" /></span>
+                                          <span className="text-primary text-[15px] shrink-0">{doc.label} :</span>
+                                          <span className="flex-1 text-primary/85 text-[15px] leading-snug group-hover:text-brand">{doc.title}</span>
+                                          <span className="text-muted text-[14px] font-data shrink-0">{doc.pages}p · {doc.size}</span>
+                                          <svg className="w-4 h-4 text-border group-hover:text-brand transition-colors shrink-0" viewBox="0 0 16 16" fill="none">
+                                            <path d="M 4,9 L 4,12 L 12,12 L 12,9 M 8,2 L 8,9 M 5,6 L 8,9 L 11,6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                                          </svg>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-muted text-[14px] uppercase tracking-wide mb-1">{note.category}</p>
-                <p className="text-primary text-base group-hover:text-[#3d2652] transition-colors leading-snug mb-1">
-                  {note.title}
-                </p>
-                <p className="text-muted text-[14px]">{note.chapter}</p>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="text-border text-[14px] font-mono">{note.pages} pages</span>
-                  <span className="text-border text-[14px]">·</span>
-                  <span className="text-border text-[14px] font-mono">{note.size}</span>
-                </div>
-              </div>
-
-              <svg className="w-4 h-4 text-border group-hover:text-primary transition-colors shrink-0 mt-1" viewBox="0 0 16 16" fill="none">
-                <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </motion.button>
-          ))}
+            )
+          })}
         </div>
+
+        {filtered.length === 0 && (
+          <div className="text-center py-16 text-muted">
+            <p className="text-[15px]">No notes match your search.</p>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
-        {openNote && <PDFViewer note={openNote} onClose={() => setOpenNote(null)} />}
+        {openDoc && <PDFViewer doc={openDoc.doc} chapterTitle={openDoc.chapterTitle} onClose={() => setOpenDoc(null)} />}
       </AnimatePresence>
     </>
   )

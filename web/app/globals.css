@@ -18,8 +18,33 @@
   --color-accent4: #c8e0da;
   --color-muted: #8b6fa0;
   --color-border: #c8b8d8;
+  --color-brand: #7A6B96;        /* dusty plum — student portal accent (admin/landing don't use) */
+  --color-brand-dark: #635580;   /* plum-dark — hover / pressed */
   --font-sans: "Contralto", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+
+/* Student portal — scoped slate ink + dusty-plum accent theme.
+   Re-binds the shared color tokens for the /student subtree only: text/headings
+   (`text-primary`) and `text-muted` become neutral slate, accent tints become
+   soft plum. The sparing plum accent itself uses the global `brand` token
+   (`bg-brand`/`text-brand`). Admin + landing keep the purple defaults above. */
+.student-scope {
+  --color-primary: #1e293b;   /* slate-800 — ink / headings */
+  --color-muted:   #64748b;   /* slate-500 */
+  --color-accent1: #F1EEF5;   /* plum-50  — soft tint bg / hover */
+  --color-accent2: #E7E2EF;   /* plum-100 */
+  --color-accent3: #e2e8f0;   /* slate-200 — neutral */
+  --color-accent4: #F1EEF5;
+  --color-border:  #E6E2EC;   /* faint plum-grey border */
+}
+
+/* Numbers / data display inside the student portal use Space Grotesk. */
+.student-scope .font-data,
+.student-scope .font-num {
+  font-family: 'Space Grotesk', var(--font-data), ui-monospace, system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
 }
 
 *, *::before, *::after {

@@ -1,41 +1,39 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
 
 const navItems = [
   {
     href: '/student',
     label: 'Dashboard',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-        <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="2" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="11" y="2" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="2" y="11" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="11" y="11" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     ),
   },
   {
     href: '/student/courses',
-    label: 'Courses',
+    label: 'Video Lessons',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-        <path d="M 3,5 L 17,5 M 3,8 L 13,8 M 3,11 L 17,11 M 3,14 L 13,14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="16" cy="14" r="3" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M 18.5,16.5 L 20,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="5" width="11" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M 13,9 L 18,6 L 18,14 L 13,11 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
     href: '/student/notes',
-    label: 'Notes',
+    label: 'PDF Notes',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-        <path d="M 5,3 L 15,3 Q 17,3 17,5 L 17,17 Q 17,19 15,19 L 5,19 Q 3,19 3,17 L 3,5 Q 3,3 5,3 Z" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M 7,8 L 13,8 M 7,11 L 13,11 M 7,14 L 11,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 5,2 L 12,2 L 16,6 L 16,18 Q 16,18 15,18 L 5,18 Q 4,18 4,17 L 4,3 Q 4,2 5,2 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 12,2 L 12,6 L 16,6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 7,11 L 13,11 M 7,14 L 11,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -43,7 +41,7 @@ const navItems = [
     href: '/student/attendance',
     label: 'Attendance',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
         <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
         <path d="M 10,5 L 10,10 L 14,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -53,20 +51,10 @@ const navItems = [
     href: '/student/tests',
     label: 'Tests',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
         <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <path d="M 7,3 L 7,5 M 13,3 L 13,5 M 3,9 L 17,9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         <path d="M 7,13 L 9,15 L 13,11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: '/student/profile',
-    label: 'Profile',
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M 3,18 Q 3,13 10,13 Q 17,13 17,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -87,122 +75,153 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
   }
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 72 : 220 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="h-screen sticky top-0 flex flex-col bg-white border-r border-[#e2d5f0] shrink-0 overflow-hidden"
+    <div
+      style={{ width: collapsed ? 64 : 256 }}
+      className="h-full flex flex-col bg-white border-r border-[#e2e5ec] shrink-0 transition-[width] duration-300 ease-in-out overflow-hidden"
     >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-[#e2d5f0]">
-        <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-          <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
-            <circle cx="18" cy="18" r="16" stroke="#5e4075" strokeWidth="1.8" />
-            <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(60 18 18)" />
-            <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(-60 18 18)" />
-            <circle cx="18" cy="18" r="3" fill="#5e4075" />
-          </svg>
+      {/* Header */}
+      {collapsed ? (
+        <div className="flex items-center justify-center h-14 shrink-0">
+          <div className="w-6 h-6 shrink-0">
+            <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
+              <circle cx="18" cy="18" r="16" stroke="#7A6B96" strokeWidth="1.8" />
+              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(60 18 18)" />
+              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(-60 18 18)" />
+              <circle cx="18" cy="18" r="3" fill="#7A6B96" />
+            </svg>
+          </div>
         </div>
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden whitespace-nowrap"
-            >
-              <span className="text-[#5e4075] text-base">Chemistry</span>
-              <span className="text-[#8b6fa0] text-base">@OCTET</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      ) : (
+        <div className="flex items-center h-14 shrink-0 px-4 gap-2">
+          <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+            <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
+              <circle cx="18" cy="18" r="16" stroke="#7A6B96" strokeWidth="1.8" />
+              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(60 18 18)" />
+              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#7A6B96" strokeWidth="1.5" transform="rotate(-60 18 18)" />
+              <circle cx="18" cy="18" r="3" fill="#7A6B96" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <p className="text-base text-[#7A6B96] whitespace-nowrap leading-tight">
+              Chemistry<span className="text-[#64748b]">@OCTET</span>
+            </p>
+          </div>
+          <button
+            onClick={onToggle}
+            className="shrink-0 w-7 h-7 flex items-center justify-center text-[#64748b] hover:bg-[#F4F1F8] rounded-md transition-colors"
+            title="Collapse sidebar"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
+              <path d="M 8,2 L 4,6 L 8,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
-      {/* Toggle button */}
-      <button
-        onClick={onToggle}
-        className="absolute top-5 -right-3 w-6 h-6 bg-white border border-[#e2d5f0] rounded-full flex items-center justify-center text-[#5e4075] hover:bg-[#f0e8f8] transition-colors duration-200 z-10"
-      >
-        <svg className={`w-3 h-3 transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`} viewBox="0 0 12 12" fill="none">
-          <path d="M 8,2 L 4,6 L 8,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      {/* MENU label */}
+      {!collapsed && (
+        <p className="px-4 pt-5 pb-1 text-xs text-[#64748b] uppercase tracking-widest">
+          Menu
+        </p>
+      )}
 
       {/* Nav items */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
         {navItems.map((item) => {
           const active = isActive(item.href)
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                active
-                  ? 'bg-[#5e4075]/8 text-[#5e4075]'
-                  : 'text-[#8b6fa0] hover:bg-[#e9deb5]/40 hover:text-[#5e4075]'
-              }`}
-            >
-              {active && (
-                <motion.div
-                  layoutId="sidebar-active"
-                  className="absolute inset-0 bg-[#5e4075]/8 rounded-xl"
-                />
-              )}
-              <span className="relative z-10 shrink-0">{item.icon}</span>
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="relative z-10 text-base whitespace-nowrap overflow-hidden"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+            <div key={item.href} className="relative">
+              <Link
+                href={item.href}
+                className={`relative flex items-center h-12 transition-colors group ${
+                  collapsed
+                    ? `w-full justify-center border-l-2 ${active ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'}`
+                    : `w-full px-4 gap-3 border-l-2 ${active ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'}`
+                }`}
+              >
+                {item.icon}
 
-              {/* Tooltip when collapsed */}
-              {collapsed && (
-                <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#5e4075] text-[#f8f9ed] text-[14px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                  {item.label}
-                </div>
-              )}
-            </Link>
+                {!collapsed && (
+                  <span className="text-lg whitespace-nowrap">{item.label}</span>
+                )}
+
+                {collapsed && (
+                  <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            </div>
           )
         })}
       </nav>
 
-      {/* Bottom — logout */}
-      <div className="p-2 border-t border-[#e2d5f0]">
-        <button
-          onClick={() => router.push('/')}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#8b6fa0] hover:bg-[#e9deb5]/40 hover:text-[#5e4075] transition-all duration-200 group"
-        >
-          <svg className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="none">
-            <path d="M 8,3 L 4,3 Q 2,3 2,5 L 2,15 Q 2,17 4,17 L 8,17 M 13,7 L 18,10 L 13,13 M 18,10 L 8,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="text-base whitespace-nowrap overflow-hidden"
-              >
-                Sign Out
-              </motion.span>
-            )}
-          </AnimatePresence>
-          {collapsed && (
-            <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#5e4075] text-[#f8f9ed] text-[14px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+      {/* My Profile + Sign out */}
+      <div className={`${collapsed ? 'flex flex-col items-center gap-1' : ''}`}>
+        {/* My Profile */}
+        {collapsed ? (
+          <Link
+            href="/student/profile"
+            className={`relative group w-full h-12 flex items-center justify-center border-l-2 transition-colors ${
+              isActive('/student/profile')
+                ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
+                : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              My Profile
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/student/profile"
+            className={`flex items-center gap-3 px-4 py-2.5 border-l-2 transition-colors group ${
+              isActive('/student/profile')
+                ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
+                : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="text-lg whitespace-nowrap">My Profile</span>
+          </Link>
+        )}
+
+        {/* Sign out */}
+        {collapsed ? (
+          <button
+            onClick={() => router.push('/')}
+            className="relative group w-12 mb-2 h-10 bg-[#7A6B96] rounded-md flex items-center justify-center text-white font-inter text-base"
+            title="Sign out"
+          >
+            A
+            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
               Sign Out
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-2">
+            <div className="w-9 h-9 rounded-md bg-[#7A6B96] flex items-center justify-center text-white font-inter text-base shrink-0">
+              A
             </div>
-          )}
-        </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-base text-[#635580] leading-tight truncate">Arjun Sharma</p>
+              <button
+                onClick={() => router.push('/')}
+                className="text-sm text-[#64748b] hover:text-[#7A6B96] transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </motion.aside>
+    </div>
   )
 }
