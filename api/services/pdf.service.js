@@ -60,12 +60,20 @@ const createPdf = async ({ title, subtopicId, isVisible = true, uploadedBy, file
   // ── Step 1: Upload to R2 ──────────────────────────────────
   // PutObjectCommand sends the file buffer to R2.
   // Body accepts a Buffer (which is what multer gives us with memoryStorage).
-  await r2.send(new PutObjectCommand({
-    Bucket:      BUCKET,
-    Key:         r2Key,
-    Body:        file.buffer,
-    ContentType: file.mimetype,
-  }));
+  try {
+    await r2.send(new PutObjectCommand({
+      Bucket:      BUCKET,
+      Key:         r2Key,
+      Body:        file.buffer,
+      ContentType: file.mimetype,
+    }));
+  } catch (r2Error) {
+    console.log("BUCKET:", BUCKET);           // ← is this correct?
+    console.log("R2 error code:", r2Error.Code);
+    console.log("R2 error message:", r2Error.message);
+    console.log("R2 full error:", r2Error);
+    throw r2Error;
+  }
 
   // ── Step 2: Save metadata to Supabase ─────────────────────
   // We never store the full URL — only the r2Key.

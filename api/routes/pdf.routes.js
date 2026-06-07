@@ -45,7 +45,7 @@ router.get("/", pdfController.getAllPdfs);
 router.get("/:id", pdfController.getPdfById);
 
 // PUT    /api/content/pdf/:id      → update metadata of a PDF
-router.put("/:id", pdfController.updatePdf);
+router.patch("/:id", pdfController.updatePdf);
 
 // DELETE /api/content/pdf/:id      → delete a PDF
 router.delete("/:id", pdfController.deletePdf);

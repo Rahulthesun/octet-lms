@@ -142,8 +142,8 @@ const deletePdf = async (req, res) => {
       return res.status(404).json({ error: "PDF not found" });
     }
 
-    // 204 = success, no body. Common for DELETE.
-    res.status(204).send();
+    
+    res.status(200).json({ message: "PDF deleted successfully", id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
