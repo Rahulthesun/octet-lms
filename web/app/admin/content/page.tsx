@@ -10,6 +10,8 @@ import {
   IconCheckCircle,
 } from "@/components/ui/SvgIcons";
 
+import { useContentTree } from "@/hooks/useContentTree";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Grade = "11" | "12" | "jee" | "neet";
@@ -397,6 +399,17 @@ function StorageBar() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ContentPage() {
+
+  const {
+    subjects,
+    chaptersMap,
+    subtopicsMap,
+    loading,
+    error,
+    loadChapters,
+    loadSubtopics,
+  } = useContentTree();
+
   const [tree, setTree] = useState<ContentTree>(initialTree);
   const [selectedGrade, setSelectedGrade] = useState<Grade>("11");
   const [openSubject, setOpenSubject] = useState<Subject | null>(null);
