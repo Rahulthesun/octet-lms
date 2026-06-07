@@ -22,8 +22,8 @@ router.get("/", subjectController.getAllSubjects);
 // GET   /api/subjects/:id  → get a single subject
 router.get("/:id", subjectController.getSubjectById);
 
-// PUT   /api/subjects/:id  → update a subject
-router.put("/:id", subjectController.updateSubject);
+// PATCH /api/subjects/:id  → update a subject
+router.patch("/:id", subjectController.updateSubject);
 
 // DELETE /api/subjects/:id → delete a subject
 router.delete("/:id", subjectController.deleteSubject);
