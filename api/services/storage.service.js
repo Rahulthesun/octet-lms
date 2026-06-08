@@ -1,50 +1,89 @@
 /**
  * services/storage.service.js
  * ─────────────────────────────────────────────────────────────
- * Aggregates storage data across PDF and Video collections.
- *
- * In Mongoose you'd use the .aggregate() pipeline for this.
- * Example (Mongoose):
- *
- *   const result = await Pdf.aggregate([
- *     { $group: {
- *         _id: null,
- *         totalBytes: { $sum: "$sizeBytes" },
- *         count:      { $sum: 1 }
- *     }}
- *   ]);
- * ─────────────────────────────────────────────────────────────
+ * Storage statistics using Cloudflare R2.
  */
 
-// TODO: const Pdf   = require('../models/pdf.model');
-// TODO: const Video = require('../models/video.model');
+const { S3Client, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
-/**
- * getStorageUsage
- * @returns {{ totalBytes, totalPdfs, totalVideos, totalPdfBytes, totalVideoBytes }}
- */
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
+const BUCKET = process.env.R2_BUCKET_NAME;
+
 const getStorageUsage = async () => {
-  // TODO: run aggregate queries on Pdf and Video collections
+  let continuationToken;
+
+  let totalBytes = 0;
+  let totalPdfs = 0;
+  let totalVideos = 0;
+  let totalPdfBytes = 0;
+  let totalVideoBytes = 0;
+
+  do {
+    const response = await r2.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    const objects = response.Contents || [];
+
+    for (const object of objects) {
+      const key = object.Key || "";
+      const size = object.Size || 0;
+
+      totalBytes += size;
+
+      if (key.toLowerCase().endsWith(".pdf")) {
+        totalPdfs += 1;
+        totalPdfBytes += size;
+      }
+
+      if (
+        key.toLowerCase().endsWith(".mp4") ||
+        key.toLowerCase().endsWith(".mov") ||
+        key.toLowerCase().endsWith(".avi") ||
+        key.toLowerCase().endsWith(".mkv") ||
+        key.toLowerCase().endsWith(".webm")
+      ) {
+        totalVideos += 1;
+        totalVideoBytes += size;
+      }
+    }
+
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
   return {
-    totalBytes:      0,
-    totalPdfs:       0,
-    totalVideos:     0,
-    totalPdfBytes:   0,
-    totalVideoBytes: 0,
+    totalBytes,
+    totalPdfs,
+    totalVideos,
+    totalPdfBytes,
+    totalVideoBytes,
   };
 };
 
-/**
- * getContentStats
- * @returns {{ bySubject: Array, byUser: Array }}
- */
 const getContentStats = async () => {
-  // TODO: join Subject → Chapter → Subtopic → (Pdf | Video)
-  // group by subject and by uploadedBy user
+  const usage = await getStorageUsage();
+
   return {
     bySubject: [],
-    byUser:    [],
+    byUser: [],
+    summary: usage,
   };
 };
 
-module.exports = { getStorageUsage, getContentStats };
+module.exports = {
+  getStorageUsage,
+  getContentStats,
+};
