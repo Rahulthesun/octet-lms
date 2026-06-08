@@ -36,7 +36,7 @@ const pdfService = require("../services/pdf.service");
  * POST /api/content/pdf/upload
  *
  * Expects: multipart/form-data with a "file" field + metadata fields
- *   { title, subjectId, chapterId, subtopicId, isVisible }
+ *   { title, subjectId, chapterId, chapterId, isVisible }
  *
  * In production you'd plug in multer (file upload middleware) here.
  * For now, req.file and req.body are placeholders.
@@ -49,13 +49,13 @@ const uploadPdf = async (req, res) => {
   console.log("req.body:", req.body);   // ← add this
   console.log("req.file:", req.file); 
   try {
-    const { title, subtopicId, isVisible } = req.body;
-    if (!title || !subtopicId) {
-      return res.status(400).json({ error: "title and subtopicId are required" });
+    const { title, chapterId, isVisible } = req.body;
+    if (!title || !chapterId) {
+      return res.status(400).json({ error: "title and chapterId are required" });
     }
     const newPdf = await pdfService.createPdf({
       title,
-      subtopicId,
+      chapterId,
       isVisible: isVisible === "true",
       uploadedBy: req.user?.id || null,
       file: req.file,   // set by multer
@@ -69,12 +69,12 @@ const uploadPdf = async (req, res) => {
  * GET /api/content/pdf
  *
  * Returns a list of all PDFs. You can later add query params
- * for filtering: ?subtopicId=xyz&isVisible=true
+ * for filtering: ?chapterId=xyz&isVisible=true
  */
 const getAllPdfs = async (req, res) => {
   try {
     // req.query holds everything after the ? in the URL.
-    // e.g. GET /api/content/pdf?subtopicId=abc → req.query = { subtopicId: 'abc' }
+    // e.g. GET /api/content/pdf?chapterId=abc → req.query = { chapterId: 'abc' }
     const filters = req.query;
     const pdfs = await pdfService.getAllPdfs(filters);
     res.status(200).json(pdfs);

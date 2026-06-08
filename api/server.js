@@ -46,14 +46,14 @@ app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
 app.use("/api/subjects",      subjectRouter);
 app.use("/api/chapters",      chapterRouter);
-app.use("/api/subtopics",     subtopicRouter);
+//app.use("/api/subtopics",     subtopicRouter); DEPRECATED USE OF SUBTOPIC ROUTER
 app.use("/api/storage",       storageRouter);
 
 // ── Health check ──────────────────────────────────────────────
 // A simple GET / so you can confirm the server is running.
 // Hit http://localhost:5000 in the browser or with curl.
 app.get("/", (req, res) => {
-  res.json({ message: "C@O API is running 🚀" });
+  res.json({ message: "Chemistry@OCTET API is running !!" });
 });
 
 // ── 404 handler ───────────────────────────────────────────────
