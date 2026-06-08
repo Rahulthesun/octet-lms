@@ -16,11 +16,13 @@ const subtopicController = require("../controllers/subtopic.controller");
 //   body should include { chapterId, name, ... }
 router.post("/", subtopicController.createSubtopic);
 
-// GET   /api/subtopics/:chapterId       → get all subtopics for a chapter
-router.get("/:chapterId", subtopicController.getSubtopicsByChapter);
+router.get("/:id", subtopicController.getSubtopicById);
+
+// GET   /api/subtopics/chapter/:chapterId       → get all subtopics for a chapter
+router.get("/chapter/:chapterId", subtopicController.getSubtopicsByChapter);
 
 // PUT   /api/subtopics/:id              → update a subtopic
-router.put("/:id", subtopicController.updateSubtopic);
+router.patch("/:id", subtopicController.updateSubtopic);
 
 // DELETE /api/subtopics/:id             → delete a subtopic
 router.delete("/:id", subtopicController.deleteSubtopic);

@@ -1,43 +1,117 @@
 /**
  * services/subtopic.service.js
  * ─────────────────────────────────────────────────────────────
- * DB Model:
- *  Subtopic {
- *    _id         : ObjectId
- *    name        : String (required)
- *    description : String
- *    order       : Number
- *    chapterId   : ref → Chapter (required)
- *    createdAt   : Date
- *    updatedAt   : Date
+ * DB Schema:
+ *  subtopics {
+ *    id          : uuid (auto-generated)
+ *    chapter_id  : uuid (FK → chapters, on delete cascade)
+ *    name        : text (required)
+ *    description : text
+ *    order_index : integer (controls display order, default 0)
+ *    is_visible  : boolean (default true)
+ *    created_at  : timestamptz (auto-set)
+ *    updated_at  : timestamptz (auto-set)
  *  }
  *
- *  PDFs and Videos reference subtopicId in their own collection
- *  rather than being embedded – this keeps documents small and
- *  makes it easy to query "all PDFs in this subtopic".
+ *  PDFs and Videos reference subtopic_id in their own tables
+ *  rather than being embedded — keeps queries simple and lets
+ *  you fetch "all PDFs in this subtopic" efficiently.
  * ─────────────────────────────────────────────────────────────
  */
 
-// TODO: const Subtopic = require('../models/subtopic.model');
+const supabase = require("../config/supabase");
 
-const createSubtopic = async ({ name, chapterId, description, order }) => {
-  // TODO: Subtopic.create({ name, chapterId, description, order })
-  return { id: "stub-id", name, chapterId };
+// ─── Create ───────────────────────────────────────────────────
+
+const createSubtopic = async ({ name, chapterId, description, orderIndex, isVisible }) => {
+  const { data, error } = await supabase
+    .from("subtopics")
+    .insert({
+      name,
+      chapter_id:  chapterId,
+      description,
+      order_index: orderIndex ?? 0,
+      is_visible:  isVisible  ?? true,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 };
+
+// ─── Read all by chapter ──────────────────────────────────────
 
 const getSubtopicsByChapter = async (chapterId) => {
-  // TODO: Subtopic.find({ chapterId }).sort({ order: 1 })
-  return [];
+  const { data, error } = await supabase
+    .from("subtopics")
+    .select("*")
+    .eq("chapter_id", chapterId)
+    .order("order_index", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error(`No subtopics found for chapter ID: ${chapterId}`);
+  return data;
 };
+
+// ─── Read one ─────────────────────────────────────────────────
+
+const getSubtopicById = async (id) => {
+  const { data, error } = await supabase
+    .from("subtopics")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error?.code === "PGRST116") return null;
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+// ─── Update ───────────────────────────────────────────────────
 
 const updateSubtopic = async (id, updates) => {
-  // TODO: Subtopic.findByIdAndUpdate(id, updates, { new: true })
-  return null;
+  const allowed = {};
+  if (updates.name        !== undefined) allowed.name        = updates.name;
+  if (updates.description !== undefined) allowed.description = updates.description;
+  if (updates.orderIndex  !== undefined) allowed.order_index = updates.orderIndex;
+  if (updates.isVisible   !== undefined) allowed.is_visible  = updates.isVisible;
+  if (updates.chapterId   !== undefined) allowed.chapter_id  = updates.chapterId;
+  allowed.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("subtopics")
+    .update(allowed)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error?.code === "PGRST116") return null;
+  if (error) throw new Error(error.message);
+  return data;
 };
+
+// ─── Delete ───────────────────────────────────────────────────
 
 const deleteSubtopic = async (id) => {
-  // TODO: Subtopic.findByIdAndDelete(id)
-  return null;
+  const existing = await getSubtopicById(id);
+  if (!existing) return null;
+
+  const { error } = await supabase
+    .from("subtopics")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  // ON DELETE CASCADE removes all pdfs and videos under this subtopic
+  return { id };
 };
 
-module.exports = { createSubtopic, getSubtopicsByChapter, updateSubtopic, deleteSubtopic };
+module.exports = {
+  createSubtopic,
+  getSubtopicsByChapter,
+  getSubtopicById,
+  updateSubtopic,
+  deleteSubtopic,
+};
