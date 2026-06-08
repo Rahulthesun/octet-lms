@@ -49,7 +49,7 @@ const getSignedPdfUrl = async (r2Key) => {
 //   file.mimetype     → e.g. "application/pdf"
 //   file.size         → bytes
 // ─────────────────────────────────────────────────────────────
-const createPdf = async ({ title, subtopicId, isVisible = true, uploadedBy, file }) => {
+const createPdf = async ({ title, chapterId, isVisible = true, uploadedBy, file }) => {
   if (!file) throw new Error("No file provided");
 
   // Build a unique key so two files with the same name never collide.
@@ -82,7 +82,7 @@ const createPdf = async ({ title, subtopicId, isVisible = true, uploadedBy, file
     .from("pdfs")
     .insert({
       title,
-      subtopic_id: subtopicId,
+      chapter_id: chapterId,
       filename:    file.originalname,
       r2_key:      r2Key,
       mime_type:   file.mimetype,
@@ -107,15 +107,15 @@ const createPdf = async ({ title, subtopicId, isVisible = true, uploadedBy, file
 
 // ─────────────────────────────────────────────────────────────
 // getAllPdfs
-// Supports optional filtering by subtopicId and/or isVisible.
-// Example: getAllPdfs({ subtopic_id: "abc", is_visible: true })
+// Supports optional filtering by chapterId and/or isVisible.
+// Example: getAllPdfs({ chapter_id: "abc", is_visible: true })
 // ─────────────────────────────────────────────────────────────
 const getAllPdfs = async (filters = {}) => {
   let query = supabase.from("pdfs").select("*").order("created_at", { ascending: false });
 
   // Dynamically apply whatever filters were passed in.
   // This avoids writing a separate query for every filter combo.
-  if (filters.subtopicId) query = query.eq("subtopic_id", filters.subtopicId);
+  if (filters.chapterId) query = query.eq("chapter_id", filters.chapterId);
   if (filters.isVisible !== undefined) query = query.eq("is_visible", filters.isVisible === "true");
 
   const { data, error } = await query;
@@ -155,7 +155,7 @@ const getPdfById = async (id) => {
 // ─────────────────────────────────────────────────────────────
 // updatePdf
 // Only updates metadata fields — does NOT re-upload the file.
-// Allowed fields: title, is_visible, subtopic_id
+// Allowed fields: title, is_visible, chapter_id
 // ─────────────────────────────────────────────────────────────
 const updatePdf = async (id, updates) => {
   // Whitelist what's allowed to be updated.
@@ -163,7 +163,7 @@ const updatePdf = async (id, updates) => {
   const allowed = {};
   if (updates.title      !== undefined) allowed.title       = updates.title;
   if (updates.isVisible  !== undefined) allowed.is_visible  = updates.isVisible;
-  if (updates.subtopicId !== undefined) allowed.subtopic_id = updates.subtopicId;
+  if (updates.chapterId !== undefined) allowed.chapter_id = updates.chapterId;
   allowed.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
