@@ -63,7 +63,9 @@ const deleteSubject = async (req, res) => {
   try {
     const deleted = await subjectService.deleteSubject(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Subject not found" });
-    res.status(204).send();
+    
+    res.status(200).json({ message: "Subject deleted successfully", id: deleted.id });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

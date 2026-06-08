@@ -26,6 +26,23 @@ const createChapter = async (req, res) => {
   }
 };
 
+
+
+const getChapterById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const chapter = await chapterService.getChapterById(id);
+    if (!chapter) {
+      return res.status(404).json({ error: "Chapter not found with ID: " + id });
+    }
+
+    res.status(200).json(chapter);
+   }
+    catch (err) { 
+      res.status(500).json({ error: err.message });
+    }
+}
+
 /**
  * GET /api/chapters/:subjectId
  *
@@ -36,6 +53,9 @@ const getChaptersBySubject = async (req, res) => {
   try {
     const { subjectId } = req.params;
     const chapters = await chapterService.getChaptersBySubject(subjectId);
+    if (!chapters || chapters.length === 0) {
+      return res.status(404).json({ error: `No chapters found for subject ID: ${subjectId}` });
+    }
     res.status(200).json(chapters);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -58,10 +78,11 @@ const deleteChapter = async (req, res) => {
   try {
     const deleted = await chapterService.deleteChapter(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Chapter not found" });
-    res.status(204).send();
+    
+    res.status(200).json({ message: "Chapter deleted successfully", id: deleted.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-module.exports = { createChapter, getChaptersBySubject, updateChapter, deleteChapter };
+module.exports = { createChapter, getChapterById, getChaptersBySubject, updateChapter, deleteChapter };
