@@ -15,11 +15,14 @@ const chapterController = require("../controllers/chapter.controller");
 //   body should include { subjectId, name, ... }
 router.post("/", chapterController.createChapter);
 
+// GET   /api/chapters/chapter/:id          → get a single chapter by id
+router.get("/:id", chapterController.getChapterById);
+
 // GET   /api/chapters/:subjectId           → get all chapters for a subject
-router.get("/:subjectId", chapterController.getChaptersBySubject);
+router.get("/subject/:subjectId", chapterController.getChaptersBySubject);
 
 // PUT   /api/chapters/:id                  → update a chapter
-router.put("/:id", chapterController.updateChapter);
+router.patch("/:id", chapterController.updateChapter);
 
 // DELETE /api/chapters/:id                 → delete a chapter
 router.delete("/:id", chapterController.deleteChapter);
