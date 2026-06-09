@@ -153,6 +153,30 @@ const getPdfById = async (id) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// getPdfByChapterId
+// ─────────────────────────────────────────────────────────────
+const getPdfsByChapterId = async (chapterId) => {
+  const { data, error } = await supabase
+    .from("pdfs")
+    .select("*")
+    .eq("chapter_id", chapterId)
+
+  // Supabase returns error.code "PGRST116" when no row is found.
+  // We return null so the controller can send a 404.
+  if (error?.code === "PGRST116") return null;
+  if (error) throw new Error(error.message);
+
+  //Takes the arrays of PDF's From data , and fetches signed URL for each PDF in the array and returns a new array with the signed URLs included  
+  return await Promise.all(
+    data.map(async (pdf) => ({
+      ...pdf,
+      signedUrl: await getSignedPdfUrl(pdf.r2_key),
+    }))
+  );
+};
+
+
+// ─────────────────────────────────────────────────────────────
 // updatePdf
 // Only updates metadata fields — does NOT re-upload the file.
 // Allowed fields: title, is_visible, chapter_id
@@ -213,4 +237,4 @@ const deletePdf = async (id) => {
   return pdf;
 };
 
-module.exports = { createPdf, getAllPdfs, getPdfById, updatePdf, deletePdf };
+module.exports = { createPdf, getAllPdfs, getPdfById, getPdfsByChapterId , updatePdf, deletePdf };
