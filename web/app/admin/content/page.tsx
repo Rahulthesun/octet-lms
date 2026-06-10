@@ -53,7 +53,6 @@ type DeleteTarget = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8000";
-const R2_BASE  = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
 
 function fmt(iso?: string) {
   if (!iso) return "";
@@ -225,10 +224,13 @@ export default function ContentPage() {
 
   // ── Derived: PDF preview URL ───────────────────────────────────────────────
   // Requires NEXT_PUBLIC_R2_PUBLIC_URL in .env.local
-  // For private buckets, fetch a presigned URL from your backend instead.
+  // Proxy through Express — avoids CORS and keeps the real R2 URL off the client.
+  // Falls back to null for locally-optimistic files (id starts with "local-").
   const pdfPreviewUrl: string | null =
-    selectedPath?.contentType === "pdf" && selectedFile?.r2_key
-      ? `${R2_BASE}/${(selectedFile as BackendPdf).r2_key}`
+    selectedPath?.contentType === "pdf" &&
+    selectedFile?.id &&
+    !selectedFile.id.startsWith("local-")
+      ? `${BASE_URL}/api/pdfs/${selectedFile.id}/stream`
       : null;
 
   // ── Search visibility ──────────────────────────────────────────────────────
@@ -480,7 +482,7 @@ export default function ContentPage() {
             </p>
           </div>
           <div className="lg:w-80 shrink-0">
-            <StorageBar totalVideoBytes={storage.totalBytes} />
+            <StorageBar totalVideoBytes={storage.totalVideoBytes} />
           </div>
         </div>
       </div>
