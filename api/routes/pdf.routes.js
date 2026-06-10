@@ -37,6 +37,9 @@ const upload = multer({
 // POST   /api/content/pdf/upload   → upload a new PDF
 router.post("/upload", upload.single("file"), pdfController.uploadPdf);
 
+// GET    /api/content/pdf/:id/stream   → Stream a PDF file by ID (for inline viewing)
+router.get("/:id/stream", pdfController.streamPdfbyId);
+
 // GET    /api/content/pdf          → list all PDFs
 router.get("/", pdfController.getAllPdfs);
 

@@ -19,13 +19,13 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-const { PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand, DeleteObjectCommand} = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { v4: uuidv4 } = require("uuid");
 
 const supabase = require("../config/supabase");
-const r2       = require("../config/r2");
+const r2 = require("../config/r2");
 
 const BUCKET = process.env.R2_BUCKET_NAME;
 
@@ -134,6 +134,58 @@ const getAllPdfs = async (filters = {}) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// streamPdfById
+// ─────────────────────────────────────────────────────────────
+const streamPdfbyId = async (id , res) => {
+  const { data : pdf, error } = await supabase
+    .from("pdfs")
+    .select("r2_key, title , filename")
+    .eq("id", id)
+    .single();
+
+  // Supabase returns error.code "PGRST116" when no row is found.
+  // We return null so the controller can send a 404.
+  if (error?.code === "PGRST116") return null;
+  if (error || !pdf) {
+    throw new Error("PDF_NOT_FOUND");
+  }
+
+  if (error) throw new Error(error.message);
+  
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: pdf.r2_key,
+  });
+
+  try {
+    const s3Response = await r2.send(command);
+  
+    console.log("R2 response received");
+    console.log("Body exists:", !!s3Response.Body);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${pdf.filename ?? pdf.title}.pdf"`
+    );
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    // Stream directly from R2 → Client
+    console.log({
+    contentType: s3Response.ContentType,
+    contentLength: s3Response.ContentLength,
+    metadata: s3Response.Metadata,
+    });
+    s3Response.Body.pipe(res);
+  } catch (r2Error) {
+    console.log("Error fetching from R2:", r2Error);
+    throw new Error("Failed to fetch PDF from storage");
+  }
+  
+  
+};
+
+// ─────────────────────────────────────────────────────────────
 // getPdfById
 // ─────────────────────────────────────────────────────────────
 const getPdfById = async (id) => {
@@ -237,4 +289,4 @@ const deletePdf = async (id) => {
   return pdf;
 };
 
-module.exports = { createPdf, getAllPdfs, getPdfById, getPdfsByChapterId , updatePdf, deletePdf };
+module.exports = { createPdf, getAllPdfs, getPdfById,streamPdfbyId, getPdfsByChapterId , updatePdf, deletePdf };
