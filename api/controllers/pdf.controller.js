@@ -83,6 +83,25 @@ const getAllPdfs = async (req, res) => {
   }
 };
 
+
+const streamPdfbyId = async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pdfService.streamPdfbyId(id, res);
+    
+    } catch (err) {
+    console.error("streamPdfbyId controller error:", err);
+    if (err.message === "PDF_NOT_FOUND") {
+      return res.status(404).json({ message: "PDF not found" });
+    }
+    return res.status(500).json({
+      message: "Failed to stream PDF",
+      error: err.message,
+      stack: err.stack,
+    });
+  }
+  }
+
 /**
  * GET /api/content/pdf/:id
  *
@@ -176,6 +195,7 @@ module.exports = {
   uploadPdf,
   getAllPdfs,
   getPdfById,
+  streamPdfbyId,
   getPdfsByChapterId,
   updatePdf,
   deletePdf,
