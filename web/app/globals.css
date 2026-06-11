@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@font-face {
+  font-family: "Contralto";
+  src: url("/fonts/contralto-small-regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-white: #ffffff;
+  --color-bg: #f8f9ed;
+  --color-primary: #5e4075;
+  --color-accent1: #e9deb5;
+  --color-accent2: #daeae4;
+  --color-accent3: #d4c5e2;
+  --color-accent4: #c8e0da;
+  --color-muted: #8b6fa0;
+  --color-border: #c8b8d8;
+  --color-brand: #7A6B96;        /* dusty plum — student portal accent (admin/landing don't use) */
+  --color-brand-dark: #635580;   /* plum-dark — hover / pressed */
+  --font-sans: "Contralto", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Student portal — scoped slate ink + dusty-plum accent theme.
+   Re-binds the shared color tokens for the /student subtree only: text/headings
+   (`text-primary`) and `text-muted` become neutral slate, accent tints become
+   soft plum. The sparing plum accent itself uses the global `brand` token
+   (`bg-brand`/`text-brand`). Admin + landing keep the purple defaults above. */
+.student-scope {
+  --color-primary: #1e293b;   /* slate-800 — ink / headings */
+  --color-muted:   #64748b;   /* slate-500 */
+  --color-accent1: #F1EEF5;   /* plum-50  — soft tint bg / hover */
+  --color-accent2: #E7E2EF;   /* plum-100 */
+  --color-accent3: #e2e8f0;   /* slate-200 — neutral */
+  --color-accent4: #F1EEF5;
+  --color-border:  #E6E2EC;   /* faint plum-grey border */
+}
+
+/* Numbers / data display inside the student portal use Space Grotesk. */
+.student-scope .font-data,
+.student-scope .font-num {
+  font-family: 'Space Grotesk', var(--font-data), ui-monospace, system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+@layer base {
+  html {
+    scroll-behavior: auto;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-color: #f8f9ed;
+    color: #5e4075;
+    font-family: "Contralto", system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  a {
+    text-decoration: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Lenis smooth scroll */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9ed;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c8b8d8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5e4075;
+}
+
+::selection {
+  background: #e9deb5;
+  color: #5e4075;
+}
+
+/* Space Grotesk for numeric/data displays in admin UI */
+.font-inter,
+.font-data {
+  font-family: 'Space Grotesk', var(--font-data), system-ui, sans-serif;
 }
