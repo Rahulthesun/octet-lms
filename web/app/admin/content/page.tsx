@@ -8,7 +8,7 @@ import {
   IconClose,
   IconCheckCircle,
 } from "@/components/ui/SvgIcons";
-import { useContentTree } from "@/hooks/useContentTree";
+import { useContentTree } from "../../../hooks/admin/useContentTree";
 import { PdfViewer } from "../../../components/admin/PDFViewer";
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ export default function ContentPage() {
     selectedPath?.contentType === "pdf" &&
     selectedFile?.id &&
     !selectedFile.id.startsWith("local-")
-      ? `${BASE_URL}/api/pdfs/${selectedFile.id}/stream`
+      ? `${BASE_URL}/api/content/pdf/${selectedFile.id}/stream`
       : null;
 
   // ── Search visibility ──────────────────────────────────────────────────────

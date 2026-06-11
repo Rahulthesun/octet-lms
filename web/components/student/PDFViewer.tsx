@@ -86,9 +86,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const containerRef  = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<any>(null);
-  const isScrollingRef = useRef<boolean>(false);
 
   // ── Compute fit-to-width scale ─────────────────────────────────────────────
   const computeFitScale = useCallback(async (doc: any, pNum: number) => {
@@ -126,7 +124,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setFitScale(fit);
-        setScale(fit);
+        setScale(fit); // auto-fit to width on first load
       } catch (e: any) {
         if (!cancelled) setLoadError(e?.message ?? "Failed to load PDF");
       } finally {
@@ -137,57 +135,60 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     return () => { cancelled = true; };
   }, [url, computeFitScale]);
 
-  // ── Render all pages ────────────────────────────────────────────────────
+  // ── Render current page ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!pdfDoc || !containerRef.current) return;
+      if (!pdfDoc || !containerRef.current) return;
 
-    let cancelled = false;
-    setRendering(true);
+      let cancelled = false;
+      setRendering(true);
 
-    (async () => {
-      try {
-        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
-          if (cancelled) return;
+      (async () => {
+        try {
+          for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+            if (cancelled) return;
 
-          const page = await pdfDoc.getPage(pageNumber);
+            const page = await pdfDoc.getPage(pageNumber);
 
-          const canvas = containerRef.current?.querySelector(
-            `canvas[data-page="${pageNumber}"]`
-          ) as HTMLCanvasElement | null;
+            const canvas = containerRef.current?.querySelector(
+              `canvas[data-page="${pageNumber}"]`
+            ) as HTMLCanvasElement | null;
 
-          if (!canvas) continue;
+            if (!canvas) continue;
 
-          const viewport = page.getViewport({ scale });
+            const viewport = page.getViewport({ scale });
 
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = `${viewport.width}px`;
-          canvas.style.height = `${viewport.height}px`;
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
 
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) continue;
 
-          await page.render({
-            canvasContext: ctx,
-            viewport,
-          }).promise;
+            await page.render({
+              canvasContext: ctx,
+              viewport,
+            }).promise;
 
-          if (cancelled) return;
+            if (cancelled) return;
 
-          drawWatermark(ctx, viewport.width, viewport.height);
+            drawWatermark(ctx, viewport.width, viewport.height);
+          }
+        } catch (e: any) {
+          if (
+            e?.name !== "RenderingCancelledException" &&
+            !cancelled
+          ) {
+            console.error("Render error:", e);
+          }
+        } finally {
+          if (!cancelled) setRendering(false);
         }
-      } catch (e: any) {
-        if (e?.name !== "RenderingCancelledException" && !cancelled) {
-          console.error("Render error:", e);
-        }
-      } finally {
-        if (!cancelled) setRendering(false);
-      }
-    })();
+      })();
 
-    return () => {
-      cancelled = true;
-    };
+      return () => {
+        cancelled = true;
+      };
   }, [pdfDoc, scale]);
 
   // ── DRM: block Ctrl+S / Ctrl+P / Ctrl+C / Ctrl+A ──────────────────────────
@@ -212,36 +213,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     });
     obs.observe(containerRef.current);
     return () => obs.disconnect();
-  }, [pdfDoc, computeFitScale]);
-
-  // ── Smooth scroll handling for better inertia ──────────────────────────────
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    let scrollTimeout: NodeJS.Timeout;
-    
-    const handleScrollStart = () => {
-      isScrollingRef.current = true;
-      clearTimeout(scrollTimeout);
-      scrollContainer.style.scrollBehavior = 'auto';
-    };
-    
-    const handleScrollEnd = () => {
-      scrollTimeout = setTimeout(() => {
-        isScrollingRef.current = false;
-        scrollContainer.style.scrollBehavior = 'smooth';
-      }, 150);
-    };
-    
-    scrollContainer.addEventListener('scroll', handleScrollStart);
-    scrollContainer.addEventListener('scrollend', handleScrollEnd);
-    
-    return () => {
-      scrollContainer.removeEventListener('scroll', handleScrollStart);
-      scrollContainer.removeEventListener('scrollend', handleScrollEnd);
-    };
-  }, []);
+  }, [pdfDoc,computeFitScale]);
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
   const zoomIn   = () => setScale((s) => Math.min(+(s * 1.25).toFixed(3), 4.0));
@@ -275,55 +247,10 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     <>
       {/* DRM: hide entire viewer on print */}
       <style>{`@media print { .cato-pdf-viewer { display: none !important; } }`}</style>
-      
-      {/* Global styles for smooth scrolling */}
-      <style>{`
-        .pdf-scroll-container {
-          scroll-behavior: smooth;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior: contain;
-          scrollbar-width: thin;
-          scrollbar-gutter: stable;
-        }
-        
-        .pdf-scroll-container::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        
-        .pdf-scroll-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
-        }
-        
-        .pdf-scroll-container::-webkit-scrollbar-thumb {
-          background: #c1c1c1;
-          border-radius: 4px;
-        }
-        
-        .pdf-scroll-container::-webkit-scrollbar-thumb:hover {
-          background: #a8a8a8;
-        }
-        
-        .pdf-page {
-          transition: transform 0.2s ease-out;
-          will-change: transform;
-        }
-        
-        .pdf-page:hover {
-          transform: scale(1.01);
-          transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-        }
-      `}</style>
 
-      {/* FIX: Add h-full to the outer div and ensure it takes full height */}
       <div
         className={`cato-pdf-viewer flex flex-col rounded-xl overflow-hidden border border-gray-200 bg-white select-none focus:outline-none ${className}`}
-        style={{ 
-          minHeight: 380,
-          height: '100%',  // ADD THIS - ensures the viewer takes full height
-          maxHeight: '100%' // ADD THIS - prevents overflow
-        }}
+        style={{ minHeight: 380 }}
         onContextMenu={(e) => e.preventDefault()}
       >
         {/* ── Branded toolbar ── */}
@@ -395,89 +322,70 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
           </div>
         </div>
 
-        {/* ── Canvas scroll area with improved smooth scrolling ── */}
-        {/* FIX: Add min-h-0 to allow flex child to shrink properly */}
+        {/* ── Canvas scroll area ── */}
         <div
-          ref={scrollContainerRef}
-          className="pdf-scroll-container flex-1 overflow-auto bg-gradient-to-b from-[#e8e8e8] to-[#f0f0f0]"
-          style={{ 
-            minHeight: 0,  // CHANGE THIS from 300 to 0 - critical for flex scrolling!
-            scrollBehavior: 'smooth',
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain',
-          }}
+          ref={containerRef}
+          className="flex-1 overflow-auto bg-[#e8e8e8] flex flex-col items-center py-5 gap-1"
+          style={{ minHeight: 300 }}
         >
-          <div ref={containerRef} className="flex flex-col items-center py-6 gap-5">
-            {/* Loading state */}
-            {loading && (
-              <div className="flex flex-col items-center justify-center gap-3 py-20 flex-1">
-                <div className="relative">
-                  <AtomIcon className="w-8 h-8 text-primary/20 animate-pulse" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  </div>
-                </div>
-                <span className="text-xs text-gray-400 mt-1">Loading document…</span>
-              </div>
-            )}
-
-            {/* Error state */}
-            {loadError && !loading && (
-              <div className="flex flex-col items-center justify-center gap-3 py-20 flex-1">
-                <svg className="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none">
-                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                    stroke="currentColor" strokeWidth="1.5" />
-                  <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  <circle cx="12" cy="17" r="1" fill="currentColor" />
-                </svg>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">Could not load PDF</p>
-                  <p className="text-xs text-gray-400 mt-1 max-w-48 text-center">{loadError}</p>
+          {/* Loading state */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center gap-3 py-20 flex-1">
+              <div className="relative">
+                <AtomIcon className="w-8 h-8 text-primary/20 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                 </div>
               </div>
-            )}
+              <span className="text-xs text-gray-400 mt-1">Loading document…</span>
+            </div>
+          )}
 
-            {/* PDF canvas pages with improved spacing and hover effects */}
-            {!loading && !loadError && (
-              <div className="w-full flex flex-col items-center gap-6">
-                {Array.from({ length: numPages }, (_, i) => (
-                  <div
-                    key={i + 1}
-                    className="pdf-page relative shadow-xl rounded-lg transition-all duration-300 hover:shadow-2xl"
-                    style={{
-                      transition: 'transform 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1), box-shadow 0.2s ease'
-                    }}
-                  >
-                    <canvas
-                      data-page={i + 1}
-                      className="block rounded-lg"
-                      style={{
-                        display: "block",
-                        maxWidth: "100%",
-                        pointerEvents: "none",
-                        height: 'auto',
-                      }}
-                    />
-                    
-                    {/* Page number indicator (subtle) */}
-                    <div className="absolute bottom-2 right-2 bg-black/40 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono">
-                      {i + 1}
-                    </div>
-                  </div>
-                ))}
+          {/* Error state */}
+          {loadError && !loading && (
+            <div className="flex flex-col items-center justify-center gap-3 py-20 flex-1">
+              <svg className="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                  stroke="currentColor" strokeWidth="1.5" />
+                <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="12" cy="17" r="1" fill="currentColor" />
+              </svg>
+              <div className="text-center">
+                <p className="text-sm text-gray-500">Could not load PDF</p>
+                <p className="text-xs text-gray-400 mt-1 max-w-48 text-center">{loadError}</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Bottom brand watermark strip */}
-            {!loading && !loadError && numPages > 0 && (
-              <div className="flex items-center gap-1.5 mt-4 pb-2 opacity-40">
-                <AtomIcon className="w-3 h-3 text-gray-500" />
-                <span className="text-[10px] text-gray-500 font-medium tracking-wide">
-                  Chemistry@OCTET — Secured Content
-                </span>
+          {/* PDF canvas */}
+          <div className="w-full flex flex-col items-center gap-4">
+            {Array.from({ length: numPages }, (_, i) => (
+              <div
+                key={i + 1}
+                className="relative shadow-2xl rounded-sm"
+              >
+                <canvas
+                  data-page={i + 1}
+                  className="block rounded-sm"
+                  style={{
+                    display: "block",
+                    maxWidth: "100%",
+                    pointerEvents: "none",
+                  }}
+                />
               </div>
-            )}
+            ))}
           </div>
+
+          {/* Bottom brand watermark strip */}
+          {!loading && !loadError && (
+            <div className="flex items-center gap-1.5 mt-2 opacity-40">
+              <AtomIcon className="w-3 h-3 text-gray-500" />
+              <span className="text-[10px] text-gray-500 font-medium tracking-wide">
+                Chemistry@OCTET — Secured Content
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </>
