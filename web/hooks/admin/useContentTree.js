@@ -8,7 +8,7 @@ export function useContentTree() {
   const [loading, setLoading]         = useState(true);
   const [storage, setStorage]         = useState({
     totalBytes: 0, totalPdfs: 0, totalVideos: 0,
-    totalPdfBytes: 0, totalVideoBytes: 0,
+    totalPdfBytes: 0, totalVideoBytes: 0, limitBytes:60 * 1024 * 1024 * 1024 // 60 GB default limit
   });
   const [error, setError] = useState(null);
 
@@ -70,7 +70,7 @@ export function useContentTree() {
     await Promise.all(fetches);
   }
 
-  // Fetch storage usage (call this on mount from your page)
+  // Fetch storage usage
   async function getStorage() {
     try {
       const res  = await fetch(`${BASE}/api/storage/usage`);
@@ -82,17 +82,53 @@ export function useContentTree() {
     }
   }
 
-  // ── Optimistic mutators ───────────────────────────────────────────────────
-
-  // Add a chapter optimistically (replace with real data after API call)
+  // Add a chapter optimistically
   function addChapter(subjectId, chapter) {
     setChaptersMap((prev) => ({
       ...prev,
       [subjectId]: [...(prev[subjectId] ?? []), chapter],
     }));
-    // Also initialise empty content buckets so the chapter is ready to load
     setPdfsMap((prev)   => ({ ...prev, [chapter.id]: [] }));
     setVideosMap((prev) => ({ ...prev, [chapter.id]: [] }));
+  }
+
+  // ✅ NEW: Delete a chapter
+  async function deleteChapter(subjectId, chapterId) {
+    try {
+      const response = await fetch(`${BASE}/api/chapters/${chapterId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete chapter: ${response.status} - ${errorText}`);
+      }
+      
+      // Update local state - remove chapter from chaptersMap
+      setChaptersMap((prev) => ({
+        ...prev,
+        [subjectId]: (prev[subjectId] || []).filter((ch) => ch.id !== chapterId),
+      }));
+      
+      // Clean up PDFs and videos maps for this chapter
+      setPdfsMap((prev) => {
+        const newMap = { ...prev };
+        delete newMap[chapterId];
+        return newMap;
+      });
+      
+      setVideosMap((prev) => {
+        const newMap = { ...prev };
+        delete newMap[chapterId];
+        return newMap;
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting chapter:", error);
+      throw error;
+    }
   }
 
   function updatePdfs(chapterId, updater) {
@@ -113,7 +149,8 @@ export function useContentTree() {
     subjects, chaptersMap, pdfsMap, videosMap,
     storage, loading, error,
     loadChapters, loadChapterContent,
-    addChapter, updatePdfs, updateVideos,
+    addChapter, deleteChapter, // ← Include deleteChapter here
+    updatePdfs, updateVideos,
     getStorage,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { CheckIcon , XMarkIcon , TrashIcon } from "@heroicons/react/16/solid";
 import {
   IconPlay,
   IconDocument,
@@ -78,7 +79,8 @@ function formatBytes(bytes: number, decimals = 2) {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function TrashIcon({ className = "w-4 h-4" }: { className?: string }) {
+{/*
+  function TrashIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" fill="none">
       <path d="M 3,4.5 H 13 M 6,4.5 V 3 Q 6,2.5 6.5,2.5 H 9.5 Q 10,2.5 10,3 V 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -87,6 +89,8 @@ function TrashIcon({ className = "w-4 h-4" }: { className?: string }) {
     </svg>
   );
 }
+  */}
+
 
 function SearchIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
@@ -118,10 +122,10 @@ function ChevronIcon({ open, className = "w-3.5 h-3.5" }: { open: boolean; class
 
 // ─── Storage bar — receives live values as props ───────────────────────────────
 
-function StorageBar({ totalVideoBytes }: { totalVideoBytes: number }) {
+function StorageBar({ totalBytes }: { totalBytes: number }) {
   const TOTAL_GB  = 60;
-  const totalBytes = TOTAL_GB * 1024 * 1024 * 1024;
-  const usedPct    = Math.min((totalVideoBytes / totalBytes) * 100, 100);
+  const limitBytes = TOTAL_GB * 1024 * 1024 * 1024;
+  const usedPct    = Math.min((totalBytes / limitBytes) * 100, 100);
 
   return (
     <div className="flex items-center gap-4 bg-white p-4 rounded-2xl">
@@ -129,7 +133,7 @@ function StorageBar({ totalVideoBytes }: { totalVideoBytes: number }) {
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600 text-base">Video Storage</span>
           <span className="font-inter font-bold text-primary">
-            {formatBytes(totalVideoBytes)} / {formatBytes(totalBytes)}
+            {formatBytes(totalBytes)} / {formatBytes(limitBytes)}
           </span>
         </div>
         <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -140,7 +144,7 @@ function StorageBar({ totalVideoBytes }: { totalVideoBytes: number }) {
         </div>
       </div>
       <span className="text-sm text-gray-600 shrink-0">
-        <span className="font-inter">{formatBytes(totalBytes - totalVideoBytes)}</span> free
+        <span className="font-inter">{formatBytes(limitBytes - totalBytes)}</span> free
       </span>
     </div>
   );
@@ -158,6 +162,7 @@ export default function ContentPage() {
     loading,
     error,
     loadChapters,
+    deleteChapter, // ← Add this line
     loadChapterContent,
     addChapter,
     updatePdfs,
@@ -184,6 +189,15 @@ export default function ContentPage() {
 
   // ── Delete confirmation ────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deletingChapter, setDeletingChapter] = useState<{
+    id: string;
+    name: string;
+    subjectName: string;
+    idx: number;
+    files: { id: string; name: string; type: "pdf" | "video" }[];
+  } | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
 
   // ── File edit state ────────────────────────────────────────────────────────
   const [editTitle, setEditTitle]             = useState("");
@@ -322,19 +336,17 @@ export default function ContentPage() {
     subjectId: string,
     name: string,
   ): Promise<{ id: string; name: string } | null> {
-    // Replace this block with your actual API call, e.g.:
-    //
-    // const res = await fetch(`${BASE_URL}/api/chapters`, {
-    //   method:  "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body:    JSON.stringify({ subject_id: subjectId, name }),
-    // });
-    // if (!res.ok) throw new Error("Failed to create chapter");
-    // const data = await res.json();
-    // return data.chapter ?? data; // adjust to your response shape
-    //
-    // ── Optimistic mock — remove when your API is wired up ─────────────────
-    return { id: `local-ch-${Date.now()}`, name };
+   
+  
+    const res = await fetch(`${BASE_URL}/api/chapters`, {
+       method:  "POST",
+       headers: { "Content-Type": "application/json" },
+       body:    JSON.stringify({ subjectId: subjectId, name : name }),
+    });
+    if (!res.ok) throw new Error("Failed to create chapter");
+    const data = await res.json();
+
+    return data.chapter ?? data;
   }
   // ─── ⬆ YOUR API INTEGRATION ───────────────────────────────────────────────
 
@@ -455,6 +467,54 @@ export default function ContentPage() {
     getStorage();
   }
 
+  // ── Delete chapter ─────────────────────────────────────────────────────────
+
+  const handleDeleteChapter = (chapter: {
+    id: string;
+    name: string;
+    subjectName: string;
+    idx: number;
+    files: { id: string; name: string; type: "pdf" | "video" }[];
+  }) => {
+    setDeletingChapter(chapter);
+  };
+
+  // In your useContentTree hook file (hooks/admin/useContentTree.ts)
+  const confirmDeleteChapter = async () => {
+    if (!deletingChapter) return;
+    setConfirmingDelete(true);
+    
+    try {
+      // Find subjectId for this chapter
+      let subjectId = null;
+      for (const [sid, chapters] of Object.entries(chaptersMap)) {
+        if (chapters.some((ch: any) => ch.id === deletingChapter.id)) {
+          subjectId = sid;
+          break;
+        }
+      }
+      
+      if (!subjectId) throw new Error("Subject not found for this chapter");
+      
+      // Call the deleteChapter method from your hook
+      await deleteChapter(subjectId, deletingChapter.id);
+      
+      // If the deleted chapter was currently open, close it
+      if (openChapterId === deletingChapter.id) {
+        setOpenChapterId(null);
+        setSelectedItemId(null);
+      }
+      
+      // Close modal
+      setDeletingChapter(null);
+      
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to delete chapter");
+    } finally {
+      setConfirmingDelete(false);
+    }
+  }; 
   // ── Render vars ────────────────────────────────────────────────────────────
   const isVideo    = selectedPath?.contentType === "video";
   const fileAccept = isVideo ? ".mp4,.mov,.mkv,.avi" : ".pdf,.pptx,.docx,.xlsx";
@@ -482,7 +542,7 @@ export default function ContentPage() {
             </p>
           </div>
           <div className="lg:w-80 shrink-0">
-            <StorageBar totalVideoBytes={storage.totalVideoBytes} />
+            <StorageBar totalBytes={storage.totalBytes} />
           </div>
         </div>
       </div>
@@ -590,22 +650,23 @@ export default function ContentPage() {
                                 return (
                                   <div key={chapter.id}>
 
-                                    {/* Chapter row */}
+                                   {/* Chapter row */}
                                     <button
                                       onClick={() => toggleChapter(chapter.id)}
                                       className={`w-full flex items-center gap-2.5 pl-8 pr-4 py-2.5 text-left transition-colors ${
                                         chapterOpen ? "bg-gray-50" : "hover:bg-gray-50"
                                       }`}
                                     >
-                                      <span className="text-sm text-gray-400 shrink-0 w-15">
+                                      <span className="text-sm text-gray-400 shrink-0 w-auto">
                                         Chap - {idx + 1}
                                       </span>
                                       <span className="flex-1 text-md text-gray-700 leading-snug">
                                         {chapter.name}
                                       </span>
+
                                       <ChevronIcon open={chapterOpen} className="w-3 h-3 text-gray-400" />
                                     </button>
-
+                            
                                     {/* Chapter content */}
                                     <AnimatePresence initial={false}>
                                       {chapterOpen && (
@@ -654,13 +715,45 @@ export default function ContentPage() {
                                                   <PlusIcon className="w-3 h-3" />
                                                   <IconDocument className="w-3.5 h-3.5" />
                                                 </button>
-                                                <button
+
+                                                {/* 
+                                                 ------ Add VIDEO BUTTON HIDDEN BECAUSE VIDEO UPLOAD IS DISABLED IN BACKEND FOR NOW ------
+                                                
+                                                */}
+                                                <button 
+                                                  hidden
                                                   onClick={(e) => { e.stopPropagation(); openUploadFor(chapter.id, "video"); }}
                                                   title="Upload Video"
                                                   className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer"
                                                 >
                                                   <PlusIcon className="w-3 h-3" />
                                                   <IconPlay className="w-3.5 h-3.5" />
+                                                </button>
+
+                                                {/* Delete chapter button */}
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteChapter({
+                                                      id: chapter.id,
+                                                      name: chapter.name,
+                                                      subjectName: subject.name,
+                                                      idx,
+                                                      files: [
+                                                        ...((pdfsMap[chapter.id] ?? []) as BackendPdf[])
+                                                        .filter((f) => !visibility || visibility.visiblePdfs.has(f.id))
+                                                        .map((f) => ({ id: f.id, name: f.title, type: "pdf" as const })),
+                                                      ...((videosMap[chapter.id] ?? []) as BackendVideo[])
+                                                        .filter((f) => !visibility || visibility.visibleVideos.has(f.id))
+                                                        .map((f) => ({ id: f.id, name: f.title, type: "video" as const })),
+                                                    ],
+                                                    });
+                                                  }}
+                                                  className="shrink-0 rounded-lg p-1.5 bg-transparent transition-all
+                                                  roup-hover:text-gray-300 text-red-400 hover:bg-red-100"
+                                                  title="Delete chapter"
+                                                >
+                                                  <TrashIcon className="h-3.5 w-3.5" />
                                                 </button>
                                               </div>
                                             )}
@@ -719,48 +812,62 @@ export default function ContentPage() {
                               })}
 
                             {/* ── Add Chapter ── */}
-                            {!visibility && chaptersMap[subject.id] !== undefined && (
-                              addingChapterToSubject === subject.id ? (
-                                <div className="pl-8 pr-4 py-2 flex items-center gap-2">
-                                  <input
-                                    autoFocus
-                                    type="text"
-                                    value={newChapterName}
-                                    onChange={(e) => setNewChapterName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter")  submitAddChapter(subject.id);
-                                      if (e.key === "Escape") cancelAddChapter();
+                              {!visibility && chaptersMap[subject.id] !== undefined && (
+                                addingChapterToSubject === subject.id ? (
+                                  <div className="mx-4 mb-3 mt-1 rounded-xl border border-primary/30 bg-primary/5 p-3 shadow-sm ring-1 ring-primary/10">
+                                    <p className="mb-2 text-xs font-medium tracking-wide text-primary/70 uppercase">
+                                      New Chapter
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        autoFocus
+                                        type="text"
+                                        value={newChapterName}
+                                        onChange={(e) => setNewChapterName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter")  submitAddChapter(subject.id);
+                                          if (e.key === "Escape") cancelAddChapter();
+                                        }}
+                                        placeholder="e.g. Atomic Structure"
+                                        className="flex-1 rounded-lg border border-primary/30 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                      />
+                                      <button
+                                        onClick={() => submitAddChapter(subject.id)}
+                                        disabled={addingChapter || !newChapterName.trim()}
+                                        className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        {addingChapter ? (
+                                          <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                        ) : (
+                                          <CheckIcon className="h-3.5 w-3.5" />
+                                        )}
+                                        Add
+                                      </button>
+                                      <button
+                                        onClick={cancelAddChapter}
+                                        className="rounded-lg border border-gray-200 p-2 text-gray-400 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-600"
+                                      >
+                                        <XMarkIcon className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-400">
+                                      Press <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono text-[10px] text-gray-500">Enter</kbd> to save · <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono text-[10px] text-gray-500">Esc</kbd> to cancel
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setAddingChapterToSubject(subject.id);
+                                      setNewChapterName("");
                                     }}
-                                    placeholder="Chapter name…"
-                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary text-gray-700"
-                                  />
-                                  <button
-                                    onClick={() => submitAddChapter(subject.id)}
-                                    disabled={addingChapter || !newChapterName.trim()}
-                                    className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg disabled:opacity-50 cursor-pointer"
+                                    className="mx-4 mb-3 mt-1 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 py-2.5 text-sm text-gray-400 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
                                   >
-                                    {addingChapter ? "…" : "✓"}
+                                    <PlusIcon className="h-4 w-4" />
+                                    Add Chapter
                                   </button>
-                                  <button
-                                    onClick={cancelAddChapter}
-                                    className="px-2 py-1.5 text-gray-400 hover:text-gray-600 text-sm cursor-pointer"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setAddingChapterToSubject(subject.id);
-                                    setNewChapterName("");
-                                  }}
-                                  className="w-full flex items-center gap-2 pl-8 pr-4 py-2 text-sm text-gray-400 hover:text-primary transition-colors cursor-pointer"
-                                >
-                                  <PlusIcon className="w-3.5 h-3.5" />
-                                  Add Chapter
-                                </button>
-                              )
-                            )}
+                                )
+                              )}
+
                           </div>
                         </motion.div>
                       )}
@@ -1210,6 +1317,117 @@ export default function ContentPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete Chapter Modal */}
+
+      {/* Delete Chapter Modal */}
+      {deletingChapter && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    {/* Backdrop */}
+    <div
+      className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-200"
+      onClick={() => !confirmingDelete && setDeletingChapter(null)}
+    />
+    
+    {/* Modal Container */}
+    <div className="relative mx-4 w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95">
+      
+      {/* Header Section */}
+      <div className="p-6 pb-3">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-50">
+          <TrashIcon className="h-5 w-5 text-red-500" />
+        </div>
+        
+        <h2 className="text-lg font-semibold text-gray-900">Delete Chapter?</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          This will permanently delete the chapter and all its files. This action cannot be undone.
+        </p>
+      </div>
+
+      {/* Chapter Details Card */}
+      <div className="mx-6 mb-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+        <div className="divide-y divide-gray-100">
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-400">Subject</span>
+            <span className="text-sm font-medium text-gray-700">{deletingChapter.subjectName}</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-400">Chapter</span>
+            <span className="text-sm font-medium text-gray-700">Chap - {deletingChapter.idx + 1}</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm text-gray-400">Name</span>
+            <span className="text-sm font-medium text-gray-700">{deletingChapter.name}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Files List Section */}
+      <div className="mx-6 mb-4">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+            Files in this chapter
+          </p>
+          <span className="text-xs text-gray-400">
+            {deletingChapter.files.length} file{deletingChapter.files.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {deletingChapter.files.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 py-3 text-center">
+            <p className="text-xs text-gray-400">No files — chapter is empty</p>
+          </div>
+        ) : (
+          <div className="max-h-36 overflow-y-auto rounded-xl border border-red-100 bg-red-50/50">
+            <div className="divide-y divide-red-100">
+              {deletingChapter.files.map((file, idx) => (
+                <div key={file.id} className="flex items-center gap-2.5 px-3 py-2">
+                  <span className="shrink-0 text-[10px] font-mono text-red-300">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  
+                  {file.type === "pdf" ? (
+                    <IconDocument className="h-3.5 w-3.5 shrink-0 text-red-300" />
+                  ) : (
+                    <IconPlay className="h-3.5 w-3.5 shrink-0 text-red-300" />
+                  )}
+                  
+                  <span className="flex-1 truncate text-sm text-red-700">
+                    {file.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4">
+        <button
+          onClick={() => setDeletingChapter(null)}
+          disabled={confirmingDelete}
+          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Cancel
+        </button>
+        
+        <button
+          onClick={confirmDeleteChapter}
+          disabled={confirmingDelete}
+          className="flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-red-600 focus:ring-2 focus:ring-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {confirmingDelete && (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          )}
+          {confirmingDelete ? "Deleting…" : "Yes, Delete Chapter"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 }
