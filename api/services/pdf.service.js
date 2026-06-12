@@ -19,6 +19,8 @@
  * ─────────────────────────────────────────────────────────────
  */
 
+const { indexPdfDocument } = require("./pdfIndexer.service");
+
 const { PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
@@ -102,7 +104,24 @@ const createPdf = async ({ title, chapterId, isVisible = true, uploadedBy, file 
 
   // ── Step 3: Return metadata + a fresh signed URL ──────────
   const signedUrl = await getSignedPdfUrl(r2Key);
-  return { ...data, signedUrl };
+  // return { ...data, signedUrl };
+
+  setImmediate(async () => {
+
+    try {
+
+        await indexPdfDocument(data);
+
+        console.log("PDF indexed successfully");
+
+    } catch (err) {
+
+        console.error("Indexing failed:", err);
+    }
+
+});
+
+return { ...data, signedUrl };
 };
 
 // ─────────────────────────────────────────────────────────────

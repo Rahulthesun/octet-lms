@@ -49,6 +49,12 @@ app.use("/api/chapters",      chapterRouter);
 //app.use("/api/subtopics",     subtopicRouter); DEPRECATED USE OF SUBTOPIC ROUTER
 app.use("/api/storage",       storageRouter);
 
+
+app.use("/api/search", require("./routes/search.routes"));
+
+
+
+
 // ── Health check ──────────────────────────────────────────────
 // A simple GET / so you can confirm the server is running.
 // Hit http://localhost:5000 in the browser or with curl.
