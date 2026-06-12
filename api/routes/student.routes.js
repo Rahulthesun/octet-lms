@@ -12,6 +12,11 @@ const express = require("express");
 const router = express.Router();
 const studentController = require("../controllers/student.controller");
 
+//FOR BULK IMPORT CSV UPLOAD
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+
 // ======================== Student CRUD ========================
 
 // GET    /api/students          → list all students (with filters: batch, mode, status, search)
@@ -22,6 +27,8 @@ router.get("/pending", studentController.getPendingStudents);
 
 // GET    /api/students/:id      → get a single student by ID
 router.get("/:id", studentController.getStudentById);
+
+//CREATE + UPDATE + DELETE OPERATIONS (admin only)
 
 // POST   /api/students          → create a new student application (direct, not via form)
 router.post("/", studentController.createStudent);
@@ -36,7 +43,7 @@ router.delete("/:id", studentController.deleteStudent);
 
 // POST   /api/students/bulk-import   → import a list of pre‑approved students
 // Request body: { students: [...] }
-router.post("/bulk-import", studentController.bulkImportStudents);
+router.post("/bulk-import", upload.single('file'), studentController.bulkImport);
 
 // ======================== Approval Flow ========================
 

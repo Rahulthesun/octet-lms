@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-const { supabaseAdmin } = require("../config/supabase");
+const supabase = require("../config/supabase");
 const { generateTempPassword, generateUsername } = require("../utils/helpers");
 
 /**
@@ -21,10 +21,10 @@ async function createStudentAuthUser(student, admissionNumber) {
     const tempPassword = generateTempPassword();
     const username = generateUsername(student.name);
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    const { data, error } = await supabase.auth.admin.createUser({
         email: student.email,
         password: tempPassword,
-        email_confirm: true,                // No extra confirmation email
+        email_confirm: true,
         user_metadata: {
             name: student.name,
             role: "student",
@@ -38,12 +38,18 @@ async function createStudentAuthUser(student, admissionNumber) {
         throw new Error(`Auth user creation failed for ${student.email}: ${error.message}`);
     }
 
+    // Guard against missing data or user object
+    if (!data || !data.user || !data.user.id) {
+        throw new Error(`Auth user creation returned invalid response for ${student.email}: ${JSON.stringify(data)}`);
+    }
+
     return {
         authUserId: data.user.id,
         tempPassword,
         username,
     };
 }
+
 
 /**
  * Deletes an auth user by ID (used when deleting a student).
@@ -52,7 +58,7 @@ async function createStudentAuthUser(student, admissionNumber) {
  * @returns {Promise<void>}
  */
 async function deleteStudentAuthUser(authUserId) {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+    const { error } = await supabase.auth.admin.deleteUser(authUserId);
     if (error) {
         throw new Error(`Failed to delete auth user ${authUserId}: ${error.message}`);
     }
@@ -67,9 +73,10 @@ async function deleteStudentAuthUser(authUserId) {
  * @returns {Promise<void>}
  */
 async function updateStudentPassword(authUserId, newPassword) {
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+    const { error } = await supabase.auth.admin.updateUserById(authUserId, {
         password: newPassword,
     });
+    
     if (error) throw new Error(`Password update failed: ${error.message}`);
 }
 
@@ -81,7 +88,7 @@ async function updateStudentPassword(authUserId, newPassword) {
  * @returns {Promise<void>}
  */
 async function sendPasswordResetEmail(email, redirectUrl) {
-    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
     });
     if (error) throw new Error(`Reset email could not be sent: ${error.message}`);

@@ -7,9 +7,61 @@
 
 /**
  * Generates a random temporary password for a new student.
- * @param {number} length - Desired password length (default 10)
+ * @param {number} length - Desired password length (default 10)a
  * @returns {string} - Alphanumeric password
+ * 
  */
+
+// utils/helpers.js
+const fs = require('fs');
+const path = require('path');
+
+// File where the last admission number counter is stored
+const COUNTER_FILE = path.join(__dirname, '..', '.admission_counter.json');
+
+/**
+ * Generates a sequential admission number.
+ * Format: OCTET-YYYY-XXX (e.g., OCTET-2026-001)
+ * The counter persists across server restarts using a JSON file.
+ * @returns {string} Admission number
+ */
+function generateAdmissionNumber() {
+    // Read current counter
+    let counter = 1;
+    try {
+        if (fs.existsSync(COUNTER_FILE)) {
+            const data = JSON.parse(fs.readFileSync(COUNTER_FILE, 'utf8'));
+            counter = data.lastNumber + 1;
+        }
+    } catch (err) {
+        console.warn('Could not read counter file, starting from 1');
+    }
+
+    const year = new Date().getFullYear();
+    const padded = String(counter).padStart(3, '0');
+    const admissionNumber = `OCTET-${year}-${padded}`;
+
+    // Save new counter
+    try {
+        fs.writeFileSync(COUNTER_FILE, JSON.stringify({ lastNumber: counter }, null, 2));
+    } catch (err) {
+        console.error('Failed to save counter:', err.message);
+    }
+
+    return admissionNumber;
+}
+
+// ... rest of your existing helper functions (generateTempPassword, generateUsername, etc.)
+
+module.exports = {
+    generateTempPassword,
+    generateUsername,
+    generateAdmissionNumber,   // <-- add this
+    isValidBatch,
+    isValidLearningMode,
+    sanitizeStudent,
+    sleep,
+};
 function generateTempPassword(length = 10) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let password = '';
@@ -71,6 +123,7 @@ function sleep(ms) {
 
 module.exports = {
     generateTempPassword,
+    generateAdmissionNumber,
     generateUsername,
     isValidBatch,
     isValidLearningMode,

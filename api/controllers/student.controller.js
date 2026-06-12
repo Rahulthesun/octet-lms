@@ -57,13 +57,40 @@ exports.deleteStudent = async (req, res) => {
   }
 };
 
-exports.bulkImportStudents = async (req, res) => {
-  try {
-    const result = await studentService.bulkImportStudents(req.body.students);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+const csv = require('csv-parse');
+
+exports.bulkImport = async (req, res) => {
+    try {
+        let studentsArray;
+
+        // CASE 1: CSV file uploaded (multipart/form-data)
+        if (req.file) {
+            const csvData = req.file.buffer.toString('utf8');
+            studentsArray = await new Promise((resolve, reject) => {
+                csv.parse(csvData, { columns: true, skip_empty_lines: true }, (err, output) => {
+                    if (err) reject(err);
+                    else resolve(output);
+                });
+            });
+            // Convert comma-separated subjects to array
+            studentsArray = studentsArray.map(s => ({
+                ...s,
+                subjects: s.subjects ? s.subjects.split(',').map(sub => sub.trim()) : []
+            }));
+        } 
+        // CASE 2: JSON body (application/json)
+        else if (req.body && req.body.students) {
+            studentsArray = req.body.students;
+        } 
+        else {
+            return res.status(400).json({ success: false, error: 'Provide either a CSV file (field "file") or a JSON body with "students" array' });
+        }
+
+        const result = await studentService.bulkImportStudents(studentsArray);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
 exports.approveStudent = async (req, res) => {
