@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import ChemistryOctetLogo from "@/components/ui/ChemistryOctetLogo";
 
 const navItems = [
   {
@@ -197,68 +198,14 @@ export default function AdminSidebar({
       {/* Header */}
       {collapsed ? (
         <div className="flex items-center justify-center h-14 shrink-0">
-          <div className="w-6 h-6 shrink-0">
-            <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                stroke="#5e4075"
-                strokeWidth="1.8"
-              />
-              <ellipse
-                cx="18"
-                cy="18"
-                rx="14"
-                ry="6"
-                stroke="#5e4075"
-                strokeWidth="1.5"
-                transform="rotate(60 18 18)"
-              />
-              <ellipse
-                cx="18"
-                cy="18"
-                rx="14"
-                ry="6"
-                stroke="#5e4075"
-                strokeWidth="1.5"
-                transform="rotate(-60 18 18)"
-              />
-              <circle cx="18" cy="18" r="3" fill="#5e4075" />
-            </svg>
+          <div className="w-10 h-10 shrink-0">
+            <ChemistryOctetLogo size={40} />
           </div>
         </div>
       ) : (
         <div className="flex items-center h-14 shrink-0 px-4 gap-2">
-          <div className="w-8 h-8 shrink-0 flex items-center justify-center">
-            <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
-              <circle
-                cx="18"
-                cy="18"
-                r="16"
-                stroke="#5e4075"
-                strokeWidth="1.8"
-              />
-              <ellipse
-                cx="18"
-                cy="18"
-                rx="14"
-                ry="6"
-                stroke="#5e4075"
-                strokeWidth="1.5"
-                transform="rotate(60 18 18)"
-              />
-              <ellipse
-                cx="18"
-                cy="18"
-                rx="14"
-                ry="6"
-                stroke="#5e4075"
-                strokeWidth="1.5"
-                transform="rotate(-60 18 18)"
-              />
-              <circle cx="18" cy="18" r="3" fill="#5e4075" />
-            </svg>
+          <div className="w-11 h-11 shrink-0 flex items-center justify-center">
+            <ChemistryOctetLogo size={44} />
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
             <p className="text-base text-primary whitespace-nowrap leading-tight">

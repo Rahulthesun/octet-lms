@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AtomSVG, FlaskSVG } from '@/components/ui/PencilSVGs'
+import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,12 +27,9 @@ export default function LoginPage() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-8 py-3.5 border-b border-accent1 shrink-0">
           <Link href="/" className="flex items-center gap-2.5">
-            <svg viewBox="0 0 36 36" fill="none" className="w-8 h-8">
-              <circle cx="18" cy="18" r="16" stroke="#5e4075" strokeWidth="1.8" />
-              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(60 18 18)" />
-              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(-60 18 18)" />
-              <circle cx="18" cy="18" r="3" fill="#5e4075" />
-            </svg>
+            <div className="w-11 h-11 shrink-0">
+              <ChemistryOctetLogo size={44} />
+            </div>
             <span className="text-primary text-base">Chemistry<span className="text-muted">@</span>OCTET</span>
           </Link>
           <Link href="/" className="inline-flex items-center gap-2 text-muted text-base hover:text-primary transition-colors">
