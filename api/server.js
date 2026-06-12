@@ -42,6 +42,8 @@ const chapterRouter  = require("./routes/chapter.routes");
 const subtopicRouter = require("./routes/subtopic.routes");
 const storageRouter  = require("./routes/storage.routes");
 
+const studentRouter  = require("./routes/student.routes");
+
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
 app.use("/api/subjects",      subjectRouter);
@@ -54,6 +56,10 @@ app.use("/api/search", require("./routes/search.routes"));
 
 
 
+
+//Students Management 
+
+app.use("/api/students", studentRouter);
 
 // ── Health check ──────────────────────────────────────────────
 // A simple GET / so you can confirm the server is running.
