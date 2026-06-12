@@ -37,12 +37,20 @@ const upload = multer({
 // POST   /api/content/pdf/upload   → upload a new PDF
 router.post("/upload", upload.single("file"), pdfController.uploadPdf);
 
+// GET    /api/content/pdf/:id/stream   → Stream a PDF file by ID (for inline viewing)
+router.get("/:id/stream", pdfController.streamPdfbyId);
+
 // GET    /api/content/pdf          → list all PDFs
 router.get("/", pdfController.getAllPdfs);
 
 // GET    /api/content/pdf/:id      → get a single PDF by ID
 // :id is a URL parameter – accessible via req.params.id
 router.get("/:id", pdfController.getPdfById);
+
+
+// GET    /api/content/pdf/chapter/:chapterId     → get PDFs by chapter ID
+// :chapterId is a URL parameter – accessible via req.params.chapterId
+router.get("/chapter/:chapterId", pdfController.getPdfsByChapterId);
 
 // PUT    /api/content/pdf/:id      → update metadata of a PDF
 router.patch("/:id", pdfController.updatePdf);

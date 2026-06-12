@@ -83,6 +83,25 @@ const getAllPdfs = async (req, res) => {
   }
 };
 
+
+const streamPdfbyId = async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pdfService.streamPdfbyId(id, res);
+    
+    } catch (err) {
+    console.error("streamPdfbyId controller error:", err);
+    if (err.message === "PDF_NOT_FOUND") {
+      return res.status(404).json({ message: "PDF not found" });
+    }
+    return res.status(500).json({
+      message: "Failed to stream PDF",
+      error: err.message,
+      stack: err.stack,
+    });
+  }
+  }
+
 /**
  * GET /api/content/pdf/:id
  *
@@ -96,6 +115,27 @@ const getPdfById = async (req, res) => {
 
     if (!pdf) {
       return res.status(404).json({ error: "PDF not found" });
+    }
+
+    res.status(200).json(pdf);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/content/pdf/chapter/:chapterId
+ *
+ * Returns all PDF documents for a given chapter.
+ * :chapterId in the route path becomes req.params.chapterId here.
+ */
+const getPdfsByChapterId = async (req, res) => {
+  try {
+    const { chapterId } = req.params; // destructure from req.params
+    const pdf = await pdfService.getPdfsByChapterId(chapterId);
+
+    if (!pdf) {
+      return res.status(404).json({ error: "No PDFs found for this chapter" });
     }
 
     res.status(200).json(pdf);
@@ -155,6 +195,8 @@ module.exports = {
   uploadPdf,
   getAllPdfs,
   getPdfById,
+  streamPdfbyId,
+  getPdfsByChapterId,
   updatePdf,
   deletePdf,
 };
