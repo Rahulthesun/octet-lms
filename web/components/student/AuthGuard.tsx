@@ -12,21 +12,32 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-
-      if (!data.session) {
-        router.replace('/login')
-      } else {
-        setChecking(false)
-      }
-    })
-
-    // Also react to logout/expiry while the user is on the page
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const evaluate = (session: any) => {
       if (!session) {
         router.replace('/login')
+        return
       }
+
+      const role = session.user?.app_metadata?.role ?? 'student'
+
+      // Pure admins never see the student site - send them to /admin.
+      // 'both' (or 'student') roles are allowed through.
+      if (role === 'admin') {
+        router.replace('/admin')
+        return
+      }
+
+      setChecking(false)
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      evaluate(data.session)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return
+      evaluate(session)
     })
 
     return () => {
@@ -35,7 +46,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
-  // Don't render protected content until we've confirmed a session exists
   if (checking) {
     return (
       <div className="h-screen flex items-center justify-center">

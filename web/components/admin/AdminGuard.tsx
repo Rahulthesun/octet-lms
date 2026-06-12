@@ -24,10 +24,11 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         return
       }
 
-      const userRole = session.user?.app_metadata?.role ?? 'student'
-      setEmail(session.user?.email ?? null)
-      setRole(userRole)
-      setStatus(userRole === 'admin' ? 'allowed' : 'denied')
+      // inside AdminGuard's evaluate()
+        const userRole = session.user?.app_metadata?.role ?? 'student'
+        setEmail(session.user?.email ?? null)
+        setRole(userRole)
+        setStatus(userRole === 'admin' || userRole === 'both' ? 'allowed' : 'denied')
     }
 
     supabase.auth.getSession().then(({ data }) => {
