@@ -3,7 +3,7 @@
 export type PageStatus = 'production' | 'testing'
 
 export const PAGE_STATUS: Record<string, PageStatus> = {
-  '/admin': 'production',
+  //'/admin': 'production',
   '/admin/content': 'production',
   '/admin/students': 'testing',
   '/admin/attendance': 'testing',

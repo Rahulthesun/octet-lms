@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 // ─── KPI data (aggregated from all sections) ──────────────────────────────────
 
@@ -109,6 +111,14 @@ export default function AdminDashboard() {
   const today = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   })
+
+  const router = useRouter()
+
+  useEffect(() => {
+
+    router.replace('/admin/content')
+
+  }, [router])
 
   return (
     <div className="p-8 space-y-8">

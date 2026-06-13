@@ -54,7 +54,7 @@ type NoticeType = "success" | "error" | "info";
 const CONTENT_ACCEPT = ".pdf,.pptx";
 const ALLOWED_CONTENT_MIME_TYPES = new Set([
   "application/pdf",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  //"application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
 
 type DeleteTarget = {
@@ -170,7 +170,7 @@ function getResponseError(data: any, fallback: string) {
 function getContentFileError(file: File | null) {
   if (!file) return "Please choose a PDF or PPTX file.";
   const extension = file.name.split(".").pop()?.toLowerCase();
-  const validByExtension = extension === "pdf" || extension === "pptx";
+  const validByExtension = extension === "pdf"; //|| extension === "pptx";
   const validByMime = !file.type || ALLOWED_CONTENT_MIME_TYPES.has(file.type);
 
   if (!validByExtension || !validByMime) {
@@ -972,7 +972,7 @@ export default function ContentPage() {
                                                       : "border-gray-300 text-gray-500 hover:border-gray-400"
                                                   }`}
                                                 >
-                                                  Content Files
+                                                  PDF Files
                                                 </button>
 
                                                 {/* Spacer */}
@@ -987,7 +987,7 @@ export default function ContentPage() {
                                                       "pdf",
                                                     );
                                                   }}
-                                                  title="Upload PDF or PPTX"
+                                                  title="Upload PDF"
                                                   className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer"
                                                 >
                                                   <PlusIcon className="w-3 h-3" />

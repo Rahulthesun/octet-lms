@@ -12,7 +12,7 @@ const navItems = [
   {
     href: "/admin",
     label: "Dashboard",
-    status: "production",
+    status: "testing",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"

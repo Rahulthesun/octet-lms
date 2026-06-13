@@ -34,7 +34,7 @@ export default function LoginPage() {
 
       // Pure admins -> /admin, everyone else (student / both) -> /student
       if (role === 'admin') {
-        router.push('/admin')
+        router.push('/admin/content')
       } else {
         router.push('/student')
       }
