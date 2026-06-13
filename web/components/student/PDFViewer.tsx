@@ -281,6 +281,22 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     [],
   );
 
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX) && e.deltaX === 0) {
+      return;
+    }
+
+    container.scrollBy({
+      top: e.deltaY,
+      left: e.deltaX,
+      behavior: "auto",
+    });
+    e.preventDefault();
+  }, []);
+
   useEffect(() => {
     if (!url) return;
     const container = scrollContainerRef.current;
@@ -475,6 +491,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
             overscrollBehavior: "contain",
             scrollbarGutter: "stable",
           }}
+          onWheel={handleWheel}
           onKeyDown={handleScrollKeyDown}
           onMouseDown={() => scrollContainerRef.current?.focus()}
           onTouchStart={() => scrollContainerRef.current?.focus()}

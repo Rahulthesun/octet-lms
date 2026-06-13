@@ -174,12 +174,12 @@ function PdfOverlay({
             </div>
           </div>
           
-          {/* Scrollable PDF area - LIKE THE WORKING EXAMPLE */}
-          <div className="flex-1 overflow-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Fill the panel so the viewer's own scroll container handles the PDF */}
+          <div className="flex-1 min-h-0">
             <PdfViewer
               url={pdfUrl}
               filename={openDoc.pdf.title}
-              className="h-[80vh] !rounded-none !border-none"
+              className="h-full min-h-0 !rounded-none !border-none"
             />
           </div>
         </div>
