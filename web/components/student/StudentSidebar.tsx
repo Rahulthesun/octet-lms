@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useUserRole } from '@/hooks/useUserRole'
+import { canAccessPage } from '@/lib/pageStatus'
+import { signOut } from '@/lib/auth'
 
 const navItems = [
   {
@@ -68,10 +71,18 @@ interface StudentSidebarProps {
 export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { role } = useUserRole()
+
+  const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
 
   const isActive = (href: string) => {
     if (href === '/student') return pathname === '/student'
     return pathname.startsWith(href)
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace('/login')
   }
 
   return (
@@ -127,7 +138,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
 
       {/* Nav items */}
       <nav className="flex-1 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = isActive(item.href)
           return (
             <div key={item.href} className="relative">
@@ -196,7 +207,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
         {/* Sign out */}
         {collapsed ? (
           <button
-            onClick={() => router.push('/')}
+            onClick={handleSignOut}
             className="relative group w-12 mb-2 h-10 bg-[#7A6B96] rounded-md flex items-center justify-center text-white font-inter text-base"
             title="Sign out"
           >
@@ -213,7 +224,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
             <div className="flex-1 min-w-0">
               <p className="text-base text-[#635580] leading-tight truncate">Arjun Sharma</p>
               <button
-                onClick={() => router.push('/')}
+                onClick={handleSignOut}
                 className="text-sm text-[#64748b] hover:text-[#7A6B96] transition-colors"
               >
                 Sign out

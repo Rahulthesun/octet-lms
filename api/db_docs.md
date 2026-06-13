@@ -1,309 +1,454 @@
-# C@O Admin Dashboard — Backend Reference
-**Project:** Chemistry@OCTET | **Assignee:** Rahul | **Stack:** Express · Supabase PostgreSQL · Cloudflare R2
+# C@O LMS – Database & Auth Reference
+
+**Project:** Chemistry@OCTET (OCTET LMS)  
+**Stack:** Express · Supabase (PostgreSQL + Auth) · Cloudflare R2  
+**Architecture:** Server‑side only – all database access uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS)
 
 ---
 
-## 1. Project Structure
+## 1. Core Concepts
 
-The API follows a 3-layer architecture. Every HTTP request flows through these layers in order:
+| Domain | Description |
+|--------|-------------|
+| **Content Management** | Subjects → Chapters → Subtopics → PDFs / Videos. Hierarchical learning materials. |
+| **Student Management** | Admission form → `PENDING` record → Approval → Create Supabase Auth user → `APPROVED` student. |
+| **Storage** | All files (PDFs, videos, thumbnails, student documents) stored in Cloudflare R2. Metadata in Supabase. |
 
-```
-Browser → server.js → routes/ → controllers/ → services/ → Supabase / R2 → back up → Browser
-```
-
-| Folder | Job |
-|--------|-----|
-| `server.js` | Entry point. Boots Express, registers middleware (cors, json parser), mounts all routers. Nothing else. |
-| `routes/` | Maps a URL + HTTP method to a controller function. No logic, no DB. Just routing. |
-| `controllers/` | Reads req, validates input, calls a service, sends res. Speaks HTTP. Does not touch the DB. |
-| `services/` | All business logic and DB queries live here. Has no knowledge of HTTP. |
-| `config/` | Supabase client and R2 client initialisation. Imported by services only. |
+Foreign keys always use `ON DELETE CASCADE` – deleting a parent removes all children.
 
 ---
 
-## 2. Database Structure (Supabase PostgreSQL)
+## 2. Database Schema (Supabase PostgreSQL)
 
-Hierarchy:
-```
-Subject → Chapter → Subtopic → (PDFs | Videos)
-```
+### 2.1 Batches
 
-`on delete cascade` is set on every foreign key — deleting a Subject removes all its children automatically.
-
-### 2.1 subjects
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | Primary key, auto-generated |
-| `name` | text | Required, unique |
-| `description` | text | Optional |
-| `order_index` | integer | Controls display order |
-| `is_visible` | boolean | Default true |
-| `created_at` | timestamptz | Auto-set |
-| `updated_at` | timestamptz | Auto-set |
+Morning / Evening / Night with fixed timings from admission form.
 
 ```sql
-create table subjects (
-  id          uuid default gen_random_uuid() primary key,
-  name        text not null unique,
-  description text,
-  order_index integer default 0,
-  is_visible  boolean default true,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+CREATE TABLE public.batches (
+    id TEXT PRIMARY KEY,                     -- 'MORNING', 'EVENING', 'NIGHT'
+    name TEXT NOT NULL,
+    days TEXT,                               -- e.g., 'Tue/Thu/Sat'
+    start_time TIME,
+    end_time TIME,
+    delivery_type TEXT CHECK (delivery_type IN ('ONLINE', 'OFFLINE', 'HYBRID')),
+    meet_link TEXT,
+    location TEXT
+);
+
+INSERT INTO public.batches (id, name, days, start_time, end_time, delivery_type) VALUES
+    ('MORNING', 'Morning Batch', 'Tue/Thu/Sat', '06:15', '07:30', 'HYBRID'),
+    ('EVENING', 'Evening Batch', 'Tue/Thu/Sat', '17:00', '18:15', 'HYBRID'),
+    ('NIGHT', 'Night Batch', 'Tue/Thu/Sat', '21:00', '22:10', 'ONLINE');
+```
+
+### 2.2 Students (Admission + Profile)
+
+Every field from the admission form.  
+`auth_user_id` links to `auth.users.id` only after approval. Pending students have `NULL`.
+
+```sql
+CREATE TABLE public.students (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    auth_user_id UUID UNIQUE,                     -- FK to auth.users, NULL until approved
+    admission_number TEXT UNIQUE,
+    
+    -- Personal
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    date_of_birth DATE,
+    mobile_number TEXT,
+    whatsapp_number TEXT,
+    telegram_number TEXT,
+    
+    -- 10th details
+    tenth_school TEXT,
+    tenth_score TEXT,
+    
+    -- Current academics
+    class_grade TEXT,
+    school_college TEXT,
+    subjects TEXT[],
+    
+    -- Tuition / coaching
+    maths_tuition TEXT,
+    physics_tuition TEXT,
+    other_tuition TEXT,
+    neet_jee_details TEXT,
+    future_plan TEXT,
+    
+    -- Batch & mode
+    preferred_batch TEXT REFERENCES public.batches(id),
+    learning_mode TEXT NOT NULL CHECK (learning_mode IN ('ONLINE', 'OFFLINE', 'HYBRID')),
+    
+    -- Father
+    father_name TEXT,
+    father_mobile TEXT,
+    father_whatsapp TEXT,
+    father_telegram TEXT,
+    father_email TEXT,
+    father_profession TEXT,
+    
+    -- Mother
+    mother_name TEXT,
+    mother_mobile TEXT,
+    mother_whatsapp TEXT,
+    mother_telegram TEXT,
+    mother_email TEXT,
+    mother_profession TEXT,
+    
+    -- Address
+    address TEXT,
+    landmark TEXT,
+    city TEXT,
+    pincode TEXT,
+    
+    -- Document URLs (R2 signed URLs generated at request time)
+    marksheet_10th_url TEXT,
+    school_id_card_url TEXT,
+    uniform_photo_url TEXT,
+    
+    -- System
+    status TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    username TEXT UNIQUE,
+    admin_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### 2.2 chapters
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | Primary key |
-| `subject_id` | uuid | FK → subjects(id) on delete cascade |
-| `name` | text | Required |
-| `description` | text | Optional |
-| `order_index` | integer | Controls display order within subject |
-| `is_visible` | boolean | Default true |
-| `created_at` | timestamptz | Auto-set |
-| `updated_at` | timestamptz | Auto-set |
+**Foreign key to Auth (after creation):**
 
 ```sql
-create table chapters (
-  id          uuid default gen_random_uuid() primary key,
-  subject_id  uuid references subjects(id) on delete cascade not null,
-  name        text not null,
-  description text,
-  order_index integer default 0,
-  is_visible  boolean default true,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+ALTER TABLE public.students
+    ADD CONSTRAINT fk_students_auth_user
+    FOREIGN KEY (auth_user_id) REFERENCES auth.users(id)
+    ON DELETE SET NULL;   -- or CASCADE
+```
+
+### 2.3 Admission Requests Log
+
+Raw Google Form submissions for audit.
+
+```sql
+CREATE TABLE public.admission_requests (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    form_response_id TEXT,
+    raw_data JSONB,
+    processed BOOLEAN DEFAULT FALSE,
+    student_email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### 2.3 subtopics
+### 2.4 Content Hierarchy
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | Primary key |
-| `chapter_id` | uuid | FK → chapters(id) on delete cascade |
-| `name` | text | Required |
-| `description` | text | Optional |
-| `order_index` | integer | Controls display order within chapter |
-| `is_visible` | boolean | Default true |
-| `created_at` | timestamptz | Auto-set |
-| `updated_at` | timestamptz | Auto-set |
+#### subjects
 
 ```sql
-create table subtopics (
-  id          uuid default gen_random_uuid() primary key,
-  chapter_id  uuid references chapters(id) on delete cascade not null,
-  name        text not null,
-  description text,
-  order_index integer default 0,
-  is_visible  boolean default true,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+CREATE TABLE public.subjects (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    order_index INTEGER DEFAULT 0,
+    is_visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### 2.4 pdfs
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | Primary key |
-| `subtopic_id` | uuid | FK → subtopics(id) on delete cascade |
-| `title` | text | Required |
-| `filename` | text | Original file name |
-| `r2_key` | text | Path inside R2 bucket. Unique. Used to generate signed URLs |
-| `mime_type` | text | Default: application/pdf |
-| `size_bytes` | bigint | File size in bytes |
-| `uploaded_by` | uuid | FK → auth.users(id) |
-| `is_visible` | boolean | Default true |
-| `created_at` | timestamptz | Auto-set |
-| `updated_at` | timestamptz | Auto-set |
+#### chapters
 
 ```sql
-create table pdfs (
-  id          uuid default gen_random_uuid() primary key,
-  subtopic_id uuid references subtopics(id) on delete cascade not null,
-  title       text not null,
-  filename    text not null,
-  r2_key      text not null unique,
-  mime_type   text default 'application/pdf',
-  size_bytes  bigint,
-  uploaded_by uuid references auth.users(id),
-  is_visible  boolean default true,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+CREATE TABLE public.chapters (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    order_index INTEGER DEFAULT 0,
+    is_visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### 2.5 videos
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | Primary key |
-| `subtopic_id` | uuid | FK → subtopics(id) on delete cascade |
-| `title` | text | Required |
-| `filename` | text | Original file name |
-| `r2_key` | text | Path inside R2 bucket. Unique |
-| `thumbnail_key` | text | R2 key for the thumbnail image |
-| `mime_type` | text | Default: video/mp4 |
-| `size_bytes` | bigint | File size in bytes |
-| `duration_secs` | integer | Video length in seconds (from ffprobe) |
-| `uploaded_by` | uuid | FK → auth.users(id) |
-| `is_visible` | boolean | Default true |
-| `created_at` | timestamptz | Auto-set |
-| `updated_at` | timestamptz | Auto-set |
+#### subtopics
 
 ```sql
-create table videos (
-  id            uuid default gen_random_uuid() primary key,
-  subtopic_id   uuid references subtopics(id) on delete cascade not null,
-  title         text not null,
-  filename      text not null,
-  r2_key        text not null unique,
-  thumbnail_key text,
-  mime_type     text default 'video/mp4',
-  size_bytes    bigint,
-  duration_secs integer,
-  uploaded_by   uuid references auth.users(id),
-  is_visible    boolean default true,
-  created_at    timestamptz default now(),
-  updated_at    timestamptz default now()
+CREATE TABLE public.subtopics (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    chapter_id UUID REFERENCES public.chapters(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    order_index INTEGER DEFAULT 0,
+    is_visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
+
+#### pdfs
+
+```sql
+CREATE TABLE public.pdfs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    subtopic_id UUID REFERENCES public.subtopics(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    r2_key TEXT NOT NULL UNIQUE,              -- path inside R2 bucket
+    mime_type TEXT DEFAULT 'application/pdf',
+    size_bytes BIGINT,
+    uploaded_by UUID REFERENCES auth.users(id),
+    is_visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### videos
+
+```sql
+CREATE TABLE public.videos (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    subtopic_id UUID REFERENCES public.subtopics(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    r2_key TEXT NOT NULL UNIQUE,
+    thumbnail_key TEXT,                       -- R2 key for thumbnail image
+    mime_type TEXT DEFAULT 'video/mp4',
+    size_bytes BIGINT,
+    duration_secs INTEGER,
+    uploaded_by UUID REFERENCES auth.users(id),
+    is_visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 2.5 Indexes
+
+```sql
+CREATE INDEX idx_students_email ON public.students(email);
+CREATE INDEX idx_students_status ON public.students(status);
+CREATE INDEX idx_students_auth_user ON public.students(auth_user_id);
+CREATE INDEX idx_students_batch ON public.students(preferred_batch);
+
+CREATE INDEX idx_pdfs_subtopic ON public.pdfs(subtopic_id);
+CREATE INDEX idx_videos_subtopic ON public.videos(subtopic_id);
+CREATE INDEX idx_chapters_subject ON public.chapters(subject_id);
+CREATE INDEX idx_subtopics_chapter ON public.subtopics(chapter_id);
+```
+
+### 2.6 Auto‑update `updated_at`
+
+```sql
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER update_students_updated_at
+    BEFORE UPDATE ON public.students
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+-- Repeat for subjects, chapters, subtopics, pdfs, videos (optional but recommended)
+```
+
+### 2.7 Admission Number Generator
+
+```sql
+CREATE SEQUENCE public.admission_number_seq START 1;
+
+CREATE OR REPLACE FUNCTION public.generate_admission_number()
+RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    year TEXT;
+    next_num INTEGER;
+BEGIN
+    year := TO_CHAR(NOW(), 'YYYY');
+    next_num := nextval('public.admission_number_seq');
+    RETURN 'OCTET-' || year || '-' || LPAD(next_num::TEXT, 3, '0');
+END;
+$$;
 ```
 
 ---
 
-## 3. Storage Architecture
+## 3. Storage (Cloudflare R2)
 
-### 3.1 What goes where
+### 3.1 What is stored where
 
-| Data | Where | Why |
-|------|-------|-----|
-| PDF / Video files | Cloudflare R2 | Cheap egress, CDN, fast delivery |
-| Thumbnails | Cloudflare R2 | Same bucket, thumbnail_key column |
-| Metadata (title, size, etc.) | Supabase PostgreSQL | Queryable, filterable, relational |
-| User auth | Supabase Auth | Built-in, JWT tokens |
+| File type | R2 bucket folder | `r2_key` example |
+|-----------|----------------|------------------|
+| PDFs | `pdfs/` | `pdfs/2024/abc-123.pdf` |
+| Videos | `videos/` | `videos/2024/def-456.mp4` |
+| Thumbnails | `thumbnails/` | `thumbnails/def-456.jpg` |
+| 10th marksheet | `documents/` | `documents/marksheet_<uuid>.pdf` |
+| School ID card | `documents/` | `documents/idcard_<uuid>.jpg` |
+| Uniform photo | `documents/` | `documents/uniform_<uuid>.png` |
 
-### 3.2 What is r2_key?
+### 3.2 Workflow for a file
 
-`r2_key` is a plain text column in Supabase that stores the file's path inside your R2 bucket.
+1. Client uploads file to Express (multipart/form-data)
+2. Express generates a unique `r2_key` (e.g., `pdfs/2024/<uuid>-originalname.pdf`)
+3. Upload file to R2 using AWS SDK (S3‑compatible)
+4. Save metadata (title, size, `r2_key`, etc.) to Supabase
+5. Return success
 
-Example: `pdfs/2024/abc123-thermodynamics.pdf`
+### 3.3 Serving files (signed URLs)
 
-The actual file lives in R2. Supabase only remembers where it is.
+- **Never return the raw R2 URL** – always generate a **signed URL** valid for a short time (e.g., 1 hour).
+- Client then downloads directly from Cloudflare – Express is not a proxy.
 
-When a student requests a PDF:
+```javascript
+// Example: generate signed URL for a PDF
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const command = new GetObjectCommand({ Bucket, Key: r2_key });
+const url = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
 ```
-1. Fetch r2_key from Supabase
-2. Use r2_key to generate a signed URL pointing to R2
-3. Return the signed URL to the client
-4. Client fetches the file directly from Cloudflare — never hits your Express server
-```
 
-If you ever change your R2 domain or bucket name, you update one config variable. Every `r2_key` in the DB stays valid.
+Videos also use signed URLs; frontend `<video src="...">` works with HTTP Range requests (206 Partial Content) automatically.
 
 ---
 
-## 4. API Endpoints
+## 4. Authentication & Authorisation
 
-### 4.1 PDF Management — mounted at `/api/content/pdf`
+### 4.1 Supabase Auth
+
+- `auth.users` is managed **only** for approved students (and possibly admins).
+- **Pending students** have `auth_user_id = NULL` – no auth account yet.
+- On approval, the backend:
+  - Calls `supabase.auth.admin.createUser()` to create the account.
+  - Updates `students.auth_user_id` with the new `user.id`.
+  - Sends a welcome email with temporary password.
+
+### 4.2 Roles
+
+- **Student** – identified by `auth_user_id` not null + `status = 'APPROVED'`.
+- **Admin** – not stored in `auth.users`; instead, use a separate `admins` table or a `is_admin` flag in `students` (if admins are also students). For simplicity, the API uses a hardcoded admin check or a separate admin authentication flow (e.g., another Supabase project or a simple shared secret). Because the backend is server‑side, you can also rely on the `SUPABASE_SERVICE_ROLE_KEY` for all admin operations – no auth required for the API itself if it's internal.
+
+### 4.3 No Row Level Security (RLS)
+
+All database access uses the **service role key** (`SUPABASE_SERVICE_ROLE_KEY`).  
+RLS is **disabled** on all tables because the backend is trusted and the frontend never talks directly to Supabase.
+
+> Important: Never expose the service role key to the client.
+
+---
+
+## 5. API Endpoints (Summary)
+
+### Student Management
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/upload` | Upload a PDF file + save metadata |
-| GET | `/` | List all PDFs (supports `?subtopicId=` filter) |
-| GET | `/:id` | Get single PDF metadata + signed URL |
-| PUT | `/:id` | Update PDF metadata (title, visibility, etc.) |
-| DELETE | `/:id` | Delete metadata from Supabase + file from R2 |
+| POST | `/api/students/bulk-import` | Create multiple pre‑approved students (creates auth users, sends emails) |
+| POST | `/api/enrollment/webhook` | Receive Google Form submission → create PENDING student |
+| POST | `/api/students/:id/approve` | Approve a PENDING student, create auth user, send email |
+| GET | `/api/students` | List all students (with filters: batch, mode, status, search) |
+| GET | `/api/students/pending` | List PENDING applications |
+| GET | `/api/students/:id` | Get a single student |
+| PUT | `/api/students/:id` | Update student info |
+| DELETE | `/api/students/:id` | Delete student (also delete auth user if exists) |
 
-### 4.2 Video Management — mounted at `/api/content/video`
+### Authentication Utilities (for student self‑service)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/upload` | Upload video + thumbnail, save metadata |
-| GET | `/` | List all videos |
-| GET | `/:id` | Get video metadata + signed URL |
-| GET | `/:id/stream` | Stream video with HTTP Range support (206) |
-| PUT | `/:id` | Update metadata |
-| DELETE | `/:id` | Delete from Supabase + R2 |
-
-### 4.3 Content Structuring
+These endpoints are optional – the frontend can use Supabase JS client directly with the anon key. But if you want to keep everything behind your API:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/subjects` | Create a subject |
-| GET | `/api/subjects` | List all subjects |
-| GET | `/api/subjects/:id` | Get one subject |
-| PUT | `/api/subjects/:id` | Update subject |
-| DELETE | `/api/subjects/:id` | Delete subject (cascades to all children) |
-| POST | `/api/chapters` | Create a chapter (needs subjectId in body) |
-| GET | `/api/chapters/:subjectId` | Get all chapters for a subject |
-| PUT | `/api/chapters/:id` | Update chapter |
-| DELETE | `/api/chapters/:id` | Delete chapter |
-| POST | `/api/subtopics` | Create a subtopic (needs chapterId in body) |
-| GET | `/api/subtopics/:chapterId` | Get all subtopics for a chapter |
-| PUT | `/api/subtopics/:id` | Update subtopic |
-| DELETE | `/api/subtopics/:id` | Delete subtopic |
+| POST | `/api/auth/login` | Proxy to Supabase Auth – returns session |
+| GET | `/api/auth/me` | Get current student profile (requires JWT) |
+| POST | `/api/auth/change-password` | Change password (requires JWT) |
+| POST | `/api/auth/forgot-password` | Trigger reset email |
 
-### 4.4 Storage Info
+### Content Management
+
+All routes mounted under `/api`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/storage/usage` | Total bytes used, PDF count, video count |
-| GET | `/api/storage/content-stats` | Breakdown by subject and by user |
+| GET | `/subjects` | List all subjects |
+| POST | `/subjects` | Create subject |
+| PUT | `/subjects/:id` | Update subject |
+| DELETE | `/subjects/:id` | Delete subject (cascade) |
+| GET | `/chapters/:subjectId` | Chapters of a subject |
+| POST | `/chapters` | Create chapter |
+| ... | etc. for chapters, subtopics | |
+
+### File Storage
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/content/pdf/upload` | Upload PDF + metadata |
+| GET | `/content/pdf/:id` | Get PDF metadata + signed URL |
+| DELETE | `/content/pdf/:id` | Delete PDF from R2 and DB |
+| POST | `/content/video/upload` | Upload video + thumbnail |
+| GET | `/content/video/:id` | Video metadata + signed URL |
+| GET | `/content/video/:id/stream` | Return signed URL (or proxy streaming) |
 
 ---
 
-## 5. Environment Variables (.env)
-
-> Never commit `.env` to git. Add it to `.gitignore` immediately.
+## 6. Environment Variables
 
 ```env
-SUPABASE_URL=https://yourproject.supabase.co
-SUPABASE_SERVICE_KEY=your-service-role-key   # NOT the anon key
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # never expose to client
 
-R2_ACCOUNT_ID=your-cloudflare-account-id
-R2_ACCESS_KEY_ID=your-r2-access-key
-R2_SECRET_ACCESS_KEY=your-r2-secret-key
-R2_BUCKET_NAME=your-bucket-name
-R2_PUBLIC_URL=https://cdn.yourdomain.com     # custom domain, not .r2.dev
+# Cloudflare R2
+R2_ACCOUNT_ID=your-account-id
+R2_ACCESS_KEY_ID=your-access-key
+R2_SECRET_ACCESS_KEY=your-secret-key
+R2_BUCKET_NAME=octet-lms-files
+R2_PUBLIC_URL=https://cdn.octet.com   # optional custom domain
 
-PORT=8000   # 5000 is taken by AirPlay on Mac
+# Server
+PORT=8000
+
+# Email (for sending credentials)
+EMAIL_USER=octet@yourmail.com
+EMAIL_PASS=app-password
 ```
 
 ---
 
-## 6. Dependencies
+## 7. Key Rules & Conventions
 
-| Package | Purpose |
-|---------|---------|
-| `express` | HTTP server and routing |
-| `cors` | Allow cross-origin requests from the frontend |
-| `dotenv` | Load .env into process.env |
-| `multer` | Handle multipart/form-data file uploads |
-| `@supabase/supabase-js` | Supabase client — DB queries and auth |
-| `@aws-sdk/client-s3` | R2 file upload/delete (R2 is S3-compatible) |
-| `@aws-sdk/s3-request-presigner` | Generate signed URLs for R2 files |
-| `nodemon` (dev) | Auto-restart server on file changes |
-
-Install everything:
-```bash
-npm install express cors dotenv multer @supabase/supabase-js @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-npm install --save-dev nodemon
-```
+| Rule | Reason |
+|------|--------|
+| All DB access uses service role key | Bypasses RLS; backend is trusted. |
+| `auth_user_id` is NULL until approval | Pending students have no auth account. |
+| Foreign keys with `ON DELETE CASCADE` | Simpler cleanup – delete subject → everything under it gone. |
+| `r2_key` stores relative path, not full URL | Allows changing CDN domain without updating DB. |
+| Signed URLs are generated per request | Gives time‑limited access, no public permanent links. |
+| No RLS on any table | Not needed because client never queries DB directly. |
+| Admission numbers generated by DB function | Guarantees uniqueness and format `OCTET-YYYY-XXX`. |
 
 ---
 
-## 7. Key Decisions & Notes
+## 8. Example Data Flow – Student Approval
 
-- **Port 8000 not 5000** — AirPlay Receiver on Mac hijacks port 5000
-- **No `"type": "module"`** — use `require()` / `module.exports` throughout, not ESM import/export
-- **Use `SUPABASE_SERVICE_KEY` on the backend** — never the anon key. Service key bypasses RLS and is safe server-side only
-- **`r2_key` stores the bucket path, NOT the full URL** — URLs are generated at request time via signed URLs
-- **`on delete cascade` on all FK constraints** — deleting a subject cleans up all chapters, subtopics, PDFs, and videos below it
-- **`order_index` on subjects, chapters, subtopics** — controls display order in the frontend, sort ascending
-- **Videos stream via signed R2 URLs with HTTP Range headers (206 Partial Content)** — allows seeking without re-downloading
-- **Express never streams the video file itself** — it only returns a signed URL, client fetches directly from Cloudflare
+```
+1. Google Form submitted → POST /api/enrollment/webhook
+   → Insert into students (status='PENDING', auth_user_id=NULL)
+   → Store raw data in admission_requests
+
+2. Admin sees pending list → GET /api/students/pending
+
+3. Admin clicks Approve → POST /api/students/{id}/approve
+   → Call generate_admission_number()
+   → Generate temporary password
+   → supabase.auth.admin.createUser(...)
+   → Update students set auth_user_id, admission_number, status='APPROVED'
+   → Send welcome email with credentials
+
+4. Student logs in (frontend uses Supabase client or /api/auth/login)
+   → JWT session created
+   → Can fetch own profile from /api/auth/me
+```
+
+---

@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "../../lib/auth"; // adjust path to wherever your signOut lives
+import { canAccessPage } from "@/lib/pageStatus";
+import { useUserRole } from "@/hooks/useUserRole";
+
 
 const navItems = [
   {
     href: "/admin",
     label: "Dashboard",
+    status: "production",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -55,6 +60,7 @@ const navItems = [
   {
     href: "/admin/content",
     label: "Content",
+    status: "production",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -79,6 +85,7 @@ const navItems = [
   {
     href: "/admin/attendance",
     label: "Attendance",
+    status: "testing",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -109,6 +116,7 @@ const navItems = [
   {
     href: "/admin/tests",
     label: "Test Results",
+    status: "testing",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -141,6 +149,7 @@ const navItems = [
   {
     href: "/admin/students",
     label: "Students",
+    status: "testing",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -183,11 +192,23 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { role } = useUserRole()
+
+
+  const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
+
 
   const isActive = (href: string) => {
     if (href === "/admin") return pathname === "/admin";
     return pathname.startsWith(href);
   };
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
+  };
+
+  
+
 
   return (
     <div
@@ -292,7 +313,7 @@ export default function AdminSidebar({
 
       {/* Nav items */}
       <nav className="flex-1 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = isActive(item.href);
           return (
             <div key={item.href} className="relative">
@@ -364,7 +385,7 @@ export default function AdminSidebar({
         {/* Sign out */}
         {collapsed ? (
           <button
-            onClick={() => router.push("/")}
+            onClick={handleSignOut}
             className="relative group w-12 mb-2 h-10 bg-primary flex items-center justify-center text-white font-inter text-base"
             title="Sign out"
           >
@@ -383,7 +404,7 @@ export default function AdminSidebar({
                 Admin
               </p>
               <button
-                onClick={() => router.push("/")}
+                onClick={handleSignOut}
                 className="text-sm text-gray-400 hover:text-primary transition-colors"
               >
                 Sign out

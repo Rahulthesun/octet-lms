@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.1",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/recharts": "^1.8.29",
     "framer-motion": "^12.38.0",

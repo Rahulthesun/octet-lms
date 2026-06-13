@@ -5,18 +5,43 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AtomSVG, FlaskSVG } from '@/components/ui/PencilSVGs'
+import { signIn } from '../../lib/auth'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
+    if (!email || !password) {
+      setError('Please enter both email and password.')
+      return
+    }
+
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 800))
-    router.push('/student')
+
+    try {
+      const { user } = await signIn(email, password)
+
+      const role = user?.app_metadata?.role ?? 'student'
+
+      // Pure admins -> /admin, everyone else (student / both) -> /student
+      if (role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/student')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -53,6 +78,12 @@ export default function LoginPage() {
             <div className="bg-white rounded-2xl border border-accent3/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-8">
               <h1 className="text-2xl text-primary mb-1">Welcome back</h1>
               <p className="text-muted text-[15px] mb-6">Sign in to access your student portal</p>
+
+              {error && (
+                <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[14px]">
+                  {error}
+                </div>
+              )}
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
@@ -110,10 +141,6 @@ export default function LoginPage() {
                 </Link>
               </p>
             </div>
-
-            <p className="text-border text-[14px] text-center mt-3">
-              Demo mode: any email & password will sign you in
-            </p>
           </motion.div>
         </div>
       </div>
