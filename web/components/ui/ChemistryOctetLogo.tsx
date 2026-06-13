@@ -26,20 +26,20 @@ export default function ChemistryOctetLogo({
     const ctx = canvas.getContext("2d")!;
     if (!ctx) return;
 
-    // Internal render resolution — always 600×600, scaled via CSS
-    const W = 600,
-      H = 600;
-    const cx = 300,
-      cy = 300;
+    // Internal render resolution — 440×440, scaled via CSS (cropped to reduce dead margin)
+    const W = 440,
+      H = 440;
+    const cx = 220,
+      cy = 220;
 
-    const rOut = 198;
-    const rIn = 156;
+    const rOut = 208;
+    const rIn = 150;
     const rBand = (rIn + rOut) / 2;
 
     const RINGS = [
-      { rx: rIn - 10, ry: 46, tilt: 0 },
-      { rx: rIn - 10, ry: 46, tilt: Math.PI / 3 },
-      { rx: rIn - 10, ry: 46, tilt: -Math.PI / 3 },
+      { rx: rIn - 10, ry: 56, tilt: 0 },
+      { rx: rIn - 10, ry: 56, tilt: Math.PI / 3 },
+      { rx: rIn - 10, ry: 56, tilt: -Math.PI / 3 },
     ];
     const RING_SPEEDS = [
       (2 * Math.PI) / 4,
@@ -50,16 +50,16 @@ export default function ChemistryOctetLogo({
     let lastTime: number | null = null;
 
     const NUCLEONS: number[][] = [
-      [-8, -4, 4, 12, 0, 0.0, 7.0, 1.0, 0.4, 0.3, 2.2, 1.13, 0.79, 0.97, 0.9, 4.0, 0.38],
-      [6, 4, -4, 12, 1, 1.2, 6.5, 1.35, 0.7, 0.1, 2.8, 0.88, 1.21, 0.65, 1.1, 5.0, 0.51],
-      [22, 2, 8, 12, 1, 0.5, 8.0, 0.8, 0.2, 0.6, 2.0, 1.37, 0.63, 1.1, 0.7, 3.5, 0.44],
-      [-22, -2, -8, 12, 0, 1.8, 6.8, 1.15, 0.55, 0.45, 2.5, 0.72, 1.05, 0.83, 1.0, 4.5, 0.33],
-      [6, 18, -10, 12, 0, 2.3, 9.0, 0.95, 0.1, 0.8, 3.0, 1.05, 0.87, 1.25, 1.3, 6.0, 0.47],
-      [-6, -18, 10, 12, 1, 0.9, 6.0, 1.5, 0.85, 0.2, 2.2, 0.93, 1.31, 0.71, 0.8, 3.8, 0.56],
-      [-10, 8, 20, 12, 1, 1.5, 8.5, 0.7, 0.3, 0.7, 3.2, 1.18, 0.69, 1.02, 1.2, 5.5, 0.41],
-      [10, -8, -20, 12, 0, 2.7, 7.2, 1.25, 0.6, 0.35, 2.6, 0.81, 1.14, 0.88, 0.9, 4.2, 0.49],
-      [12, -14, 8, 12, 0, 0.3, 9.5, 0.85, 0.45, 0.55, 2.8, 1.26, 0.74, 1.18, 1.1, 5.2, 0.36],
-      [-12, 14, -8, 12, 1, 2.0, 5.5, 1.55, 0.75, 0.15, 2.4, 0.97, 1.08, 0.79, 1.0, 4.8, 0.53],
+      [-10, -5, 5, 15, 0, 0.0, 8.75, 1.0, 0.4, 0.3, 2.75, 1.13, 0.79, 0.97, 1.125, 5.0, 0.38],
+      [7.5, 5, -5, 15, 1, 1.2, 8.125, 1.35, 0.7, 0.1, 3.5, 0.88, 1.21, 0.65, 1.375, 6.25, 0.51],
+      [27.5, 2.5, 10, 15, 1, 0.5, 10.0, 0.8, 0.2, 0.6, 2.5, 1.37, 0.63, 1.1, 0.875, 4.375, 0.44],
+      [-27.5, -2.5, -10, 15, 0, 1.8, 8.5, 1.15, 0.55, 0.45, 3.125, 0.72, 1.05, 0.83, 1.25, 5.625, 0.33],
+      [7.5, 22.5, -12.5, 15, 0, 2.3, 11.25, 0.95, 0.1, 0.8, 3.75, 1.05, 0.87, 1.25, 1.625, 7.5, 0.47],
+      [-7.5, -22.5, 12.5, 15, 1, 0.9, 7.5, 1.5, 0.85, 0.2, 2.75, 0.93, 1.31, 0.71, 1.0, 4.75, 0.56],
+      [-12.5, 10, 25, 15, 1, 1.5, 10.625, 0.7, 0.3, 0.7, 4.0, 1.18, 0.69, 1.02, 1.5, 6.875, 0.41],
+      [12.5, -10, -25, 15, 0, 2.7, 9.0, 1.25, 0.6, 0.35, 3.25, 0.81, 1.14, 0.88, 1.125, 5.25, 0.49],
+      [15, -17.5, 10, 15, 0, 0.3, 11.875, 0.85, 0.45, 0.55, 3.5, 1.26, 0.74, 1.18, 1.375, 6.5, 0.36],
+      [-15, 17.5, -10, 15, 1, 2.0, 6.875, 1.55, 0.75, 0.15, 3.0, 0.97, 1.08, 0.79, 1.25, 6.0, 0.53],
     ];
     // index 4: 0 = proton, 1 = neutron (was string 'p'/'n')
     let nucTheta = 0;
@@ -132,7 +132,7 @@ export default function ChemistryOctetLogo({
     }
 
     function drawElectron(pos: { x: number; y: number }) {
-      const r = 9.2;
+      const r = 11;
       const g = ctx.createRadialGradient(pos.x - 1.5, pos.y - 1.5, 0.5, pos.x, pos.y, r);
       g.addColorStop(0, "#c0a0f0");
       g.addColorStop(0.45, "#7a5ca0");
@@ -151,13 +151,13 @@ export default function ChemistryOctetLogo({
       ctx.beginPath();
       ctx.ellipse(cx, cy, ring.rx, ring.ry, ring.tilt, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(175, 100, 255, 0.13)";
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 3.5;
       ctx.globalAlpha = 1;
       ctx.stroke();
       ctx.beginPath();
       ctx.ellipse(cx, cy, ring.rx, ring.ry, ring.tilt, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(205, 155, 255, 0.78)";
-      ctx.lineWidth = 0.75;
+      ctx.lineWidth = 1.8;
       ctx.globalAlpha = 1;
       ctx.stroke();
       ctx.globalAlpha = 1;
@@ -226,7 +226,7 @@ export default function ChemistryOctetLogo({
 
       // "@" at 12 o'clock
       fCtx.fillStyle = "#ffffff";
-      fCtx.font = '900 23px "DM Sans", sans-serif';
+      fCtx.font = '700 40px "DM Sans", sans-serif';
       fCtx.textAlign = "center";
       fCtx.textBaseline = "middle";
       {
@@ -243,15 +243,15 @@ export default function ChemistryOctetLogo({
       {
         const text = "Chemistry";
         const styles = [
-          { wt: "900", sz: 20 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
-          { wt: "700", sz: 17 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
+          { wt: "700", sz: 37 },
         ];
         const span = halfSpan - GAP;
         const step = span / text.length;
@@ -280,7 +280,7 @@ export default function ChemistryOctetLogo({
         fCtx.textBaseline = "middle";
         fCtx.fillStyle = "#ffffff";
         for (let i = 0; i < text.length; i++) {
-          fCtx.font = '900 21px "DM Sans", sans-serif';
+          fCtx.font = '700 37px "DM Sans", sans-serif';
           const ang = TOP_CX + GAP + (i + 0.5) * step;
           const tx = cx + rBand * Math.cos(ang);
           const ty = cy + rBand * Math.sin(ang);
@@ -295,12 +295,12 @@ export default function ChemistryOctetLogo({
       // BOTTOM: "SPREAD TRUE SCIENCE"
       fCtx.fillStyle = "#ffffff";
       arcTextBottom(fCtx, "SPREAD TRUE SCIENCE", rBand, Math.PI / 2, Math.PI - 2 * PAD, {
-        wt: "900",
-        sz: 17.0,
+        wt: "700",
+        sz: 40.0,
       });
 
       // Stars at 3 o'clock and 9 o'clock
-      fCtx.font = '900 26px "DM Sans", sans-serif';
+      fCtx.font = '900 30px "DM Sans", sans-serif';
       fCtx.fillStyle = "#ffffff";
       fCtx.textAlign = "center";
       fCtx.textBaseline = "middle";
@@ -342,11 +342,11 @@ export default function ChemistryOctetLogo({
       }
 
       // Nucleus glow
-      const glow = ctx.createRadialGradient(cx, cy, 12, cx, cy, 48);
+      const glow = ctx.createRadialGradient(cx, cy, 14, cx, cy, 58);
       glow.addColorStop(0, "rgba(160,30,80,0.22)");
       glow.addColorStop(1, "rgba(160,30,80,0)");
       ctx.beginPath();
-      ctx.arc(cx, cy, 48, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 58, 0, Math.PI * 2);
       ctx.fillStyle = glow;
       ctx.fill();
 
@@ -379,8 +379,8 @@ export default function ChemistryOctetLogo({
   return (
     <canvas
       ref={canvasRef}
-      width={600}
-      height={600}
+      width={440}
+      height={440}
       className={className}
       style={{
         width: size,
