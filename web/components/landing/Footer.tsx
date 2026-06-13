@@ -1,5 +1,6 @@
 
 import Link from 'next/link'
+import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 
 function YouTubeIcon() {
   return (
@@ -67,12 +68,9 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-8">
-              <svg viewBox="0 0 36 36" fill="none" className="w-10 h-10 shrink-0">
-                <circle cx="18" cy="18" r="16" stroke="#f8f9ed" strokeWidth="1.8" />
-                <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#f8f9ed" strokeWidth="1.5" transform="rotate(60 18 18)" />
-                <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#f8f9ed" strokeWidth="1.5" transform="rotate(-60 18 18)" />
-                <circle cx="18" cy="18" r="3" fill="#f8f9ed" />
-              </svg>
+              <div className="w-20 h-20 shrink-0">
+                <ChemistryOctetLogo size={80} />
+              </div>
               <span className="text-bg text-lg tracking-wide">
                 Chemistry<span className="text-border">@</span>OCTET
               </span>
