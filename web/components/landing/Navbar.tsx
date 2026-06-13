@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
+import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 
 const navLinks = [
   {
@@ -78,16 +79,11 @@ export default function Navbar() {
           : 'bg-bg/90 backdrop-blur-sm border-b border-accent1/60'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between py-2.5">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between py-1">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="relative w-10 h-10">
-            <svg viewBox="0 0 36 36" fill="none" className="w-full h-full">
-              <circle cx="18" cy="18" r="16" stroke="#5e4075" strokeWidth="1.8" />
-              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(60 18 18)" />
-              <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#5e4075" strokeWidth="1.5" transform="rotate(-60 18 18)" />
-              <circle cx="18" cy="18" r="3" fill="#5e4075" />
-            </svg>
+          <div className="relative w-16 h-16">
+            <ChemistryOctetLogo size={64} />
           </div>
           <span className="text-primary text-lg tracking-wide">
             Chemistry<span className="text-muted">@</span>OCTET
