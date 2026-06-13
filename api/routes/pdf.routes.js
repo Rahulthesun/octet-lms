@@ -20,22 +20,47 @@
  */
 
 const express = require("express");
-const multer  = require("multer");
-const router  = express.Router();
+const multer = require("multer");
+const router = express.Router();
 const pdfController = require("../controllers/pdf.controller");
 
+const allowedContentTypes = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") cb(null, true);
-    else cb(new Error("Only PDF files allowed"), false);
+    const extension = file.originalname.split(".").pop()?.toLowerCase();
+    const allowedExtension = extension === "pdf" || extension === "pptx";
+
+    if (allowedContentTypes.has(file.mimetype) && allowedExtension) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF and PPTX files are supported right now"), false);
+    }
   },
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-// POST   /api/content/pdf/upload   → upload a new PDF
-router.post("/upload", upload.single("file"), pdfController.uploadPdf);
+const handleUploadError = (err, req, res, next) => {
+  if (!err) return next();
+  if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+    return res
+      .status(413)
+      .json({ error: "File is too large. Maximum upload size is 50 MB." });
+  }
+  return res.status(400).json({ error: err.message || "Invalid upload" });
+};
+
+// POST   /api/content/pdf/upload   → upload a new PDF/PPTX content file
+router.post(
+  "/upload",
+  upload.single("file"),
+  handleUploadError,
+  pdfController.uploadPdf,
+);
 
 // GET    /api/content/pdf/:id/stream   → Stream a PDF file by ID (for inline viewing)
 router.get("/:id/stream", pdfController.streamPdfbyId);
@@ -46,7 +71,6 @@ router.get("/", pdfController.getAllPdfs);
 // GET    /api/content/pdf/:id      → get a single PDF by ID
 // :id is a URL parameter – accessible via req.params.id
 router.get("/:id", pdfController.getPdfById);
-
 
 // GET    /api/content/pdf/chapter/:chapterId     → get PDFs by chapter ID
 // :chapterId is a URL parameter – accessible via req.params.chapterId
