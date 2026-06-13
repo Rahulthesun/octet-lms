@@ -8,7 +8,7 @@ import { PdfViewer } from '../../../components/student/PDFViewer'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8000'
 
-// ─── Subject accent colours (same as original) ────────────────────────────────
+// ─── Subject accent colours ────────────────────────────────────────────────────
 const SUBJECT_STYLES = [
   { text: 'text-[#7A6B96]', border: 'border-l-[#7A6B96]', dot: '#7A6B96' },
   { text: 'text-[#8F7BA0]', border: 'border-l-[#8F7BA0]', dot: '#8F7BA0' },
@@ -18,12 +18,8 @@ function subjectStyle(idx: number) {
   return SUBJECT_STYLES[idx % SUBJECT_STYLES.length]
 }
 
-function sName(s: any): string {
-  return s?.name ?? s?.title ?? 'Subject'
-}
-function chName(c: any): string {
-  return c?.name ?? c?.title ?? 'Chapter'
-}
+function sName(s: any): string { return s?.name ?? s?.title ?? 'Subject' }
+function chName(c: any): string { return c?.name ?? c?.title ?? 'Chapter' }
 
 function formatSize(bytes: number | null | undefined): string | null {
   if (!bytes) return null
@@ -55,7 +51,7 @@ function Chevron({ open, className = 'w-3.5 h-3.5' }: { open: boolean; className
 
 interface OpenDoc { pdf: any; chapterTitle: string }
 
-// ─── Fullscreen PDF Overlay Component ─────────────────────────────────────────
+// ─── Fullscreen PDF Overlay ────────────────────────────────────────────────────
 interface PdfOverlayProps {
   openDoc: OpenDoc | null
   sidebarOpen: boolean
@@ -94,36 +90,46 @@ function PdfOverlay({
   useEffect(() => {
     setMounted(true)
     document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = ''
-    }
+    return () => { document.body.style.overflow = '' }
   }, [])
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   if (!mounted || !openDoc) return null
 
   const pdfUrl = `${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
-      {/* Floating container */}
-      <div className="relative w-full h-full bg-white rounded-2xl shadow-2xl flex overflow-hidden">
-        {/* Close button */}
+  // ── Truly fullscreen backdrop — no padding, edge to edge ──
+  <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex overscroll-none">
+
+    {/* ── Full-viewport white panel ── */}
+    <div className="relative w-full h-full bg-white flex overflow-hidden overscroll-none">
+
+        {/* Close button — floating top-right */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-lg flex items-center justify-center text-primary hover:text-red-500 transition-all duration-200 backdrop-blur-sm border border-gray-200"
-          title="Close PDF viewer"
+          className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-lg flex items-center justify-center text-gray-500 hover:text-red-500 transition-all duration-200 border border-gray-200"
+          title="Close (Esc)"
         >
-          <svg className="w-5 h-5" viewBox="0 0 16 16" fill="none">
-            <path d="M 3,3 L 13,13 M 13,3 L 3,13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+            <path d="M 3,3 L 13,13 M 13,3 L 3,13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
 
-        {/* Left sidebar */}
+        {/* ── Left sidebar ── */}
         <AnimatePresence initial={false}>
           {sidebarOpen && (
             <motion.aside
               initial={{ width: 0 }}
-              animate={{ width: 280 }}
+              animate={{ width: 272 }}
               exit={{ width: 0 }}
               transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
               className="shrink-0 border-r border-[#E2E5EC] bg-white relative z-10 h-full overflow-hidden"
@@ -137,7 +143,7 @@ function PdfOverlay({
                 toggleSubject={toggleSubject}
                 toggleChapter={toggleChapter}
                 openDoc={openDoc}
-                onSelectPdf={(pdf, ct) => onSelectPdf(pdf, ct, undefined, undefined)}
+                onSelectPdf={(pdf, ct) => onSelectPdf(pdf, ct)}
                 search={search}
                 onSearchChange={setSearch}
                 onBack={onClose}
@@ -149,45 +155,52 @@ function PdfOverlay({
 
         {/* Sidebar re-open tab */}
         {!sidebarOpen && (
-          <div className="shrink-0 w-8 border-r border-[#E2E5EC] bg-white flex flex-col relative z-10 h-full">
+          <div className="shrink-0 w-7 border-r border-[#E2E5EC] bg-white flex flex-col relative z-10 h-full">
             <button
               onClick={() => setSidebarOpen(true)}
               title="Show navigation"
               className="flex-1 flex items-center justify-center hover:bg-[#F4F1F8] transition-colors text-muted hover:text-brand"
             >
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
                 <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
         )}
 
-        {/* PDF Viewer container - THIS HANDLES SCROLLING */}
-        <div className="flex-1 min-w-0 h-full flex flex-col">
-          {/* Header with filename */}
-          <div className="shrink-0 px-4 py-3 border-b border-gray-200 bg-white">
-            <div className="flex items-center gap-2">
-              <PdfIcon className="w-4 h-4 text-red-500" />
-              <span className="text-sm font-medium text-gray-700 truncate">
-                {openDoc.pdf.title}
-              </span>
-            </div>
+        {/* ── PDF panel — fills all remaining space, PdfViewer handles own scrolling ── */}
+        <div className="flex-1 min-w-0 h-full flex flex-col min-h-0 overflow-hidden">
+          {/* Slim header strip */}
+          <div className="shrink-0 px-4 py-2.5 border-b border-gray-100 bg-white flex items-center gap-2 pr-14">
+            <PdfIcon className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <span className="text-sm text-gray-600 truncate font-medium">
+              {openDoc.pdf.title}
+            </span>
+            <span className="text-gray-300 mx-1">·</span>
+            <span className="text-xs text-gray-400 truncate shrink-0">
+              {openDoc.chapterTitle}
+            </span>
           </div>
-          
-          {/* Fill the panel so the viewer's own scroll container handles the PDF */}
-          <div className="flex-1 min-h-0">
-            <PdfViewer
-              url={pdfUrl}
-              filename={openDoc.pdf.title}
-              className="h-full min-h-0 !rounded-none !border-none"
-            />
-          </div>
+
+          {/*
+            PdfViewer fills remaining height with flex-1 min-h-0.
+            It uses absolute-positioned internal scroll container so
+            trackpad / mouse-wheel scrolling is fully native — no nesting.
+            !rounded-none and !border-none strip decorative chrome since
+            the overlay panel already provides the visual container.
+          */}
+          <PdfViewer
+            url={pdfUrl}
+            filename={openDoc.pdf.title}
+            className="flex-1 min-h-0 !rounded-none !border-none"
+          />
         </div>
       </div>
     </div>,
     document.body
   )
 }
+
 // ─── Compact sidebar navigation ───────────────────────────────────────────────
 interface CompactNavProps {
   subjects: any[]
@@ -225,9 +238,7 @@ function CompactNav({
           ? chapters.filter((ch: any) => {
               if (subjMatch) return true
               if (chName(ch).toLowerCase().includes(q)) return true
-              return (pdfsMap[ch.id] ?? []).some((p: any) =>
-                p.title.toLowerCase().includes(q)
-              )
+              return (pdfsMap[ch.id] ?? []).some((p: any) => p.title.toLowerCase().includes(q))
             })
           : chapters
         return { ...subj, _idx: idx, chapters: matchedChapters }
@@ -292,7 +303,7 @@ function CompactNav({
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto py-2 min-h-0">
+        <div className="flex-1 overflow-y-auto py-2 min-h-0 overscroll-contain">
         {filtered.length === 0 && (
           <div className="px-4 py-12 text-center">
             <p className="text-muted text-[13px]">No results for "{search}"</p>
@@ -310,12 +321,8 @@ function CompactNav({
                 className={`w-full flex items-center gap-3 pl-3 pr-4 py-2.5 text-left hover:bg-[#F4F1F8] transition-colors border-l-3 ${s.border}`}
               >
                 <Chevron open={isOpen} className="w-3.5 h-3.5 text-muted shrink-0" />
-                <span className={`${s.text} shrink-0`}>
-                  <PdfIcon className="w-4 h-4" />
-                </span>
-                <span className="flex-1 text-primary text-[13px] font-medium leading-snug truncate">
-                  {sName(subject)}
-                </span>
+                <span className={`${s.text} shrink-0`}><PdfIcon className="w-4 h-4" /></span>
+                <span className="flex-1 text-primary text-[13px] font-medium leading-snug truncate">{sName(subject)}</span>
                 <span className="text-muted text-[11px] font-mono tabular-nums shrink-0 bg-[#F4F1F8] px-1.5 py-0.5 rounded">
                   {subject.chapters.length}
                 </span>
@@ -338,10 +345,9 @@ function CompactNav({
                     )}
 
                     {subject.chapters.map((chapter: any, ci: number) => {
-                      const chapOpen = searching || openChapters.has(chapter.id)
-                      const pdfs     = pdfsMap[chapter.id] as any[] | undefined
-                      const cn       = chName(chapter)
-
+                      const chapOpen    = searching || openChapters.has(chapter.id)
+                      const pdfs        = pdfsMap[chapter.id] as any[] | undefined
+                      const cn          = chName(chapter)
                       const displayPdfs = pdfs
                         ? searching && !cn.toLowerCase().includes(q)
                           ? pdfs.filter((p: any) => p.title.toLowerCase().includes(q))
@@ -355,12 +361,8 @@ function CompactNav({
                             className="w-full flex items-center gap-2 pl-10 pr-4 py-2 text-left hover:bg-[#F4F1F8] transition-colors"
                           >
                             <Chevron open={chapOpen} className="w-3 h-3 text-muted shrink-0" />
-                            <span className="text-muted text-[11px] font-mono tabular-nums w-12 shrink-0">
-                              Ch {ci + 1}
-                            </span>
-                            <span className="flex-1 text-primary/80 text-[13px] leading-snug truncate">
-                              {cn}
-                            </span>
+                            <span className="text-muted text-[11px] font-mono tabular-nums w-12 shrink-0">Ch {ci + 1}</span>
+                            <span className="flex-1 text-primary/80 text-[13px] leading-snug truncate">{cn}</span>
                             <span className="text-muted text-[11px] font-mono tabular-nums shrink-0">
                               {pdfs ? pdfs.length : '—'}
                             </span>
@@ -393,23 +395,16 @@ function CompactNav({
                                       key={pdf.id}
                                       onClick={() => onSelectPdf(pdf, cn)}
                                       className={`w-full flex items-center gap-2 pl-20 pr-4 py-2 text-left transition-colors ${
-                                        isActive
-                                          ? 'bg-brand/10 hover:bg-brand/15'
-                                          : 'hover:bg-[#F4F1F8]'
+                                        isActive ? 'bg-brand/10 hover:bg-brand/15' : 'hover:bg-[#F4F1F8]'
                                       }`}
                                     >
-                                      {isActive ? (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
-                                      ) : (
-                                        <PdfIcon className="w-3.5 h-3.5 text-muted/60 shrink-0" />
-                                      )}
-                                      <span
-                                        className={`flex-1 text-[13px] leading-snug truncate ${
-                                          isActive
-                                            ? 'text-brand font-medium'
-                                            : 'text-primary/70'
-                                        }`}
-                                      >
+                                      {isActive
+                                        ? <span className="w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
+                                        : <PdfIcon className="w-3.5 h-3.5 text-muted/60 shrink-0" />
+                                      }
+                                      <span className={`flex-1 text-[13px] leading-snug truncate ${
+                                        isActive ? 'text-brand font-medium' : 'text-primary/70'
+                                      }`}>
                                         {pdf.title}
                                       </span>
                                     </button>
@@ -454,14 +449,13 @@ export default function PdfNotesPage() {
     loadChapterContent,
   } = useContentTree()
 
-  const [search,       setSearch]       = useState('')
-  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set())
-  const [openChapters, setOpenChapters] = useState<Set<string>>(new Set())
-  const [openDoc,      setOpenDoc]      = useState<OpenDoc | null>(null)
-  const [sidebarOpen,  setSidebarOpen]  = useState(true)
+  const [search,        setSearch]        = useState('')
+  const [openSubjects,  setOpenSubjects]  = useState<Set<string>>(new Set())
+  const [openChapters,  setOpenChapters]  = useState<Set<string>>(new Set())
+  const [openDoc,       setOpenDoc]       = useState<OpenDoc | null>(null)
+  const [sidebarOpen,   setSidebarOpen]   = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
 
-  // Simulate initial loading (or wait for content tree to be ready)
   useEffect(() => {
     if (!loading) {
       const timer = setTimeout(() => setInitialLoading(false), 500)
@@ -469,12 +463,11 @@ export default function PdfNotesPage() {
     }
   }, [loading])
 
-  // Pre-load first subject's chapters on mount
   useEffect(() => {
     if (subjects.length > 0) loadChapters(subjects[0].id)
   }, [subjects.length, loadChapters])
 
-  // ── Filtering ────────────────────────────────────────────────────────────────
+  // ── Filtering ──────────────────────────────────────────────────────────────
   const q         = search.trim().toLowerCase()
   const searching = q.length > 0
 
@@ -487,9 +480,7 @@ export default function PdfNotesPage() {
           ? chapters.filter((ch: any) => {
               if (subjMatch) return true
               if (chName(ch).toLowerCase().includes(q)) return true
-              return (pdfsMap[ch.id] ?? []).some((p: any) =>
-                p.title.toLowerCase().includes(q)
-              )
+              return (pdfsMap[ch.id] ?? []).some((p: any) => p.title.toLowerCase().includes(q))
             })
           : chapters
         return { ...subj, _idx: idx, chapters: matchedChapters }
@@ -497,12 +488,11 @@ export default function PdfNotesPage() {
       .filter((s) => !searching || s.chapters.length > 0)
   }, [subjects, chaptersMap, pdfsMap, q, searching])
 
-  // ── Accordion toggles ─────────────────────────────────────────────────────
+  // ── Accordion toggles ──────────────────────────────────────────────────────
   const toggleSubject = (id: string) => {
     setOpenSubjects((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) { next.delete(id) }
-      else              { next.add(id); loadChapters(id) }
+      if (next.has(id)) { next.delete(id) } else { next.add(id); loadChapters(id) }
       return next
     })
   }
@@ -510,31 +500,23 @@ export default function PdfNotesPage() {
   const toggleChapter = (id: string) => {
     setOpenChapters((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) { next.delete(id) }
-      else              { next.add(id); loadChapterContent(id) }
+      if (next.has(id)) { next.delete(id) } else { next.add(id); loadChapterContent(id) }
       return next
     })
   }
 
-  // When a PDF is selected, ensure its parent chapter + subject are expanded
   const handleSelectPdf = (pdf: any, chapterTitle: string, chapterId?: string, subjectId?: string) => {
     setOpenDoc({ pdf, chapterTitle })
     setSidebarOpen(true)
     if (subjectId) setOpenSubjects((prev) => new Set([...prev, subjectId]))
-    if (chapterId) setOpenChapters((prev) => new Set([...prev, chapterId]))
+    if (chapterId)  setOpenChapters((prev) => new Set([...prev, chapterId]))
   }
 
-  const handleClosePdf = () => {
-    setOpenDoc(null)
-  }
+  const handleClosePdf = () => setOpenDoc(null)
 
-  // ── Expand / collapse all ─────────────────────────────────────────────────
-  const totalChapterCount = subjects.reduce(
-    (n, s) => n + (chaptersMap[s.id]?.length ?? 0), 0
-  )
-  const allOpen =
-    openSubjects.size === subjects.length &&
-    openChapters.size === totalChapterCount
+  // ── Expand / collapse all ──────────────────────────────────────────────────
+  const totalChapterCount = subjects.reduce((n, s) => n + (chaptersMap[s.id]?.length ?? 0), 0)
+  const allOpen = openSubjects.size === subjects.length && openChapters.size === totalChapterCount
 
   const expandAll = () => {
     setOpenSubjects(new Set(subjects.map((s) => s.id)))
@@ -547,18 +529,17 @@ export default function PdfNotesPage() {
       new Set(subjects.flatMap((s) => (chaptersMap[s.id] ?? []).map((c: any) => c.id)))
     )
   }
-  
+
   const collapseAll = () => {
     setOpenSubjects(new Set())
     setOpenChapters(new Set())
   }
 
-  // ── Initial Loading State ─────────────────────────────────────────────────
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (initialLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
         <div className="text-center space-y-6">
-          {/* Animated logo */}
           <div className="relative w-20 h-20 mx-auto">
             <div className="absolute inset-0 bg-brand/10 rounded-2xl animate-pulse" />
             <div className="absolute inset-2 bg-brand/20 rounded-xl animate-pulse delay-100" />
@@ -566,14 +547,10 @@ export default function PdfNotesPage() {
               <PdfIcon className="w-8 h-8 text-brand animate-bounce" />
             </div>
           </div>
-          
-          {/* Loading text */}
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-primary">Loading PDF Notes</h2>
             <p className="text-sm text-muted">Preparing your study materials...</p>
           </div>
-          
-          {/* Progress bar */}
           <div className="w-64 mx-auto h-1 bg-gray-200 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-brand rounded-full"
@@ -601,10 +578,9 @@ export default function PdfNotesPage() {
     )
   }
 
-  // ── Full page view ─────────────────────────────────────────────────────
+  // ── Main page ──────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Main page content */}
       <div className="p-6 lg:p-8 max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -669,9 +645,7 @@ export default function PdfNotesPage() {
                   className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F4F1F8] transition-colors"
                 >
                   <Chevron open={subjectOpen} className="w-4 h-4 text-muted shrink-0" />
-                  <span className={`${s.text} shrink-0`}>
-                    <PdfIcon className="w-5 h-5" />
-                  </span>
+                  <span className={`${s.text} shrink-0`}><PdfIcon className="w-5 h-5" /></span>
                   <span className="flex-1 text-primary text-base">{sName(subject)}</span>
                   <span className="text-muted text-[14px] shrink-0 font-data">
                     {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
@@ -699,7 +673,6 @@ export default function PdfNotesPage() {
                           const chapterOpen = searching || openChapters.has(chapter.id)
                           const pdfs        = pdfsMap[chapter.id] as any[] | undefined
                           const cn          = chName(chapter)
-
                           const displayPdfs = pdfs
                             ? searching && !cn.toLowerCase().includes(q)
                               ? pdfs.filter((p: any) => p.title.toLowerCase().includes(q))
@@ -714,7 +687,7 @@ export default function PdfNotesPage() {
                               >
                                 <Chevron open={chapterOpen} className="w-3.5 h-3.5 text-muted shrink-0" />
                                 <span className="text-primary/70 shrink-0"><PdfIcon className="w-4 h-4" /></span>
-                                <span className="text-muted text-[14px] w-16 shrink-0">Chap {ci + 1}</span>
+                                <span className="text-muted text-[14px] w-16 shrink-0">Unit {ci + 1}</span>
                                 <span className="flex-1 text-primary/90 text-[15px] leading-snug">{cn}</span>
                                 <span className="text-muted text-[14px] shrink-0">
                                   {pdfs ? `${pdfs.length} class${pdfs.length !== 1 ? 'es' : ''}` : '—'}
@@ -739,9 +712,7 @@ export default function PdfNotesPage() {
                                       )}
 
                                       {displayPdfs?.length === 0 && (
-                                        <p className="pl-16 pr-5 py-3 text-muted text-[14px]">
-                                          No PDFs found.
-                                        </p>
+                                        <p className="pl-16 pr-5 py-3 text-muted text-[14px]">No PDFs found.</p>
                                       )}
 
                                       {displayPdfs?.map((pdf: any) => {
@@ -749,21 +720,15 @@ export default function PdfNotesPage() {
                                         return (
                                           <button
                                             key={pdf.id}
-                                            onClick={() =>
-                                              handleSelectPdf(pdf, cn, chapter.id, subject.id)
-                                            }
+                                            onClick={() => handleSelectPdf(pdf, cn, chapter.id, subject.id)}
                                             className="w-full flex items-center gap-3 pl-16 pr-5 py-2.5 text-left hover:bg-[#F4F1F8] transition-colors group"
                                           >
-                                            <span className="text-primary/60 shrink-0">
-                                              <PdfIcon className="w-4 h-4" />
-                                            </span>
+                                            <span className="text-primary/60 shrink-0"><PdfIcon className="w-4 h-4" /></span>
                                             <span className="flex-1 text-primary/85 text-[15px] leading-snug group-hover:text-brand">
                                               {pdf.title}
                                             </span>
                                             {size && (
-                                              <span className="text-muted text-[14px] font-data shrink-0">
-                                                {size}
-                                              </span>
+                                              <span className="text-muted text-[14px] font-data shrink-0">{size}</span>
                                             )}
                                             <svg className="w-4 h-4 text-border group-hover:text-brand transition-colors shrink-0" viewBox="0 0 16 16" fill="none">
                                               <path d="M 3,8 L 13,8 M 9,4 L 13,8 L 9,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -794,7 +759,7 @@ export default function PdfNotesPage() {
         )}
       </div>
 
-      {/* PDF Overlay */}
+      {/* Fullscreen PDF Overlay */}
       <PdfOverlay
         openDoc={openDoc}
         sidebarOpen={sidebarOpen}

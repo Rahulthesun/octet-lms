@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +37,7 @@ export default function LoginPage() {
       if (role === 'admin') {
         router.push('/admin/content')
       } else {
-        router.push('/student')
+        router.push('/student/notes')
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
@@ -98,17 +99,68 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-primary text-[15px]">Password</label>
-                    <a href="#" className="text-muted text-[14px] hover:text-primary transition-colors">
+                    <a
+                      href="#"
+                      className="text-muted text-[14px] hover:text-primary transition-colors"
+                    >
                       Forgot password?
                     </a>
                   </div>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
-                  />
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 pr-12 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary transition-colors"
+                    >
+                      {showPassword ? (
+                        // Eye Off
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 3l18 18M10.58 10.58A2 2 0 0114 12m6.36 2.36A9.77 9.77 0 0121 12s-3-6-9-6a8.94 8.94 0 00-4.24 1.02M6.1 6.1A9.76 9.76 0 003 12s3 6 9 6a8.94 8.94 0 004.24-1.02"
+                          />
+                        </svg>
+                      ) : (
+                        // Eye
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <motion.button
