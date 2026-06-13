@@ -4,12 +4,14 @@ import { useState } from 'react'
 import StudentSidebar from '@/components/student/StudentSidebar'
 import { AtomSVG, FlaskSVG, TestTubeSVG, MicroscopeSVG, CompoundSVG, BeakerSVG } from '@/components/ui/PencilSVGs'
 import AuthGuard from '../../components/student/AuthGuard'
+import TestingGuard from '@/components/TestingGuard'
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <AuthGuard>
+      <TestingGuard>
       <div className="student-scope relative flex h-screen overflow-hidden bg-[#f6f5f8]">
         {/* Chemistry SVG background layer */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" aria-hidden>
@@ -53,6 +55,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           {children}
         </main>
       </div>
+      </TestingGuard>
     </AuthGuard>
   )
 }

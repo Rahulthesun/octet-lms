@@ -5,6 +5,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar'
 import { AtomSVG, FlaskSVG, TestTubeSVG, MicroscopeSVG, CompoundSVG, BeakerSVG } from '@/components/ui/PencilSVGs'
 // app/admin/layout.tsx
 import AdminGuard from '@/components/admin/AdminGuard'
+import TestingGuard from '@/components/TestingGuard'
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminGuard>
+    <TestingGuard>
     <div className="relative flex h-screen overflow-hidden bg-[#f1f2f4]">
       {/* Chemistry SVG background layer */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" aria-hidden>
@@ -55,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
+    </TestingGuard>
     </AdminGuard>
   )
   
