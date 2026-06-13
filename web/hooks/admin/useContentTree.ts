@@ -80,7 +80,7 @@ function toArray<T>(payload: ArrayResponse<T>): T[] {
   return [];
 }
 
-export function useContentTree() {
+export function useContentTree(autoLoadChapters = true) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chaptersMap, setChaptersMap] = useState<ChaptersMap>({});
   const [pdfsMap, setPdfsMap] = useState<PdfsMap>({});
@@ -111,8 +111,32 @@ export function useContentTree() {
         }
 
         if (!cancelled) {
-          setSubjects(toArray<Subject>(data));
+          const subjectsList = toArray<Subject>(data);
+          setSubjects(subjectsList);
           setError(null);
+
+          // Auto‑load chapters for all subjects if enabled
+          if (autoLoadChapters && subjectsList.length > 0) {
+            // Load chapters for each subject in parallel
+            const loadAllChapters = subjectsList.map((subject) =>
+              fetch(`${BASE}/api/chapters/subject/${subject.id}`)
+                .then(async (res) => {
+                  const data = await res.json();
+                  const chapters = res.ok ? toArray<Chapter>(data) : [];
+                  return { subjectId: subject.id, chapters };
+                })
+                .catch(() => ({ subjectId: subject.id, chapters: [] }))
+            );
+
+            const results = await Promise.all(loadAllChapters);
+            if (!cancelled) {
+              const newChaptersMap: ChaptersMap = {};
+              for (const { subjectId, chapters } of results) {
+                newChaptersMap[subjectId] = chapters;
+              }
+              setChaptersMap(newChaptersMap);
+            }
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -131,11 +155,13 @@ export function useContentTree() {
     return () => {
       cancelled = true;
     };
-  }, [BASE]);
+  }, [BASE, autoLoadChapters]);
 
-  // Lazy-load chapters for a subject (skips if already cached)
+  // ... the rest of your hook (loadChapters, loadChapterContent, etc.) remains unchanged
+  // But we need to modify `loadChapters` so it doesn't refetch if already loaded
   const loadChapters = useCallback(
     async (subjectId: string) => {
+      // If chapters already exist (either from auto‑load or previous manual load), skip
       if (chaptersMap[subjectId]) return;
       try {
         const res = await fetch(`${BASE}/api/chapters/subject/${subjectId}`);
@@ -148,6 +174,7 @@ export function useContentTree() {
     },
     [BASE, chaptersMap],
   );
+
 
   // Lazy-load both PDFs and videos for a chapter in parallel
   const loadChapterContent = useCallback(
