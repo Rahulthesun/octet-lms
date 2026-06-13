@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // Add these type definitions at the top of the file
 interface Subject {
@@ -48,6 +48,38 @@ type ChaptersMap = Record<string, Chapter[]>;
 type PdfsMap = Record<string, Pdf[]>;
 type VideosMap = Record<string, Video[]>;
 
+type ArrayResponse<T> =
+  | T[]
+  | {
+      data?: unknown;
+      subjects?: unknown;
+      chapters?: unknown;
+      error?: string;
+      message?: string;
+    };
+
+function getResponseMessage(payload: unknown, fallback: string) {
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    if (typeof record.error === "string" && record.error.trim())
+      return record.error;
+    if (typeof record.message === "string" && record.message.trim())
+      return record.message;
+  }
+  return fallback;
+}
+
+function toArray<T>(payload: ArrayResponse<T>): T[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    if (Array.isArray(record.data)) return record.data as T[];
+    if (Array.isArray(record.subjects)) return record.subjects as T[];
+    if (Array.isArray(record.chapters)) return record.chapters as T[];
+  }
+  return [];
+}
+
 export function useContentTree() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chaptersMap, setChaptersMap] = useState<ChaptersMap>({});
@@ -55,8 +87,11 @@ export function useContentTree() {
   const [videosMap, setVideosMap] = useState<VideosMap>({});
   const [loading, setLoading] = useState(true);
   const [storage, setStorage] = useState<Storage>({
-    totalBytes: 0, totalPdfs: 0, totalVideos: 0,
-    totalPdfBytes: 0, totalVideoBytes: 0,
+    totalBytes: 0,
+    totalPdfs: 0,
+    totalVideos: 0,
+    totalPdfBytes: 0,
+    totalVideoBytes: 0,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -64,71 +99,127 @@ export function useContentTree() {
 
   // Fetch subjects on mount
   useEffect(() => {
-    fetch(`${BASE}/api/subjects/`)
-      .then((r) => r.json())
-      .then((data) => setSubjects(data))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+
+    async function fetchSubjects() {
+      try {
+        const res = await fetch(`${BASE}/api/subjects/`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(getResponseMessage(data, "Failed to load subjects"));
+        }
+
+        if (!cancelled) {
+          setSubjects(toArray<Subject>(data));
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setSubjects([]);
+          setError(e instanceof Error ? e.message : "Failed to load subjects");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchSubjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [BASE]);
 
   // Lazy-load chapters for a subject (skips if already cached)
-  async function loadChapters(subjectId: string) {
-    if (chaptersMap[subjectId]) return;
-    try {
-      const res = await fetch(`${BASE}/api/chapters/subject/${subjectId}`);
-      const data = await res.json();
-      const arr: Chapter[] = Array.isArray(data) ? data
-        : Array.isArray(data?.chapters) ? data.chapters
-        : Array.isArray(data?.data) ? data.data
-        : [];
-      setChaptersMap((prev) => ({ ...prev, [subjectId]: arr }));
-    } catch {
-      setChaptersMap((prev) => ({ ...prev, [subjectId]: [] }));
-    }
-  }
+  const loadChapters = useCallback(
+    async (subjectId: string) => {
+      if (chaptersMap[subjectId]) return;
+      try {
+        const res = await fetch(`${BASE}/api/chapters/subject/${subjectId}`);
+        const data = await res.json();
+        const arr = res.ok ? toArray<Chapter>(data) : [];
+        setChaptersMap((prev) => ({ ...prev, [subjectId]: arr }));
+      } catch {
+        setChaptersMap((prev) => ({ ...prev, [subjectId]: [] }));
+      }
+    },
+    [BASE, chaptersMap],
+  );
 
   // Lazy-load both PDFs and videos for a chapter in parallel
-  async function loadChapterContent(chapterId: string) {
-    const fetches: Promise<void>[] = [];
+  const loadChapterContent = useCallback(
+    async (chapterId: string) => {
+      const fetches: Promise<void>[] = [];
 
-    if (pdfsMap[chapterId] === undefined) {
-      fetches.push(
-        fetch(`${BASE}/api/content/pdf/chapter/${chapterId}`)
-          .then((r) => r.json())
-          .then((data) => {
-            const arr: Pdf[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-            setPdfsMap((prev) => ({ ...prev, [chapterId]: arr }));
-          })
-          .catch(() => setPdfsMap((prev) => ({ ...prev, [chapterId]: [] })))
-      );
-    }
+      if (pdfsMap[chapterId] === undefined) {
+        fetches.push(
+          fetch(`${BASE}/api/content/pdf/chapter/${chapterId}`)
+            .then(async (r) => ({ ok: r.ok, data: await r.json() }))
+            .then(({ ok, data }) => {
+              const arr = ok ? toArray<Pdf>(data) : [];
+              setPdfsMap((prev) => ({ ...prev, [chapterId]: arr }));
+            })
+            .catch(() => setPdfsMap((prev) => ({ ...prev, [chapterId]: [] }))),
+        );
+      }
 
-    if (videosMap[chapterId] === undefined) {
-      fetches.push(
-        fetch(`${BASE}/api/content/video/chapter/${chapterId}`)
-          .then((r) => r.json())
-          .then((data) => {
-            const arr: Video[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-            setVideosMap((prev) => ({ ...prev, [chapterId]: arr }));
-          })
-          .catch(() => setVideosMap((prev) => ({ ...prev, [chapterId]: [] })))
-      );
-    }
+      if (videosMap[chapterId] === undefined) {
+        fetches.push(
+          fetch(`${BASE}/api/content/video/chapter/${chapterId}`)
+            .then(async (r) => ({ ok: r.ok, data: await r.json() }))
+            .then(({ ok, data }) => {
+              const arr = ok ? toArray<Video>(data) : [];
+              setVideosMap((prev) => ({ ...prev, [chapterId]: arr }));
+            })
+            .catch(() =>
+              setVideosMap((prev) => ({ ...prev, [chapterId]: [] })),
+            ),
+        );
+      }
 
-    await Promise.all(fetches);
-  }
+      await Promise.all(fetches);
+    },
+    [BASE, pdfsMap, videosMap],
+  );
 
   // Fetch storage usage
-  async function getStorage() {
+  const getStorage = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/storage/usage`);
       const data = await res.json();
-      setStorage(data);
-      console.log("Storage usage:", data);
+
+      if (!res.ok) {
+        const message = getResponseMessage(data, "Failed to fetch storage");
+
+        // Some deployed backends still do not expose storage analytics.
+        // Keep the UI usable and fall back to zeroed totals instead of
+        // surfacing a noisy console error for an optional dashboard metric.
+        if (res.status === 404 || message === "Route not found") {
+          setStorage({
+            totalBytes: 0,
+            totalPdfs: 0,
+            totalVideos: 0,
+            totalPdfBytes: 0,
+            totalVideoBytes: 0,
+          });
+          return;
+        }
+
+        throw new Error(message);
+      }
+
+      if (!data || typeof data !== "object") {
+        return;
+      }
+
+      setStorage((prev) => ({ ...prev, ...(data as Partial<Storage>) }));
     } catch (e) {
       console.error("Failed to fetch storage:", e);
     }
-  }
+  }, [BASE]);
 
   // Add a chapter optimistically
   function addChapter(subjectId: string, chapter: Chapter) {
@@ -150,13 +241,17 @@ export function useContentTree() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to delete chapter: ${response.status} - ${errorText}`);
+        throw new Error(
+          `Failed to delete chapter: ${response.status} - ${errorText}`,
+        );
       }
 
       // Update local state - remove chapter from chaptersMap
       setChaptersMap((prev) => ({
         ...prev,
-        [subjectId]: (prev[subjectId] || []).filter((ch) => ch.id !== chapterId),
+        [subjectId]: (prev[subjectId] || []).filter(
+          (ch) => ch.id !== chapterId,
+        ),
       }));
 
       // Clean up PDFs and videos maps for this chapter
@@ -186,7 +281,10 @@ export function useContentTree() {
     }));
   }
 
-  function updateVideos(chapterId: string, updater: (videos: Video[]) => Video[]) {
+  function updateVideos(
+    chapterId: string,
+    updater: (videos: Video[]) => Video[],
+  ) {
     setVideosMap((prev) => ({
       ...prev,
       [chapterId]: updater(prev[chapterId] ?? []),
