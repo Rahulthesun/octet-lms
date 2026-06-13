@@ -62,6 +62,28 @@ const navItems = [
       </svg>
     ),
   },
+
+  {
+  href: '/student/feedback',
+  label: 'Feedback',
+  icon: (
+    <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+      <path 
+        d="M3 5.5C3 4.119 4.119 3 5.5 3h9C15.881 3 17 4.119 17 5.5v7c0 1.381-1.119 2.5-2.5 2.5H11l-4 3v-3H5.5C4.119 15 3 13.881 3 12.5v-7z" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+      />
+      <path 
+        d="M7 8h6M7 11h4" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+      />
+    </svg>
+  ),
+},
 ]
 
 interface StudentSidebarProps {

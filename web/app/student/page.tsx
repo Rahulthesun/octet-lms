@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { student, lastWatched, tests, performanceHistory } from '@/lib/mockData'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { IconClipboard, IconCheckCircle, IconCalendar, IconStar, IconDocument, IconBarChart, IconPlay } from '@/components/ui/SvgIcons'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -16,6 +18,16 @@ const lastTest = tests.filter((t) => t.status === 'completed').pop()
 export default function Dashboard() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+
+  const router = useRouter()
+
+  useEffect(() => {
+
+    router.replace('/student/notes')
+
+  }, [router])
+
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">

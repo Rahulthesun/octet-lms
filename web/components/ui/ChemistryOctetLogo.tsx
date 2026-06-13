@@ -391,3 +391,109 @@ export default function ChemistryOctetLogo({
     />
   );
 }
+
+// ─── PDF WATERMARK EXTRACTOR ──────────────────────────────────────────────────
+// Renders exactly one frame of the animation invisibly to bake into PDF pages
+export async function getStaticWatermarkCanvas(): Promise<HTMLCanvasElement> {
+  await document.fonts.ready;
+  const canvas = document.createElement("canvas");
+  canvas.width = 440; canvas.height = 440;
+  const ctx = canvas.getContext("2d")!;
+  
+  const cx = 220, cy = 220, rOut = 208, rIn = 150, rBand = (rIn + rOut) / 2;
+  const ts = 8000; // Fast-forward time to scatter orbitals nicely
+  const nucTheta = (ts / 1000) * ((2 * Math.PI) / 14);
+  const eAngles = [(ts/1000)*(2*Math.PI)/4, (ts/1000)*(2*Math.PI)/5.5, (ts/1000)*(2*Math.PI)/7];
+
+  const RINGS = [
+    { rx: rIn - 10, ry: 56, tilt: 0 },
+    { rx: rIn - 10, ry: 56, tilt: Math.PI / 3 },
+    { rx: rIn - 10, ry: 56, tilt: -Math.PI / 3 },
+  ];
+
+  const NUCLEONS: number[][] = [
+    [-10, -5, 5, 15, 0, 0.0, 8.75, 1.0, 0.4, 0.3, 2.75, 1.13, 0.79, 0.97, 1.125, 5.0, 0.38],
+    [7.5, 5, -5, 15, 1, 1.2, 8.125, 1.35, 0.7, 0.1, 3.5, 0.88, 1.21, 0.65, 1.375, 6.25, 0.51],
+    [27.5, 2.5, 10, 15, 1, 0.5, 10.0, 0.8, 0.2, 0.6, 2.5, 1.37, 0.63, 1.1, 0.875, 4.375, 0.44],
+    [-27.5, -2.5, -10, 15, 0, 1.8, 8.5, 1.15, 0.55, 0.45, 3.125, 0.72, 1.05, 0.83, 1.25, 5.625, 0.33],
+    [7.5, 22.5, -12.5, 15, 0, 2.3, 11.25, 0.95, 0.1, 0.8, 3.75, 1.05, 0.87, 1.25, 1.625, 7.5, 0.47],
+    [-7.5, -22.5, 12.5, 15, 1, 0.9, 7.5, 1.5, 0.85, 0.2, 2.75, 0.93, 1.31, 0.71, 1.0, 4.75, 0.56],
+    [-12.5, 10, 25, 15, 1, 1.5, 10.625, 0.7, 0.3, 0.7, 4.0, 1.18, 0.69, 1.02, 1.5, 6.875, 0.41],
+    [12.5, -10, -25, 15, 0, 2.7, 9.0, 1.25, 0.6, 0.35, 3.25, 0.81, 1.14, 0.88, 1.125, 5.25, 0.49],
+    [15, -17.5, 10, 15, 0, 0.3, 11.875, 0.85, 0.45, 0.55, 3.5, 1.26, 0.74, 1.18, 1.375, 6.5, 0.36],
+    [-15, 17.5, -10, 15, 1, 2.0, 6.875, 1.55, 0.75, 0.15, 3.0, 0.97, 1.08, 0.79, 1.25, 6.0, 0.53],
+  ];
+
+  const ELEV = 0.24; const cosE = Math.cos(ELEV), sinE = Math.sin(ELEV);
+
+  function getNucScreen(n: number[], theta: number, now: number) {
+    const t = now * 0.00085;
+    const [bX, bY, bZ, , type, ph, oR, oS, tX, tY, pA, f1, f2, f3, jA, dA, dF] = n;
+    const oAngle = (t * oS * 2 * Math.PI) / 3.0 + ph;
+    const ox = oR * Math.cos(oAngle); const oy = oR * Math.sin(oAngle) * Math.cos(tX); const oz = oR * Math.sin(oAngle) * Math.sin(tX);
+    const wx = Math.sin(t * f1 * 2.0 + ph * 1.3) * pA; const wy = Math.cos(t * f2 * 1.8 + ph * 0.85) * pA * 0.65; const wz = Math.sin(t * f3 * 2.2 + ph * 1.7 + 1.1) * pA;
+    const jx = Math.sin(t * 4.7 + ph * 3.1) * jA; const jy = Math.cos(t * 5.3 + ph * 2.4) * jA * 0.5; const jz = Math.sin(t * 3.9 + ph * 4.0 + 2.3) * jA;
+    const depth = Math.sin(t * dF * Math.PI + ph * 2.1) * dA;
+    const x = bX + ox + wx + jx + depth * Math.cos(tY); const y = bY + oy + wy + jy; const z = bZ + oz + wz + jz + depth * Math.sin(tY);
+    const rx = x * Math.cos(theta) + z * Math.sin(theta); const ry = y; const rz = -x * Math.sin(theta) + z * Math.cos(theta);
+    const fy = ry * cosE - rz * sinE; const fz = ry * sinE + rz * cosE;
+    const s = 320 / (320 + fz);
+    return { sx: cx + rx * s, sy: cy - fy * s, ze: fz, r: n[3] * s, type };
+  }
+
+  // Draw Band & Text
+  ctx.beginPath(); ctx.arc(cx, cy, rOut, 0, Math.PI * 2, false); ctx.arc(cx, cy, rIn, 0, Math.PI * 2, true);
+  ctx.fillStyle = "#9b8ab8"; ctx.fill("evenodd");
+  ctx.strokeStyle = "#7a6898"; ctx.lineWidth = 3; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(cx, cy, rOut, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 2.0; ctx.beginPath(); ctx.arc(cx, cy, rIn, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+
+  const PAD = 0.22, halfSpan = Math.PI / 2 - PAD, TOP_CX = -Math.PI / 2, GAP = 0.13;
+  ctx.fillStyle = "#ffffff"; ctx.font = '700 40px "DM Sans", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.save(); ctx.translate(cx + rBand * Math.cos(TOP_CX), cy + rBand * Math.sin(TOP_CX)); ctx.rotate(TOP_CX + Math.PI / 2); ctx.fillText("@", 0, 0); ctx.restore();
+
+  const textL = "Chemistry"; for (let i = 0; i < textL.length; i++) {
+    ctx.font = `700 37px "DM Sans", sans-serif`; const ang = TOP_CX - GAP - (halfSpan - GAP) + (i + 0.5) * ((halfSpan - GAP) / textL.length);
+    ctx.save(); ctx.translate(cx + rBand * Math.cos(ang), cy + rBand * Math.sin(ang)); ctx.rotate(ang + Math.PI / 2); ctx.fillText(textL[i], 0, 0); ctx.restore();
+  }
+  const textR = "OCTET"; for (let i = 0; i < textR.length; i++) {
+    ctx.font = '700 37px "DM Sans", sans-serif'; const ang = TOP_CX + GAP + (i + 0.5) * ((halfSpan - GAP) / textR.length);
+    ctx.save(); ctx.translate(cx + rBand * Math.cos(ang), cy + rBand * Math.sin(ang)); ctx.rotate(ang + Math.PI / 2); ctx.fillText(textR[i], 0, 0); ctx.restore();
+  }
+  const txtB = "SPREAD TRUE SCIENCE"; const stepB = (Math.PI - 2 * PAD) / txtB.length;
+  for (let i = 0; i < txtB.length; i++) {
+    ctx.font = `700 40px "DM Sans", sans-serif`; const ang = Math.PI/2 - (Math.PI - 2 * PAD)/2 + ((txtB.length - 1 - i) + 0.5) * stepB;
+    ctx.save(); ctx.translate(cx + rBand * Math.cos(ang), cy + rBand * Math.sin(ang)); ctx.rotate(ang - Math.PI / 2); ctx.fillText(txtB[i], 0, 0); ctx.restore();
+  }
+  ctx.font = '900 30px "DM Sans", sans-serif'; ctx.globalAlpha = 0.92; ctx.fillText("★", cx - rBand, cy); ctx.fillText("★", cx + rBand, cy); ctx.globalAlpha = 1;
+
+  // Draw 3D Core
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rIn, 0, Math.PI * 2); ctx.clip();
+  
+  RINGS.forEach(ring => {
+    ctx.beginPath(); ctx.ellipse(cx, cy, ring.rx, ring.ry, ring.tilt, 0, Math.PI * 2); ctx.strokeStyle = "rgba(175, 100, 255, 0.13)"; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, ring.rx, ring.ry, ring.tilt, 0, Math.PI * 2); ctx.strokeStyle = "rgba(205, 155, 255, 0.78)"; ctx.lineWidth = 1.8; ctx.stroke();
+  });
+  
+  for (let k = 0; k < 3; k++) {
+    [eAngles[k], eAngles[k] + Math.PI].forEach(t => {
+      const ex = RINGS[k].rx * Math.cos(t), ey = RINGS[k].ry * Math.sin(t);
+      const px = cx + ex * Math.cos(RINGS[k].tilt) - ey * Math.sin(RINGS[k].tilt), py = cy + ex * Math.sin(RINGS[k].tilt) + ey * Math.cos(RINGS[k].tilt);
+      const g = ctx.createRadialGradient(px - 1.5, py - 1.5, 0.5, px, py, 11);
+      g.addColorStop(0, "#c0a0f0"); g.addColorStop(0.45, "#7a5ca0"); g.addColorStop(1, "#3e2060");
+      ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill();
+    });
+  }
+
+  const pts = NUCLEONS.map(n => getNucScreen(n, nucTheta, ts)).sort((a, b) => b.ze - a.ze);
+  pts.forEach(p => {
+    const dT = Math.max(0, Math.min(1, (p.ze + 28) / 56));
+    const g = ctx.createRadialGradient(p.sx - p.r * 0.36, p.sy - p.r * 0.36, p.r * 0.06, p.sx, p.sy, p.r);
+    if (p.type === 0) { g.addColorStop(0, "#ff8098"); g.addColorStop(0.4, "#cc2040"); g.addColorStop(1, "#78091e"); }
+    else { g.addColorStop(0, "#7898ff"); g.addColorStop(0.4, "#2040cc"); g.addColorStop(1, "#090e78"); }
+    ctx.globalAlpha = 1 - dT * 0.38; ctx.beginPath(); ctx.arc(p.sx, p.sy, p.r, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+  ctx.restore();
+
+  return canvas;
+}

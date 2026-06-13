@@ -104,9 +104,9 @@ function PdfOverlay({
   const pdfUrl = `${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
       {/* Floating container */}
-      <div className="relative w-full h-full bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="relative w-full h-full bg-white  shadow-2xl flex overflow-hidden">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -174,12 +174,12 @@ function PdfOverlay({
             </div>
           </div>
           
-          {/* Scrollable PDF area - LIKE THE WORKING EXAMPLE */}
-          <div className="flex-1 overflow-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Fill the panel so the viewer's own scroll container handles the PDF */}
+          <div className="flex-1 min-h-0">
             <PdfViewer
               url={pdfUrl}
               filename={openDoc.pdf.title}
-              className="h-[80vh] !rounded-none !border-none"
+              className="h-full min-h-0 !rounded-none !border-none"
             />
           </div>
         </div>
@@ -714,7 +714,7 @@ export default function PdfNotesPage() {
                               >
                                 <Chevron open={chapterOpen} className="w-3.5 h-3.5 text-muted shrink-0" />
                                 <span className="text-primary/70 shrink-0"><PdfIcon className="w-4 h-4" /></span>
-                                <span className="text-muted text-[14px] w-16 shrink-0">Chap {ci + 1}</span>
+                                <span className="text-muted text-[14px] w-auto shrink-0">Unit {ci + 1}</span>
                                 <span className="flex-1 text-primary/90 text-[15px] leading-snug">{cn}</span>
                                 <span className="text-muted text-[14px] shrink-0">
                                   {pdfs ? `${pdfs.length} class${pdfs.length !== 1 ? 'es' : ''}` : '—'}
