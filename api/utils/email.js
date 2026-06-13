@@ -34,21 +34,23 @@ async function sendWelcomeEmail(to, name, tempPassword, admissionNumber, loginUr
 
     const subject = `Welcome to OCTET – Admission No: ${admissionNumber}`;
     const text = `
-Hello ${name},
+Hey ${name},
 
-Your admission is confirmed.
+Raju Sir wanted your LMS active immediately so you can access all class notes and the exclusive Exam Eve Study material. 
 
-Admission Number: ${admissionNumber}
-Login Email: ${to}
-Temporary Password: ${tempPassword}
+Your Chemistry@OCTET LMS portal is ready:
 
-Login URL: ${baseUrl}
+Admission No:  ${admissionNumber}
+Login Email:   ${to}
+Temp Password: ${tempPassword}
 
-Please change your password after first login.
+Portal: ${baseUrl}
 
-If you didn't request this, ignore this email.
+Good Luck For your Exams !!!
 
-– OCTET Team
+Let's crush the chemistry boards.
+
+-- Chemistry@OCTET
     `.trim();
 
     try {
