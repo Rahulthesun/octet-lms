@@ -11,7 +11,9 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
 
   '/student': 'testing',
   '/student/notes': 'production',
+  '/student/feedback': 'production',
   '/student/courses': 'testing',
+  
 }
 
 // Exact match only - unlisted paths default to 'testing'
