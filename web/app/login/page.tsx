@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AtomSVG, FlaskSVG } from '@/components/ui/PencilSVGs'
-import { signIn } from '../../lib/auth'   // <-- changed
+import { signIn } from '../../lib/auth'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,8 +27,16 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await signIn(email, password)   // <-- changed
-      router.push('/student')
+      const { user } = await signIn(email, password)
+
+      const role = user?.app_metadata?.role ?? 'student'
+
+      // Pure admins -> /admin, everyone else (student / both) -> /student
+      if (role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/student')
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {

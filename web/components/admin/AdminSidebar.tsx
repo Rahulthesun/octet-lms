@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "../../lib/auth"; // adjust path to wherever your signOut lives
+
 
 const navItems = [
   {
@@ -188,6 +190,11 @@ export default function AdminSidebar({
     if (href === "/admin") return pathname === "/admin";
     return pathname.startsWith(href);
   };
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
+  };
+
 
   return (
     <div
@@ -364,7 +371,7 @@ export default function AdminSidebar({
         {/* Sign out */}
         {collapsed ? (
           <button
-            onClick={() => router.push("/")}
+            onClick={handleSignOut}
             className="relative group w-12 mb-2 h-10 bg-primary flex items-center justify-center text-white font-inter text-base"
             title="Sign out"
           >
@@ -383,7 +390,7 @@ export default function AdminSidebar({
                 Admin
               </p>
               <button
-                onClick={() => router.push("/")}
+                onClick={handleSignOut}
                 className="text-sm text-gray-400 hover:text-primary transition-colors"
               >
                 Sign out
