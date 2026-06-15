@@ -231,19 +231,27 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
           </button>
         ) : (
           <div className="flex items-center gap-3 px-4 py-2">
-            <div className="w-9 h-9 rounded-md bg-[#7A6B96] flex items-center justify-center text-white font-inter text-base shrink-0">
-              A
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-base text-[#635580] leading-tight truncate">Arjun Sharma</p>
-              <button
+            <button
                 onClick={handleSignOut}
                 className="text-sm text-[#64748b] hover:text-[#7A6B96] transition-colors"
               >
                 Sign out
               </button>
+            
+              {/* 
+              <div className="w-9 h-9 rounded-md bg-[#7A6B96] flex items-center justify-center text-white font-inter text-base shrink-0">
+              A
             </div>
-          </div>
+            <div className="flex-1 min-w-0">
+               <p className="text-base text-[#635580] leading-tight truncate">Arjun Sharma</p>
+                </div>
+                            
+
+               */}
+             
+            </div>
+           
+          
         )}
       </div>
     </div>
