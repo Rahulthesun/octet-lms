@@ -16,7 +16,7 @@ const { checkAccess } = require('../controllers/analytics.controller');
 
 const router = express.Router();
 
-router.use(requireRole(['admin', 'developer']));
+router.use(requireRole(['admin', 'developer' , 'both']));
 
 router.get('/access-check', checkAccess);
 
