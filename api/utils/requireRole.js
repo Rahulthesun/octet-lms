@@ -16,7 +16,7 @@
 
 const supabase = require('../config/supabase');
 
-function requireRole(allowedRoles = ['admin', 'developer']) {
+function requireRole(allowedRoles = ['admin', 'developer' , 'both']) {
   return async function (req, res, next) {
     try {
       const authHeader = req.headers.authorization || '';

@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase/client';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL;
 
 export function useAnalyticsAccess() {
   const [status, setStatus] = useState('checking'); // 'checking' | 'authorized' | 'denied'
