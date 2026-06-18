@@ -43,6 +43,7 @@ const subtopicRouter = require("./routes/subtopic.routes");
 const storageRouter  = require("./routes/storage.routes");
 
 const studentRouter  = require("./routes/student.routes");
+const analyticsRouter = require("./routes/analytics.routes")
 
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
@@ -51,14 +52,13 @@ app.use("/api/chapters",      chapterRouter);
 //app.use("/api/subtopics",     subtopicRouter); DEPRECATED USE OF SUBTOPIC ROUTER
 app.use("/api/storage",       storageRouter);
 
-
+//For indexed file search 
 app.use("/api/search", require("./routes/search.routes"));
 
-
-
+//For analytics related routes!!!
+app.use("/api/analytics", analyticsRouter );
 
 //Students Management 
-
 app.use("/api/students", studentRouter);
 
 // ── Health check ──────────────────────────────────────────────
