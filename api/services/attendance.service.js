@@ -52,10 +52,14 @@ async function getBatches() {
  * Create a new batch.
  * Writes `mode` into the existing `delivery_type` column.
  */
-async function createBatch({ name, days, start_time, end_time, meet_link, location }) {
+async function createBatch({ id, name, days, start_time, end_time, meet_link, location }) {
   if (!name) throw Object.assign(new Error("name is required"), { status: 400 });
 
-  const payload = { name };
+  const payload = { 
+    id: id,  // 👈 THIS WAS MISSING
+    name: name 
+  };
+  
   if (days)        payload.days        = days;
   if (start_time)  payload.start_time  = start_time;
   if (end_time)    payload.end_time    = end_time;

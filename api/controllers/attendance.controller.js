@@ -37,14 +37,14 @@ async function getBatches(req, res) {
  * Body: { name, mode, days?, start_time?, end_time?, meet_link?, location? }
  */
 async function createBatch(req, res) {
-  const { name, days, start_time, end_time, meet_link, location } = req.body;
+  const { id, name, days, start_time, end_time, meet_link, location } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: "name is required" });
   }
 
   try {
-    const batch = await svc.createBatch({ name, days, start_time, end_time, meet_link, location });
+    const batch = await svc.createBatch({ id , name, days, start_time, end_time, meet_link, location });
     res.status(201).json({ batch });
   } catch (err) {
     handleError(res, err);
