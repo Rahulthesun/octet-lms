@@ -152,58 +152,23 @@ const getAllPdfs = async (filters = {}) => {
   return pdfsWithUrls;
 };
 
-// ─────────────────────────────────────────────────────────────
-// streamPdfById
-// ─────────────────────────────────────────────────────────────
-const streamPdfbyId = async (id , res) => {
-  const { data : pdf, error } = await supabase
+
+// ─── CHANGE 2: Replace streamPdfbyId entirely ────────────────────────────────
+const streamPdfbyId = async (id, res) => {
+  const { data: pdf, error } = await supabase
     .from("pdfs")
-    .select("r2_key, title , filename")
+    .select("r2_key, title, filename")
     .eq("id", id)
     .single();
 
-  // Supabase returns error.code "PGRST116" when no row is found.
-  // We return null so the controller can send a 404.
-  if (error?.code === "PGRST116") return null;
-  if (error || !pdf) {
-    throw new Error("PDF_NOT_FOUND");
-  }
-
+  if (error?.code === "PGRST116" || !pdf) throw new Error("PDF_NOT_FOUND");
   if (error) throw new Error(error.message);
-  
-  const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME,
-    Key: pdf.r2_key,
-  });
 
-  try {
-    const s3Response = await r2.send(command);
-  
-    console.log("R2 response received");
-    console.log("Body exists:", !!s3Response.Body);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${pdf.filename ?? pdf.title}.pdf"`
-    );
-    res.setHeader("Cache-Control", "private, max-age=3600");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "SAMEORIGIN");
-    // Stream directly from R2 → Client
-    console.log({
-    contentType: s3Response.ContentType,
-    contentLength: s3Response.ContentLength,
-    metadata: s3Response.Metadata,
-    });
-    s3Response.Body.pipe(res);
-  } catch (r2Error) {
-    console.log("Error fetching from R2:", r2Error);
-    throw new Error("Failed to fetch PDF from storage");
-  }
-  
-  
+  //console.log("r2_key from DB:", pdf.r2_key); // ← add this
+
+  const signedUrl = await getSignedPdfUrl(pdf.r2_key);
+  res.redirect(302, signedUrl);
 };
-
 // ─────────────────────────────────────────────────────────────
 // getPdfById
 // ─────────────────────────────────────────────────────────────

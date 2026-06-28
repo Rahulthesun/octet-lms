@@ -44,6 +44,7 @@ const storageRouter  = require("./routes/storage.routes");
 
 const studentRouter  = require("./routes/student.routes");
 const analyticsRouter = require("./routes/analytics.routes")
+const attendanceRouter = require("./routes/attendance.routes");
 
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
@@ -60,6 +61,10 @@ app.use("/api/analytics", analyticsRouter );
 
 //Students Management 
 app.use("/api/students", studentRouter);
+ 
+// For Attendance related Ops:
+app.use("/api/attendance", attendanceRouter);
+ 
 
 // ── Health check ──────────────────────────────────────────────
 // A simple GET / so you can confirm the server is running.
