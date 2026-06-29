@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth';
 // Module-level cache
 let nameCache: string | null = null;
 
+const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL
+
 export function useStudentName(): string | null {
   const [name, setName] = useState<string | null>(nameCache);
 
@@ -20,12 +22,16 @@ export function useStudentName(): string | null {
         if (!session?.user?.id) return;
 
         const response = await fetch(
-          `/api/student/profile?studentId=${session.user.id}`,
+          `${SERVER_URL}/api/students/profile`,
           {
-            credentials: 'include',
-          }
-        );
+            //credentials: 'include',
+            headers : {
+              'Authorization' : `Bearer ${session.access_token}`
+            }
+          },
 
+        );
+        console.log(response);
         if (!response.ok) {
           throw new Error('Failed to fetch student profile');
         }
