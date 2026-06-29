@@ -45,6 +45,8 @@ const storageRouter  = require("./routes/storage.routes");
 const studentRouter  = require("./routes/students.routes");
 const analyticsRouter = require("./routes/analytics.routes")
 const attendanceRouter = require("./routes/attendance.routes");
+const securityRouter = require("./routes/security.routes")
+const searchRouter = require("./routes/search.routes")
 
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
@@ -54,7 +56,7 @@ app.use("/api/chapters",      chapterRouter);
 app.use("/api/storage",       storageRouter);
 
 //For indexed file search 
-app.use("/api/search", require("./routes/search.routes"));
+app.use("/api/search", searchRouter);
 
 //For analytics related routes!!!
 app.use("/api/analytics", analyticsRouter );
@@ -64,6 +66,8 @@ app.use("/api/students", studentRouter);
  
 // For Attendance related Ops:
 app.use("/api/attendance", attendanceRouter);
+
+app.use("/api/security" , securityRouter)
  
 
 // ── Health check ──────────────────────────────────────────────
