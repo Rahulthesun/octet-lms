@@ -42,7 +42,7 @@ const chapterRouter  = require("./routes/chapter.routes");
 const subtopicRouter = require("./routes/subtopic.routes");
 const storageRouter  = require("./routes/storage.routes");
 
-const studentRouter  = require("./routes/student.routes");
+const studentRouter  = require("./routes/students.routes");
 const analyticsRouter = require("./routes/analytics.routes")
 const attendanceRouter = require("./routes/attendance.routes");
 

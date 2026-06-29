@@ -316,17 +316,21 @@ async function getDashboardStats() {
 }
 
 async function getStudentByUserId(userId) {
+  console.log("A. Querying for auth_user_id:", userId);
+  
   const { data: student, error } = await supabase
     .from("students")
-    .select("name, email, blocked, avatar")
-    .eq("user_id", userId)
+    .select("name, email, blocked")
+    .eq("auth_user_id", userId)
     .single();
 
+  console.log("B. Query result:", { data: student, error: error });
+
   if (error) {
+    console.log("C. Error code:", error.code);
     if (error.code === "PGRST116") {
       throw new NotFoundError(`No student profile found for user ID: ${userId}`);
     }
-    console.error("Database error fetching student profile:", error);
     throw new Error(`Database query failed: ${error.message}`);
   }
 
@@ -341,7 +345,6 @@ async function getStudentByUserId(userId) {
     avatar: student.avatar,
   };
 }
-
 
 module.exports = {
     getAllStudents,
