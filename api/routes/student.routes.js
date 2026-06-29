@@ -61,4 +61,7 @@ router.get("/batch/:batchId", studentController.getStudentsByBatch);
 // GET    /api/students/stats/dashboard  → get dashboard statistics (total, pending, batch counts, etc.)
 router.get("/stats/dashboard", studentController.getDashboardStats);
 
+// GET /api/student/profile?studentId=:userId
+router.get("/profile", studentController.getProfilebyUserID);
+
 module.exports = router;
