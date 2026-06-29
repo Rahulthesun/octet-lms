@@ -27,7 +27,8 @@ router.get("/", studentController.getAllStudents);
 router.get("/pending", studentController.getPendingStudents);
 
 // GET /api/student/profile?studentId=:userId
-router.get("/profile", verifyToken ,  studentController.getProfilebyUserID);
+router.get("/profile", verifyToken , studentController.getProfilebyUserID);
+
 
 // GET    /api/students/:id      → get a single student by ID
 router.get("/:id", studentController.getStudentById);
