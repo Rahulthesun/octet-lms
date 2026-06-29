@@ -10,10 +10,11 @@
 
 const express = require("express");
 const router = express.Router();
-const studentController = require("../controllers/student.controller");
+const studentController = require("../controllers/students.controller");
 
 //FOR BULK IMPORT CSV UPLOAD
 const multer = require('multer');
+const { verifyToken } = require("../middleware/auth");
 const upload = multer({ storage: multer.memoryStorage() });
 
 
@@ -24,6 +25,9 @@ router.get("/", studentController.getAllStudents);
 
 // GET    /api/students/pending  → list all students with status = 'PENDING'
 router.get("/pending", studentController.getPendingStudents);
+
+// GET /api/student/profile?studentId=:userId
+router.get("/profile", verifyToken ,  studentController.getProfilebyUserID);
 
 // GET    /api/students/:id      → get a single student by ID
 router.get("/:id", studentController.getStudentById);
@@ -61,7 +65,6 @@ router.get("/batch/:batchId", studentController.getStudentsByBatch);
 // GET    /api/students/stats/dashboard  → get dashboard statistics (total, pending, batch counts, etc.)
 router.get("/stats/dashboard", studentController.getDashboardStats);
 
-// GET /api/student/profile?studentId=:userId
-router.get("/profile", studentController.getProfilebyUserID);
 
 module.exports = router;
+

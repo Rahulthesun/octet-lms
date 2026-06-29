@@ -1,5 +1,5 @@
 // controllers/student.controller.js
-const studentService = require("../services/student.service");
+const studentService = require("../services/students.service");
 
 
 exports.getAllStudents = async (req, res) => {
@@ -138,31 +138,28 @@ exports.getDashboardStats = async (req, res) => {
  */
 exports.getProfilebyUserID = async (req, res) => {
   try {
-    const requestedStudentId = req.query.studentId;
-    const authenticatedUserId = req.user.id;
-    const userRole = req.user?.app_metadata?.role;
+    const authenticatedUserId = req.user?.id;
+    console.log("1. User ID from JWT:", authenticatedUserId);
+    console.log("2. Full req.user:", req.user);
 
-    // Validate studentId query parameter
-    if (!requestedStudentId) {
-      return res.status(400).json({ error: "studentId query parameter is required" });
+    if (!authenticatedUserId) {
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Authorization: Regular students can only access their own profile
-    if (!userRole && requestedStudentId !== authenticatedUserId) {
-      return res.status(403).json({ error: "You can only access your own profile" });
-    }
-
-    // Fetch profile
-    const profile = await studentService.getStudentProfile(requestedStudentId);
-
-    if (!profile) {
-      return res.status(404).json({ error: "Student profile not found" });
-    }
+    const profile = await studentService.getStudentByUserId(authenticatedUserId);
+    console.log("3. Profile returned:", profile);
 
     return res.status(200).json(profile);
 
   } catch (error) {
-    console.error("Error fetching student profile:", error);
+    console.log("4. ERROR CAUGHT:", error.message);
+    console.log("5. Full error:", error);
+    
+    // Check what type of error it is
+    if (error.message?.includes("No student profile found")) {
+      return res.status(404).json({ error: "Student profile not found" });
+    }
+    
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+};
