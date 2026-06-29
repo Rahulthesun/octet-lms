@@ -1,6 +1,7 @@
 // controllers/student.controller.js
 const studentService = require("../services/student.service");
 
+
 exports.getAllStudents = async (req, res) => {
   try {
     const { batch, mode, status, search, limit, offset } = req.query;
@@ -128,3 +129,40 @@ exports.getDashboardStats = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+
+/**
+ * GET /api/student/profile?studentId=:userId
+ * 
+ * Returns the authenticated student's profile information.
+ */
+exports.getProfilebyUserID = async (req, res) => {
+  try {
+    const requestedStudentId = req.query.studentId;
+    const authenticatedUserId = req.user.id;
+    const userRole = req.user?.app_metadata?.role;
+
+    // Validate studentId query parameter
+    if (!requestedStudentId) {
+      return res.status(400).json({ error: "studentId query parameter is required" });
+    }
+
+    // Authorization: Regular students can only access their own profile
+    if (!userRole && requestedStudentId !== authenticatedUserId) {
+      return res.status(403).json({ error: "You can only access your own profile" });
+    }
+
+    // Fetch profile
+    const profile = await studentService.getStudentProfile(requestedStudentId);
+
+    if (!profile) {
+      return res.status(404).json({ error: "Student profile not found" });
+    }
+
+    return res.status(200).json(profile);
+
+  } catch (error) {
+    console.error("Error fetching student profile:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+}

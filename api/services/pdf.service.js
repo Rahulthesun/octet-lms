@@ -167,7 +167,7 @@ const streamPdfbyId = async (id, res) => {
   //console.log("r2_key from DB:", pdf.r2_key); // ← add this
 
   const signedUrl = await getSignedPdfUrl(pdf.r2_key);
-  res.redirect(302, signedUrl);
+  res.json({ url: signedUrl }); // ← not res.redirect
 };
 // ─────────────────────────────────────────────────────────────
 // getPdfById
