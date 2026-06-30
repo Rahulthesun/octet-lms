@@ -11,7 +11,7 @@ export function useWatermarkToken(): string | null {
         if (!session?.access_token) return;
 
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/api/watermark/token`,
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/api/security/watermark/token`,
           {
             headers: {
               Authorization: `Bearer ${session.access_token}`,

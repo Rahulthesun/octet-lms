@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, memo } from "react";
 import ChemistryOctetLogo, { getStaticWatermarkCanvas } from "../../components/ui/ChemistryOctetLogo";
 import { useIsMobileDevice, usePdfViewerLockdown } from "@/hooks/usePdfViewerLockDown";
 import type { LockdownStatus } from "@/hooks/usePdfViewerLockDown";
@@ -21,55 +21,144 @@ function drawWatermark(
   studentToken: string | null
 ) {
   const watermarkText = studentToken
-    ? `C@O · ${studentToken}`
+    ? `Chemistry@OCTET · ${studentToken}`
     : 'Chemistry@OCTET';
 
-  const fontSize = Math.max(13, w * 0.028);
+  // Smaller font + spacing scaled to the actual rendered text width is what
+  // stops repeats from overlapping each other.
+  const fontSize = Math.max(11, w * 0.018);
 
   ctx.save();
-  ctx.globalAlpha = 0.15;
+  ctx.globalAlpha = 0.3;
   ctx.fillStyle = '#4B2D8F';
   ctx.font = `bold ${fontSize}px "Inter","Segoe UI",Arial,sans-serif`;
   ctx.textAlign = 'center';
   ctx.translate(w / 2, h / 2);
   ctx.rotate(-Math.PI / 6);
-  const stepX = fontSize * 11;
-  const stepY = fontSize * 5.5;
+
+  const textWidth = ctx.measureText(watermarkText).width;
+  const stepX = textWidth + fontSize * 4;   // gap scales with actual text length
+  const stepY = fontSize * 7.5;             // taller vertical gap so rows don't crowd
+
+  // Stagger alternate rows so the diagonal repeat doesn't line up into a
+  // single dense column, which is what reads as "overlapping".
+  let row = 0;
   for (let y = -h * 1.5; y < h * 1.5; y += stepY) {
-    for (let x = -w * 1.5; x < w * 1.5; x += stepX) {
+    const rowOffset = (row % 2 === 0) ? 0 : stepX / 2;
+    for (let x = -w * 1.5 + rowOffset; x < w * 1.5; x += stepX) {
       ctx.fillText(watermarkText, x, y);
     }
+    row++;
   }
   ctx.restore();
 
   ctx.save();
-  ctx.globalAlpha = 0.13;
+  ctx.globalAlpha = 0.16;
   ctx.fillStyle = '#4B2D8F';
   ctx.font = `${Math.max(9, w * 0.016)}px Arial,sans-serif`;
   ctx.textAlign = 'left';
-  ctx.fillText('© Chemistry@OCTET — For authorised use only', 12, h - 10);
+  const footerText = studentToken
+    ? `© Chemistry@OCTET — Licensed to ${studentToken} — Unauthorised distribution prohibited`
+    : '© Chemistry@OCTET — For authorised use only';
+  ctx.fillText(footerText, 12, h - 10);
   ctx.restore();
 }
 
 // ─── Animated Logo Watermark Overlay ─────────────────────────────────────────
-// Deterministic "random" position seeded by page number so it's stable between renders
-function seededPos(pageIndex: number): { top: string; left: string } {
-  const a = ((pageIndex + 1) * 48271) % 97;
-  const b = ((pageIndex + 1) * 16807) % 97;
-  // 8–65% keeps the logo fully within most page layouts
-  const top  = 8  + (a % 57);
-  const left = 8  + (b % 57);
-  return { top: `${top}%`, left: `${left}%` };
-}
+// Fixed to the *visible viewport* of the scroll container (not the scrollable
+// document), so wherever the student has scrolled (page 1 or page 25), the
+// logo just drifts around inside whatever is currently on screen.
+// Position is driven purely via CSS `transform: translate3d(...)`, which is
+// GPU-composited and never triggers layout/reflow — this is what kills lag
+// vs animating top/left.
+function AnimatedLogoWatermark({
+  viewportRef,
+  studentToken,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  studentToken: string | null;
+}) {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [coords, setCoords] = useState({ x: 0, y: 0 });
+  const LOGO_SIZE = 380;
 
-function AnimatedLogoWatermark({ pageIndex }: { pageIndex: number }) {
-  const { top, left } = seededPos(pageIndex);
+  // Track the visible viewport size (the scroll container's own clientWidth/Height,
+  // NOT scrollHeight) so the logo only roams within what's currently on screen.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const obs = new ResizeObserver(update);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [viewportRef]);
+
+  const pickNewSpot = useCallback(() => {
+    if (size.w === 0 || size.h === 0) return;
+    const margin = LOGO_SIZE * 0.3; // keep most of the logo on-screen
+    const maxX = Math.max(0, size.w - LOGO_SIZE + margin * 2);
+    const maxY = Math.max(0, size.h - LOGO_SIZE + margin * 2);
+    const x = -margin + Math.random() * maxX;
+    const y = -margin + Math.random() * maxY;
+    setCoords({ x, y });
+  }, [size]);
+
+  useEffect(() => {
+    pickNewSpot();
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") pickNewSpot();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [pickNewSpot]);
+
+  if (size.w === 0 || size.h === 0) return null;
+
   return (
     <div
-      className="absolute pointer-events-none"
-      style={{ top, left, opacity: 0.5, transform: "translate(-50%, -50%)" }}
+      className="pointer-events-none z-10"
+      style={{
+        position: "sticky",
+        top: 0,
+        left: 0,
+        height: 0, // sticky wrapper takes no layout space
+        overflow: "visible",
+      }}
     >
-      <ChemistryOctetLogo size={250} />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: LOGO_SIZE,
+          opacity: 0.45,
+          transform: `translate3d(${coords.x}px, ${coords.y}px, 0)`,
+          transition: "transform 1.2s ease",
+          willChange: "transform",
+          contain: "layout style paint",
+          backfaceVisibility: "hidden",
+        }}
+      >
+        {/* animated (throttled to ~20fps internally) — every other logo instance
+            on this page stays static; this is the only live one */}
+        <ChemistryOctetLogo size={LOGO_SIZE} />
+        {studentToken && (
+          <div
+            style={{
+              marginTop: 6,
+              textAlign: "center",
+              fontFamily: '"DM Sans", "Inter", sans-serif',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              color: "#4B2D8F",
+              textShadow: "0 1px 2px rgba(255,255,255,0.6)",
+            }}
+          >
+            C@O · {studentToken}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -139,7 +228,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     devtoolsGracePeriodMs: GRACE_SECONDS * 1000,
     onStatusChange: setStatus,
     onSecurityEvent: (event) => {
-      fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/security-log`, {
+      fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/security/security-log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event, ts: Date.now() }),
@@ -217,7 +306,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
           if (!ctx) continue;
           await page.render({ canvasContext: ctx, viewport }).promise;
           if (cancelled) return;
-          drawWatermark(ctx, viewport.width, viewport.height , studentToken);
+          drawWatermark(ctx, viewport.width, viewport.height, studentToken);
         }
       } catch (e: any) {
         if (e?.name !== "RenderingCancelledException" && !cancelled) {
@@ -302,7 +391,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
         className={`flex flex-col items-center justify-center gap-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 ${className}`}
         style={{ minHeight: 320 }}
       >
-        <ChemistryOctetLogo size={64} className="opacity-40 grayscale" />
+        <ChemistryOctetLogo size={64} className="opacity-40 grayscale" static />
         <div className="text-center mt-2">
           <p className="text-sm font-semibold text-primary/40 tracking-tight">
             Chemistry<span className="font-normal text-gray-300">@</span>OCTET
@@ -339,7 +428,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
         {/* ── Toolbar ── */}
         <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-1.5 pr-2.5 border-r border-gray-100 shrink-0">
-            <ChemistryOctetLogo size={20} />
+            <ChemistryOctetLogo size={20} static />
             <span className="text-[11px] font-extrabold text-primary tracking-tight leading-none ml-1">
               C<span className="font-light text-gray-400">@</span>O
             </span>
@@ -405,11 +494,16 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
           {status === 'devtools-blocked' && <BlockedOverlay reason="devtools" />}
           {status === 'screenshot-blocked' && <BlockedOverlay reason="screenshot" />}
 
+          {/* ── Single floating logo — drifts within the visible viewport, GPU-only, static render ── */}
+          {!loading && !loadError && (
+            <AnimatedLogoWatermark viewportRef={scrollContainerRef} studentToken={studentToken} />
+          )}
+
           <div ref={containerRef} className="flex flex-col items-center py-5 gap-1">
             {loading && (
               <div className="flex flex-col items-center justify-center gap-3 py-20 flex-1">
                 <div className="relative">
-                  <ChemistryOctetLogo size={48} />
+                  <ChemistryOctetLogo size={48} static />
                   <div className="absolute -inset-2 flex items-center justify-center">
                     <div className="w-16 h-16 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   </div>
@@ -435,14 +529,13 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
                     className="block rounded-sm"
                     style={{ display: "block", maxWidth: "100%", pointerEvents: "none" }}
                   />
-                  <AnimatedLogoWatermark pageIndex={i} />  {/* ← add this */}
                 </div>
               ))}
             </div>
 
             {!loading && !loadError && (
               <div className="flex items-center gap-1.5 mt-2 opacity-40">
-                <ChemistryOctetLogo size={16} className="grayscale" />
+                <ChemistryOctetLogo size={16} className="grayscale" static />
                 <span className="text-[10px] text-gray-500 font-medium tracking-wide">
                   Chemistry@OCTET — Secured Content
                 </span>
@@ -453,4 +546,4 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
       </div>
     </>
   );
-} 
+}

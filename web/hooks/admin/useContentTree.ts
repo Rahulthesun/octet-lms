@@ -193,7 +193,9 @@ export function useContentTree(autoLoadChapters = true) {
         );
       }
 
-      if (videosMap[chapterId] === undefined) {
+      {/* ------- VIDEO LOAD --------
+        
+        if (videosMap[chapterId] === undefined) {
         fetches.push(
           fetch(`${BASE}/api/content/video/chapter/${chapterId}`)
             .then(async (r) => ({ ok: r.ok, data: await r.json() }))
@@ -205,7 +207,9 @@ export function useContentTree(autoLoadChapters = true) {
               setVideosMap((prev) => ({ ...prev, [chapterId]: [] })),
             ),
         );
-      }
+      } */}
+
+      
 
       await Promise.all(fetches);
     },
