@@ -6,6 +6,10 @@ import { useUserRole } from '@/hooks/useUserRole'
 import { canAccessPage } from '@/lib/pageStatus'
 import { signOut } from '@/lib/auth'
 import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
+import { useStudentName } from '@/hooks/useStudentName'
+import { toTitleCase } from '@/lib/helpers'
+
+// inside component, with other hooks:
 
 const navItems = [
   {
@@ -95,6 +99,8 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
   const pathname = usePathname()
   const router = useRouter()
   const { role } = useUserRole()
+  const studentName = useStudentName()
+
 
   const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
 
@@ -180,80 +186,57 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
         })}
       </nav>
 
-      {/* My Profile + Sign out */}
-      <div className={`${collapsed ? 'flex flex-col items-center gap-1' : ''}`}>
-        {/* My Profile */}
-        {collapsed ? (
-          <Link
-            href="/student/profile"
-            className={`relative group w-full h-12 flex items-center justify-center border-l-2 transition-colors ${
-              isActive('/student/profile')
-                ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
-                : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
-            }`}
-          >
-            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
-              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              My Profile
-            </span>
-          </Link>
-        ) : (
-          <Link
-            href="/student/profile"
-            className={`flex items-center gap-3 px-4 py-2.5 border-l-2 transition-colors group ${
-              isActive('/student/profile')
-                ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
-                : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
-            }`}
-          >
-            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
-              <circle cx="9" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M 1.5,18 Q 1.5,13 9,13 Q 16.5,13 16.5,18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <span className="text-lg whitespace-nowrap">My Profile</span>
-          </Link>
-        )}
+{/* Bottom — Sign Out + Profile */}
+<div className="shrink-0">
 
-        {/* Sign out */}
-        {collapsed ? (
-          <button
-            onClick={handleSignOut}
-            className="relative group w-12 mb-2 h-10 bg-[#7A6B96] rounded-md flex items-center justify-center text-white font-inter text-base"
-            title="Sign out"
-          >
-            A
-            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              Sign Out
-            </span>
-          </button>
-        ) : (
-          <div className="flex items-center gap-3 px-4 py-2">
-            <button
-                onClick={handleSignOut}
-                className="text-sm text-[#64748b] hover:text-[#7A6B96] transition-colors"
-              >
-                Sign out
-              </button>
-            
-              {/* 
-              <div className="w-9 h-9 rounded-md bg-[#7A6B96] flex items-center justify-center text-white font-inter text-base shrink-0">
-              A
-            </div>
-            <div className="flex-1 min-w-0">
-               <p className="text-base text-[#635580] leading-tight truncate">Arjun Sharma</p>
-                </div>
-                            
+  {/* Sign Out */}
+  <button
+    onClick={handleSignOut}
+    className={`flex items-center h-12 w-full border-l-2 border-transparent text-[#64748b] hover:bg-red-50 hover:text-red-400 transition-colors ${
+      collapsed ? 'justify-center' : 'gap-3 px-4'
+    }`}
+  >
+    <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+      <path d="M8 10h8M13 7l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 4H5a1 1 0 00-1 1v10a1 1 0 001 1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+    {!collapsed && <span className="text-lg whitespace-nowrap">Sign Out</span>}
+    {collapsed && (
+      <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#3d3354] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+        Sign Out
+      </span>
+    )}
+  </button>
 
-               */}
-             
-            </div>
-           
-          
-        )}
-      </div>
+  {/* Profile row */}
+  <Link
+    href="/student/profile"
+    className={`flex items-center h-14 w-full gap-3 border-l-2 border-transparent hover:bg-[#F4F1F8] transition-colors group mb-1 ${
+      collapsed ? 'justify-center px-0' : 'px-4'
+    }`}
+  >
+    {/* Avatar */}
+    <div className="w-8 h-8 rounded-full bg-[#7A6B96] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+      {studentName?.[0]?.toUpperCase() ?? 'S'}
+    </div>
+
+    {/* Name + settings */}
+    {!collapsed && (
+      <>
+        <p className="flex-1 min-w-0 text-sm font-medium text-[#3d3354] truncate">
+          {toTitleCase(studentName) ?? 'Student'}
+        </p>
+      </>
+    )}
+
+    {collapsed && (
+      <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#3d3354] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+        {studentName ?? 'Student'}
+      </span>
+    )}
+  </Link>
+
+</div>
     </div>
   )
 }

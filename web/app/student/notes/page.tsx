@@ -90,6 +90,7 @@ function PdfOverlay({
   onSelectPdf,
 }: PdfOverlayProps) {
   const [mounted, setMounted] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -99,10 +100,17 @@ function PdfOverlay({
     }
   }, [])
 
+  useEffect(() => {
+    if (!openDoc?.pdf?.id) return
+    setPdfUrl(null)
+
+    fetch(`${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`)
+      .then(res => res.json())
+      .then(data => setPdfUrl(data.url))
+      .catch(() => setPdfUrl(null))
+  }, [openDoc?.pdf?.id])
+
   if (!mounted || !openDoc) return null
-
-  const pdfUrl = `${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`
-
   return createPortal(
     <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
       {/* Floating container */}

@@ -9,6 +9,15 @@ interface ChemistryOctetLogoProps {
   background?: string;
   className?: string;
   style?: React.CSSProperties;
+  /**
+   * If true, renders ONE frame of the animation and stops — no requestAnimationFrame loop.
+   * Use this for every instance that doesn't need to be "alive" (toolbar icon, footer
+   * mark, loading spinner, empty states, watermarks). Each *animated* instance runs its
+   * own continuous physics + gradient simulation every frame forever; mounting several
+   * at once is the #1 cause of page lag. Default: false (animated), for backwards
+   * compatibility with existing usages.
+   */
+  static?: boolean;
 }
 
 export default function ChemistryOctetLogo({
@@ -16,6 +25,7 @@ export default function ChemistryOctetLogo({
   background = "#f0ede3",
   className,
   style,
+  static: isStatic = false,
 }: ChemistryOctetLogoProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
@@ -310,13 +320,12 @@ export default function ChemistryOctetLogo({
       fCtx.globalAlpha = 1;
     }
 
-    let rafId: number;
+    let rafId: number | undefined;
+    const TARGET_FPS = 20;
+    const FRAME_INTERVAL = 1 / TARGET_FPS; // seconds
+    let accumulator = 0;
 
-    function draw(ts: number) {
-      if (!lastTime) lastTime = ts;
-      const dt = Math.min((ts - lastTime) / 1000, 0.05);
-      lastTime = ts;
-
+    function renderFrame(ts: number, dt: number) {
       nucTheta += dt * NUC_SPEED;
       for (let k = 0; k < 3; k++) eAngles[k] += dt * RING_SPEEDS[k];
 
@@ -359,22 +368,46 @@ export default function ChemistryOctetLogo({
 
       // Composite static frame (band + text)
       ctx.drawImage(frameCanvas, 0, 0);
+    }
 
+    function draw(ts: number) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      accumulator += dt;
+      // Throttle: only actually redraw (and recompute gradients) ~20x/sec.
+      // We still request the next frame every tick to keep scheduling smooth,
+      // but skip the expensive draw work in between.
+      if (accumulator >= FRAME_INTERVAL) {
+        renderFrame(ts, accumulator);
+        accumulator = 0;
+      }
       rafId = requestAnimationFrame(draw);
     }
 
-    // Wait for DM Sans to load, then build static frame and start loop
+    // Wait for DM Sans to load, then build static frame.
+    // STATIC MODE: render exactly one frame and stop — no rAF loop, no continuous
+    // gradient recompute. This is what every "decorative" instance of the logo
+    // (toolbar, footer, loading spinner, watermark) should use.
+    // ANIMATED MODE (default): full continuous loop, as before.
     document.fonts.ready.then(() => {
       buildFrame();
-      rafId = requestAnimationFrame(draw);
+      if (isStatic) {
+        // Fixed timestamp gives a consistent, nicely-scattered single frame —
+        // same trick already used in getStaticWatermarkCanvas() below.
+        const FIXED_TS = 8000;
+        renderFrame(FIXED_TS, 0);
+      } else {
+        rafId = requestAnimationFrame(draw);
+      }
     });
 
-    frameRef.current = rafId!;
+    frameRef.current = rafId ?? 0;
 
     return () => {
-      cancelAnimationFrame(rafId);
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [background]);
+  }, [background, isStatic]);
 
   return (
     <canvas

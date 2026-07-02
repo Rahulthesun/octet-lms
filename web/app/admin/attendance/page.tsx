@@ -1,160 +1,276 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { IconCheckCircle, IconXCircle } from '@/components/ui/SvgIcons'
+import { QRCodeSVG } from 'qrcode.react'
+import { supabase } from '../../../lib/supabase/client'
+import {
+  useBatches,
+  useBatchStudents,
+  useEligibleStudents,
+  useAttendanceSession,
+  useRoster,
+  useStudentTrend,
+} from '../../../hooks/useAttendanceData'
+import type { Student } from '../../../hooks/useAttendanceData'
+
+// ─── Shared fetch helper for the few mutations this page calls directly ──────
+const API_BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+async function authedFetch(path: string, init?: RequestInit) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+const manualMark = (sessionId: string, studentId: string, present: boolean) =>
+  authedFetch(`/api/attendance/sessions/${sessionId}/manual-mark`, {
+    method: 'POST',
+    body: JSON.stringify({ studentId, present }),
+  })
+const overrideStudentBlock = (studentId: string, batchId: string, unblocked: boolean) =>
+  authedFetch(`/api/attendance/students/${studentId}/override`, {
+    method: 'POST',
+    body: JSON.stringify({ batchId, unblocked }),
+  })
+const addStudentsToBatch = (batchId: string, studentIds: string[]) =>
+  authedFetch(`/api/attendance/batches/${batchId}/students`, {
+    method: 'POST',
+    body: JSON.stringify({ studentIds }),
+  })
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Section = 'mark' | 'summary'
+type Section = 'qr' | 'summary'
 
-interface Student {
-  id: string; name: string; roll: string; grade: string; batch: string
-  onlineAtt: number | null; offlineAtt: number | null
-}
+const GRADES = ['12th'] as const
 
-interface AttendanceEntry { studentId: string; present: boolean }
+// ─── Status config — readable text/bg pairs, no white-on-light-tint ──────────
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const students: Student[] = [
-  { id: 'S01', name: 'Arjun Kumar',      roll: 'CO-001', grade: '12th', batch: 'Offline A', onlineAtt: 82,  offlineAtt: 78   },
-  { id: 'S02', name: 'Sneha Rajan',      roll: 'CO-002', grade: '12th', batch: 'Online A',  onlineAtt: 94,  offlineAtt: null },
-  { id: 'S03', name: 'Karthik S.',       roll: 'CO-003', grade: '11th', batch: 'Offline B', onlineAtt: 72,  offlineAtt: 68   },
-  { id: 'S04', name: 'Priya Thirumalai', roll: 'CO-004', grade: 'JEE',  batch: 'Online B',  onlineAtt: 88,  offlineAtt: null },
-  { id: 'S05', name: 'Meenakshi A.',     roll: 'CO-005', grade: '12th', batch: 'Offline A', onlineAtt: 91,  offlineAtt: 89   },
-  { id: 'S06', name: 'Rahul Venkat',     roll: 'CO-006', grade: 'NEET', batch: 'Online A',  onlineAtt: 73,  offlineAtt: null },
-  { id: 'S07', name: 'Divya Krishnan',   roll: 'CO-007', grade: '11th', batch: 'Offline B', onlineAtt: 65,  offlineAtt: 60   },
-  { id: 'S08', name: 'Ananya Lakshmi',   roll: 'CO-008', grade: 'NEET', batch: 'Online B',  onlineAtt: 97,  offlineAtt: null },
-  { id: 'S09', name: 'Siva Prakash',     roll: 'CO-009', grade: '12th', batch: 'Offline A', onlineAtt: 85,  offlineAtt: 83   },
-  { id: 'S10', name: 'Arun Shankar',     roll: 'CO-010', grade: 'JEE',  batch: 'Online A',  onlineAtt: 79,  offlineAtt: null },
-  { id: 'S11', name: 'Deepak Mohan',     roll: 'CO-011', grade: '11th', batch: 'Offline B', onlineAtt: 88,  offlineAtt: 85   },
-  { id: 'S12', name: 'Kaviya Raj',       roll: 'CO-012', grade: '12th', batch: 'Online B',  onlineAtt: 92,  offlineAtt: null },
-  { id: 'S13', name: 'Surya Kumar',      roll: 'CO-013', grade: 'NEET', batch: 'Offline A', onlineAtt: 71,  offlineAtt: 69   },
-  { id: 'S14', name: 'Nithya Saravanan', roll: 'CO-014', grade: '11th', batch: 'Online A',  onlineAtt: 96,  offlineAtt: null },
-  { id: 'S15', name: 'Praveen Raman',    roll: 'CO-015', grade: 'JEE',  batch: 'Offline B', onlineAtt: 76,  offlineAtt: 74   },
-  { id: 'S16', name: 'Riya Sharma',      roll: 'CO-016', grade: '12th', batch: 'Online A',  onlineAtt: 89,  offlineAtt: null },
-  { id: 'S17', name: 'Venkat Suresh',    roll: 'CO-017', grade: '11th', batch: 'Offline A', onlineAtt: 63,  offlineAtt: 58   },
-  { id: 'S18', name: 'Pooja Nair',       roll: 'CO-018', grade: 'NEET', batch: 'Online B',  onlineAtt: 93,  offlineAtt: null },
-  { id: 'S19', name: 'Manoj Pillai',     roll: 'CO-019', grade: '12th', batch: 'Offline B', onlineAtt: 80,  offlineAtt: 77   },
-  { id: 'S20', name: 'Lakshmi Devi',     roll: 'CO-020', grade: '11th', batch: 'Online A',  onlineAtt: 98,  offlineAtt: null },
-]
-
-const GRADES = ['11th', '12th', 'JEE', 'NEET'] as const
-
-// Mock chart data per grade+batch for the last 5 sessions
-const chartData: Record<string, { label: string; val: number }[]> = {
-  '12th-Offline A': [{ label: 'S1', val: 85 }, { label: 'S2', val: 89 }, { label: 'S3', val: 82 }, { label: 'S4', val: 87 }, { label: 'S5', val: 90 }],
-  '12th-Online A':  [{ label: 'S1', val: 90 }, { label: 'S2', val: 92 }, { label: 'S3', val: 88 }, { label: 'S4', val: 94 }, { label: 'S5', val: 91 }],
-  '12th-Online B':  [{ label: 'S1', val: 88 }, { label: 'S2', val: 90 }, { label: 'S3', val: 92 }, { label: 'S4', val: 91 }, { label: 'S5', val: 92 }],
-  '12th-Offline B': [{ label: 'S1', val: 78 }, { label: 'S2', val: 80 }, { label: 'S3', val: 82 }, { label: 'S4', val: 79 }, { label: 'S5', val: 80 }],
-  '11th-Offline B': [{ label: 'S1', val: 72 }, { label: 'S2', val: 69 }, { label: 'S3', val: 74 }, { label: 'S4', val: 71 }, { label: 'S5', val: 75 }],
-  '11th-Online A':  [{ label: 'S1', val: 94 }, { label: 'S2', val: 96 }, { label: 'S3', val: 97 }, { label: 'S4', val: 96 }, { label: 'S5', val: 97 }],
-  '11th-Offline A': [{ label: 'S1', val: 60 }, { label: 'S2', val: 63 }, { label: 'S3', val: 61 }, { label: 'S4', val: 65 }, { label: 'S5', val: 63 }],
-  'JEE-Online B':   [{ label: 'S1', val: 86 }, { label: 'S2', val: 88 }, { label: 'S3', val: 85 }, { label: 'S4', val: 89 }, { label: 'S5', val: 88 }],
-  'JEE-Online A':   [{ label: 'S1', val: 77 }, { label: 'S2', val: 79 }, { label: 'S3', val: 80 }, { label: 'S4', val: 78 }, { label: 'S5', val: 79 }],
-  'JEE-Offline B':  [{ label: 'S1', val: 74 }, { label: 'S2', val: 76 }, { label: 'S3', val: 75 }, { label: 'S4', val: 77 }, { label: 'S5', val: 76 }],
-  'NEET-Online A':  [{ label: 'S1', val: 70 }, { label: 'S2', val: 73 }, { label: 'S3', val: 72 }, { label: 'S4', val: 74 }, { label: 'S5', val: 73 }],
-  'NEET-Online B':  [{ label: 'S1', val: 92 }, { label: 'S2', val: 94 }, { label: 'S3', val: 93 }, { label: 'S4', val: 95 }, { label: 'S5', val: 95 }],
-  'NEET-Offline A': [{ label: 'S1', val: 68 }, { label: 'S2', val: 70 }, { label: 'S3', val: 69 }, { label: 'S4', val: 71 }, { label: 'S5', val: 69 }],
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getAtt(s: Student, batch: string): number | null {
-  return batch.startsWith('Online') ? s.onlineAtt : s.offlineAtt
+const STATUS = {
+  blocked:   { text: 'Blocked',   fg: '#B91C1C', bg: '#FEF2F2', dot: '#DC2626' },
+  warning:   { text: 'Warning',   fg: '#B45309', bg: '#FFFBEB', dot: '#D97706' },
+  good:      { text: 'Good',      fg: '#15803D', bg: '#F0FDF4', dot: '#16A34A' },
+  excellent: { text: 'Excellent', fg: '#0F766E', bg: '#F0FDFA', dot: '#0D9488' },
+  active:    { text: 'Active',    fg: '#5B21B6', bg: '#F5F3FF', dot: '#7C3AED' },
 }
 
 function statusOf(pct: number) {
-  if (pct < 75) return { text: 'Blocked',   color: '#9e4a4a' }
-  if (pct < 80) return { text: 'Warning',   color: '#9e7438' }
-  if (pct < 90) return { text: 'Good',      color: '#3e7450' }
-  return             { text: 'Excellent',   color: '#2e7470' }
+  if (pct < 75) return STATUS.blocked
+  if (pct < 80) return STATUS.warning
+  if (pct < 90) return STATUS.good
+  return STATUS.excellent
+}
+
+// Accent — used only for primary actions, dark enough for white text to pass contrast
+const ACCENT = '#5B21B6'
+
+// ─── Countdown ring ───────────────────────────────────────────────────────────
+
+function CountdownRing({ countdown, total, size = 220 }: {
+  countdown: number; total: number; size?: number
+}) {
+  const R = size / 2 - 4
+  const C = 2 * Math.PI * R
+  const offset = C - (countdown / total) * C
+  return (
+    <svg
+      width={size} height={size}
+      className="absolute inset-0 pointer-events-none"
+      style={{ transform: 'rotate(-90deg)' }}
+    >
+      <circle cx={size / 2} cy={size / 2} r={R} fill="none" stroke="#E4E4E7" strokeWidth="2" />
+      <circle
+        cx={size / 2} cy={size / 2} r={R}
+        fill="none" stroke={ACCENT} strokeWidth="2"
+        strokeDasharray={C} strokeDashoffset={offset}
+        strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 1s linear' }}
+      />
+    </svg>
+  )
 }
 
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
 
 function MiniChart({ data }: { data: { label: string; val: number }[] }) {
-  const H = 160
-  const max = 100
+  const maxH = 80
   return (
-    <div className="flex flex-col gap-1 w-full">
-      <div className="flex items-end gap-1.5" style={{ height: H }}>
-        {data.map((row, i) => (
-          <div key={i} className="flex-1 flex flex-col justify-end items-center gap-1">
-            <span className="text-base text-gray-600 font-inter">{row.val}%</span>
+    <div className="flex items-end gap-2.5 w-full" style={{ height: maxH + 28 }}>
+      {data.map((row, i) => {
+        const barH = Math.round((row.val / 100) * maxH)
+        const st = statusOf(row.val)
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5">
+            <span className="text-[11px] tabular-nums text-zinc-500">{row.val}%</span>
             <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: `${(row.val / max) * H * 0.8}px` }}
-              transition={{ duration: 0.5, delay: i * 0.06, ease: 'easeOut' }}
-              className="w-full bg-primary rounded-xs"
+              initial={{ height: 0 }} animate={{ height: barH }}
+              transition={{ duration: 0.35, delay: i * 0.06, ease: 'easeOut' }}
+              className="w-full rounded-[2px]"
+              style={{ backgroundColor: st.dot }}
             />
+            <span className="text-[10px] text-zinc-400">{row.label}</span>
           </div>
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        {data.map((row, i) => (
-          <div key={i} className="flex-1 text-center text-md text-gray-600">{row.label}</div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
 
 // ─── Add Students Modal ───────────────────────────────────────────────────────
 
-function AddStudentsModal({ grade, currentStudentIds, onAdd, onClose }: {
+function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
   grade: string
-  currentStudentIds: string[]
-  onAdd: (ids: string[]) => void
+  batchId: string
+  onAdded: () => void
   onClose: () => void
 }) {
-  const eligible = students.filter((s) => s.grade === grade && !currentStudentIds.includes(s.id))
+  const { students: eligible, loading, error: loadError } = useEligibleStudents(grade, batchId)
   const [selected, setSelected] = useState<string[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  function toggleSel(id: string) {
-    setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
-  }
+  const toggle = (id: string) =>
+    setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
-  function confirm() {
-    if (selected.length > 0) onAdd(selected)
-    onClose()
+  async function confirm() {
+    if (selected.length === 0) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await addStudentsToBatch(batchId, selected)
+      onAdded()
+      onClose()
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Failed to add students')
+      setSubmitting(false)
+    }
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96 }}
-        className="bg-white border border-gray-200 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg text-gray-900">Add Students to Batch</h3>
-          <p className="text-sm text-gray-400 mt-0.5">Select {grade} students to add to this batch</p>
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white w-full sm:max-w-md shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[85vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 sm:px-6 py-4 border-b border-zinc-200 shrink-0">
+          <h3 className="text-sm font-semibold text-zinc-900">Add students to batch</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Unassigned {grade} students</p>
         </div>
-        {eligible.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-400 text-base">
-            All {grade} students are already assigned to a batch.
+
+        {loading ? (
+          <div className="px-6 py-12 text-center text-sm text-zinc-400">Loading…</div>
+        ) : loadError ? (
+          <div className="px-6 py-12 text-center text-sm text-red-600">{loadError}</div>
+        ) : eligible.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm text-zinc-400">
+            All {grade} students are already in a batch.
           </div>
         ) : (
-          <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
-            {eligible.map((s) => (
-              <label key={s.id} className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 cursor-pointer">
-                <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggleSel(s.id)}
-                  className="w-4 h-4 accent-primary" />
-                <div>
-                  <p className="text-base text-gray-800">{s.name}</p>
-                  <p className="text-sm text-gray-400">{s.roll} · current batch: {s.batch}</p>
+          <div className="overflow-y-auto flex-1">
+            {eligible.map((s, i) => (
+              <label key={s.id} className={`flex items-center gap-3 px-5 sm:px-6 py-3 hover:bg-zinc-50 cursor-pointer ${i !== eligible.length - 1 ? 'border-b border-zinc-100' : ''}`}>
+                <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)}
+                  className="w-4 h-4 rounded-sm accent-violet-700 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-900 truncate">{s.name}</p>
+                  <p className="text-xs text-zinc-500 truncate">
+                    {s.roll}{s.currentBatchName ? ` · currently in ${s.currentBatchName}` : ''}
+                  </p>
                 </div>
               </label>
             ))}
           </div>
         )}
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-base hover:bg-gray-50">Cancel</button>
-          <button onClick={confirm} disabled={selected.length === 0}
-            className="flex-1 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            Add {selected.length > 0 ? `${selected.length} Student${selected.length !== 1 ? 's' : ''}` : 'Selected'}
+
+        {submitError && (
+          <p className="px-5 sm:px-6 pt-3 text-xs text-red-600 shrink-0">{submitError}</p>
+        )}
+
+        <div className="flex gap-2 px-5 sm:px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={confirm}
+            disabled={selected.length === 0 || submitting}
+            className="flex-1 py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: ACCENT }}
+          >
+            {submitting
+              ? 'Adding…'
+              : selected.length > 0
+                ? `Add ${selected.length} student${selected.length !== 1 ? 's' : ''}`
+                : 'Select students'}
           </button>
         </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// ─── Student Graph Modal ──────────────────────────────────────────────────────
+
+function StudentGraphModal({ student, onClose }: { student: Student; onClose: () => void }) {
+  const { points, loading, error } = useStudentTrend(student.id)
+  const avg = points.length > 0 ? Math.round(points.reduce((a, b) => a + b.pct, 0) / points.length) : null
+  const st = avg !== null ? statusOf(avg) : null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white w-full sm:max-w-sm shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 p-6 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p className="text-sm font-semibold text-zinc-900">{student.name}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{student.roll}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
+        </div>
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400 mb-4">Last 5 sessions</p>
+
+        {loading ? (
+          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">Loading…</div>
+        ) : error ? (
+          <div className="h-[108px] flex items-center justify-center text-sm text-red-600">{error}</div>
+        ) : points.length === 0 ? (
+          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">No sessions yet</div>
+        ) : (
+          <MiniChart data={points.map(p => ({ label: p.label, val: p.pct }))} />
+        )}
+
+        {avg !== null && st && (
+          <div className="mt-4 flex items-center justify-between pt-4 border-t border-zinc-200">
+            <span className="text-xs text-zinc-500">5-session average</span>
+            <span className="text-sm font-bold tabular-nums" style={{ color: st.fg }}>{avg}%</span>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )
@@ -164,122 +280,120 @@ function AddStudentsModal({ grade, currentStudentIds, onAdd, onClose }: {
 
 export default function AttendancePage() {
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null)
-  const [selectedBatch, setSelectedBatch] = useState<string | null>(null)
-  const [activeSection, setSection] = useState<Section>('mark')
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
+  const [activeSection, setSection] = useState<Section>('qr')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [entries, setEntries] = useState<AttendanceEntry[]>(() =>
-    students.map((s) => ({ studentId: s.id, present: true }))
-  )
-  const [saved, setSaved] = useState(false)
-  const [customBatches, setCustomBatches] = useState<Record<string, string[]>>({})
   const [addingBatch, setAddingBatch] = useState(false)
   const [newBatchName, setNewBatchName] = useState('')
-  const [customBatchStudents, setCustomBatchStudents] = useState<Record<string, string[]>>({})
+  const [newBatchMode, setNewBatchMode] = useState<'online' | 'offline'>('offline')
   const [showAddStudents, setShowAddStudents] = useState(false)
-  const [manualUnblocks, setManualUnblocks] = useState<string[]>([])
+  const [graphStudent, setGraphStudent] = useState<Student | null>(null)
+  const [selectedStudentIdForScan, setSelectedStudentIdForScan] = useState('')
 
-  // Unique batches for the selected grade (student-derived + custom)
-  const batchesForGrade = useMemo(() => {
-    if (!selectedGrade) return []
-    const b = new Set(students.filter((s) => s.grade === selectedGrade).map((s) => s.batch))
-    ;(customBatches[selectedGrade] ?? []).forEach((cb) => b.add(cb))
-    return [...b].sort()
-  }, [selectedGrade, customBatches])
+  const { batches, addBatch } = useBatches(selectedGrade)
+  const selectedBatch = batches.find(b => b.id === selectedBatchId) ?? null
 
-  function addCustomBatch() {
+  const { students, refetch: refetchStudents } = useBatchStudents(selectedBatchId, date)
+
+  const hasContext = !!(selectedGrade && selectedBatchId)
+  const qrActive = activeSection === 'qr' && hasContext
+
+  const { sessionId, qrToken, countdown, refreshSeconds, error: sessionError } =
+    useAttendanceSession(selectedBatchId, date, qrActive)
+  const { entries, refetch: refetchRoster } = useRoster(sessionId)
+
+  async function handleAddBatch() {
     const name = newBatchName.trim()
-    if (!name || !selectedGrade) return
-    setCustomBatches((prev) => ({
-      ...prev,
-      [selectedGrade]: [...new Set([...(prev[selectedGrade] ?? []), name])],
-    }))
-    setSelectedBatch(name)
+    if (!name) return
+    const batch = await addBatch(name, newBatchMode)
+    if (batch) setSelectedBatchId(batch.id)
     setAddingBatch(false)
     setNewBatchName('')
   }
-
-  // Students matching current grade + batch (including manually added ones)
-  const batchStudents = useMemo(() => {
-    if (!selectedGrade || !selectedBatch) return []
-    const fromData = students.filter((s) => s.grade === selectedGrade && s.batch === selectedBatch)
-    const key = `${selectedGrade}-${selectedBatch}`
-    const addedIds = customBatchStudents[key] ?? []
-    const existing = new Set(fromData.map((s) => s.id))
-    const fromCustom = students.filter((s) => addedIds.includes(s.id) && !existing.has(s.id))
-    return [...fromData, ...fromCustom]
-  }, [selectedGrade, selectedBatch, customBatchStudents])
-
-  function handleAddStudents(ids: string[]) {
-    if (!selectedGrade || !selectedBatch) return
-    const key = `${selectedGrade}-${selectedBatch}`
-    setCustomBatchStudents((prev) => ({
-      ...prev,
-      [key]: [...new Set([...(prev[key] ?? []), ...ids])],
-    }))
-  }
-
-  function toggleUnblock(studentId: string) {
-    setManualUnblocks((prev) =>
-      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
-    )
-  }
-
-  // Attendance stats for selected batch
-  const stats = useMemo(() => {
-    if (!selectedBatch) return { blocked: 0, warning: 0, good: 0, excellent: 0 }
-    const counts = { blocked: 0, warning: 0, good: 0, excellent: 0 }
-    batchStudents.forEach((s) => {
-      const pct = getAtt(s, selectedBatch)
-      if (pct === null) return
-      if (pct < 75) counts.blocked++
-      else if (pct < 80) counts.warning++
-      else if (pct < 90) counts.good++
-      else counts.excellent++
-    })
-    return counts
-  }, [batchStudents, selectedBatch])
-
-  const isPresent = (id: string) => entries.find((e) => e.studentId === id)?.present ?? true
-  const toggle = (id: string) =>
-    setEntries((prev) => prev.map((e) => e.studentId === id ? { ...e, present: !e.present } : e))
-
-  const chartKey = selectedGrade && selectedBatch ? `${selectedGrade}-${selectedBatch}` : ''
-  const miniChartData = chartData[chartKey] ?? []
 
   function handleGradeSelect(g: string) {
     setSelectedGrade(g)
-    setSelectedBatch(null)
+    setSelectedBatchId(null)
     setAddingBatch(false)
-    setNewBatchName('')
   }
 
-  const dateLabel = new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-  const hasContext = selectedGrade && selectedBatch
+  async function handleSimulateScan() {
+    if (!selectedStudentIdForScan || !sessionId) return
+    try {
+      await manualMark(sessionId, selectedStudentIdForScan, true)
+      refetchRoster()
+      setSelectedStudentIdForScan('')
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  async function handleToggleUnblock(s: Student) {
+    if (!selectedBatchId) return
+    try {
+      await overrideStudentBlock(s.id, selectedBatchId, !s.unblocked)
+      refetchStudents()
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const presentIds = useMemo(
+    () => new Set(entries.filter(e => e.present).map(e => e.studentId)),
+    [entries]
+  )
+  const isPresent = (id: string) => presentIds.has(id)
+  const presentCount = students.filter(s => presentIds.has(s.id)).length
+
+  const stats = useMemo(() => {
+    const c = { blocked: 0, warning: 0, good: 0, excellent: 0 }
+    students.forEach(s => {
+      if (s.attendancePct === null) return
+      if (s.attendancePct < 75) c.blocked++
+      else if (s.attendancePct < 80) c.warning++
+      else if (s.attendancePct < 90) c.good++
+      else c.excellent++
+    })
+    return c
+  }, [students])
+
+  const dateLabel = new Date(date).toLocaleDateString('en-IN', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+  })
 
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Attendance</h1>
-        <p className="text-base text-gray-600 mt-1">Select a grade and batch to mark or review attendance.</p>
+    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-zinc-200">
+        <div>
+          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Attendance</p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Session Management</h1>
+        </div>
+        <input
+          type="date"
+          value={date}
+          onChange={e => setDate(e.target.value)}
+          className="text-sm border border-zinc-300 rounded-md px-3 py-2 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 w-full sm:w-auto"
+        />
       </div>
 
-      {/* ── Selectors + chart on single row ── */}
-      <div className="flex items-stretch gap-4">
-        <div className={`${hasContext && miniChartData.length > 0 ? 'w-1/2' : 'flex-1'} bg-white rounded-2xl shadow-sm px-5 pt-4 pb-3 space-y-4`}>
-        {/* Grade selector */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-md text-gray-600 w-16 shrink-0">Grade</span>
-          <div className="flex gap-2 flex-wrap">
-            {GRADES.map((g) => (
+      {/* ── Grade + Batch selectors ────────────────────────────────────────── */}
+      <div className="space-y-4">
+        {/* Grade */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <span className="text-xs font-medium text-zinc-500 sm:w-12 shrink-0">Grade</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {GRADES.map(g => (
               <button
                 key={g}
                 onClick={() => handleGradeSelect(g)}
-                className={`px-4 py-1.5 text-base rounded-full border transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   selectedGrade === g
-                    ? 'bg-primary text-white border-primary'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                    ? 'text-white'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
+                style={selectedGrade === g ? { backgroundColor: ACCENT } : undefined}
               >
                 {g}
               </button>
@@ -287,303 +401,341 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Batch selector (appears after grade) */}
+        {/* Batch */}
         <AnimatePresence>
-          {selectedGrade && batchesForGrade.length > 0 && (
+          {selectedGrade && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
-              className="flex items-center gap-4 flex-wrap overflow-hidden"
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 overflow-hidden"
             >
-              <span className="text-md text-gray-600 w-16 shrink-0">Batch</span>
-              <div className="flex gap-2 flex-wrap items-center">
-                {batchesForGrade.map((b) => (
+              <span className="text-xs font-medium text-zinc-500 sm:w-12 shrink-0">Batch</span>
+              <div className="flex gap-1.5 flex-wrap items-center">
+                {batches.map(b => (
                   <button
-                    key={b}
-                    onClick={() => setSelectedBatch(b)}
-                    className={`px-4 py-1.5 text-base rounded-full border transition-colors ${
-                      selectedBatch === b
-                        ? 'bg-primary text-white border-primary'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                    key={b.id}
+                    onClick={() => setSelectedBatchId(b.id)}
+                    className={`px-3 py-1.5 rounded-md text-sm transition-colors border ${
+                      selectedBatchId === b.id
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-medium'
+                        : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-300'
                     }`}
                   >
-                    {b}
+                    {b.name}
                   </button>
                 ))}
-                {addingBatch ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newBatchName}
-                      onChange={(e) => setNewBatchName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') addCustomBatch(); if (e.key === 'Escape') { setAddingBatch(false); setNewBatchName('') } }}
-                      placeholder="e.g. Online C"
-                      className="border border-gray-300 px-3 py-1 text-sm outline-none focus:border-primary w-32"
-                    />
-                    <button onClick={addCustomBatch} className="px-2 py-1 bg-primary text-white text-sm">✓</button>
-                    <button onClick={() => { setAddingBatch(false); setNewBatchName('') }} className="px-2 py-1 text-gray-400 hover:text-gray-600 text-sm">✕</button>
-                  </div>
-                ) : (
+                {!addingBatch ? (
                   <button
                     onClick={() => setAddingBatch(true)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-400 border border-dashed border-gray-300 rounded-full hover:text-primary hover:border-primary transition-colors"
+                    className="px-3 py-1.5 rounded-md text-sm border border-dashed border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition-colors"
                   >
-                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                      <path d="M 6,1 L 6,11 M 1,6 L 11,6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                    New Batch
+                    + New batch
                   </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <input
+                      autoFocus type="text" value={newBatchName}
+                      onChange={e => setNewBatchName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddBatch()
+                        if (e.key === 'Escape') { setAddingBatch(false); setNewBatchName('') }
+                      }}
+                      placeholder="Batch name"
+                      className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 bg-white"
+                    />
+                    <div className="flex rounded-md border border-zinc-300 overflow-hidden text-xs">
+                      {(['offline', 'online'] as const).map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setNewBatchMode(m)}
+                          className={`px-2.5 py-1.5 capitalize ${newBatchMode === m ? 'text-white' : 'bg-white text-zinc-500'}`}
+                          style={newBatchMode === m ? { backgroundColor: ACCENT } : undefined}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={handleAddBatch}
+                      className="px-3 py-1.5 text-white text-sm rounded-md transition-colors"
+                      style={{ backgroundColor: ACCENT }}>
+                      Save
+                    </button>
+                    <button onClick={() => { setAddingBatch(false); setNewBatchName('') }}
+                      className="text-zinc-400 hover:text-zinc-700 px-1 text-lg leading-none">&times;</button>
+                  </div>
                 )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
 
-        {/* Date picker */}
-        <div className="flex items-center gap-4">
-          <span className="text-md text-gray-600 w-16 shrink-0">Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-gray-200 px-3 py-1.5 text-base text-gray-700 outline-none focus:border-gray-400"
-          />
-        </div>
-
-        {/* Stats — fills empty space below Date when batch is selected */}
-        {hasContext && (
-          <div className="flex justify-between border-t border-gray-100 pt-3">
-            {[
-              { label: 'Blocked',   count: stats.blocked,   color: '#9e4a4a' },
-              { label: 'Warning',   count: stats.warning,   color: '#9e7438' },
-              { label: 'Good',      count: stats.good,      color: '#3e7450' },
-              { label: 'Excellent', count: stats.excellent,  color: '#2e7470' },
-            ].map(({ label, count, color }) => (
-              <div key={label} className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-inter font-bold" style={{ color }}>{count}</span>
-                <span className="text-base text-gray-500">{label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        </div>{/* end selector card */}
-
-        {/* Chart card — only when context is set */}
-        {hasContext && miniChartData.length > 0 && (
-          <div className="w-1/2 bg-white rounded-2xl shadow-sm px-5 py-4">
-            <p className="text-md text-gray-600 tracking-widest mb-3">Last <span className="font-inter">5</span> sessions</p>
-            <MiniChart data={miniChartData} />
-          </div>
-        )}
-      </div>{/* end flex row */}
-
-      {/* ── Empty state ── */}
-      {!hasContext && (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400 gap-3">
-          <svg className="w-10 h-10 text-gray-200" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M 3,10 H 21 M 8,3 V 7 M 16,3 V 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            <circle cx="12" cy="15" r="2" stroke="currentColor" strokeWidth="1.3" />
-          </svg>
-          <p className="text-base">Select a grade and batch above to continue</p>
-        </div>
-      )}
-
-      {/* ── Content (shown only after grade + batch selected) ── */}
+      {/* ── Stats + Tabs ───────────────────────────────────────────────────── */}
       <AnimatePresence>
         {hasContext && (
           <motion.div
-            key={`${selectedGrade}-${selectedBatch}`}
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="space-y-5"
+            className="space-y-4"
           >
-            {/* Section toggle */}
-            <div className="flex items-center justify-between border-b border-gray-200">
-              <div className="flex gap-1">
-                {(['mark', 'summary'] as Section[]).map((s) => (
+
+            {/* Tab bar */}
+            <div className="flex items-center justify-between border-b border-zinc-200 flex-wrap gap-y-2">
+              <div className="flex">
+                {(['qr', 'summary'] as Section[]).map(s => (
                   <button
                     key={s}
                     onClick={() => setSection(s)}
-                    className={`px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
+                    className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                       activeSection === s
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-gray-600 hover:text-gray-800'
+                        ? 'border-zinc-900 text-zinc-900'
+                        : 'border-transparent text-zinc-400 hover:text-zinc-700'
                     }`}
                   >
-                    {s === 'mark' ? 'Mark Attendance' : 'Attendance Summary'}
+                    {s === 'qr' ? 'QR Attendance' : 'Summary'}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-4 pr-2 shrink-0">
-                <p className="text-base text-gray-700 font-medium">
-                  {activeSection === 'mark'
-                    ? <>Marking attendance for <span className="text-primary">{selectedGrade} — {selectedBatch}</span><span className="text-gray-600 font-normal"> — {dateLabel}</span></>
-                    : <>Summary — <span className="text-primary">{selectedGrade} — {selectedBatch}</span></>
-                  }
-                </p>
-                {activeSection === 'mark' && (
-                  <button onClick={() => setShowAddStudents(true)} className="text-base bg-primary p-2 rounded-xl text-white hover:cursor-pointer whitespace-nowrap">
-                    + Add Students
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* ── Mark Attendance ── */}
-            <AnimatePresence mode="wait">
-              {activeSection === 'mark' ? (
-                <motion.div key="mark" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-
-                    {batchStudents.length === 0 ? (
-                      <div className="py-14 flex flex-col items-center gap-4 text-gray-400">
-                        <p className="text-base">No students in this batch yet.</p>
-                        <button onClick={() => setShowAddStudents(true)} className="px-5 py-2.5 bg-primary text-white text-base hover:bg-primary-dark transition-colors">
-                          + Add Students to this Batch
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Column header */}
-                        <div className="grid grid-cols-[1fr_110px_90px_110px_140px] px-5 py-2.5 text-sm uppercase tracking-widest text-gray-600 border-b border-gray-100 bg-gray-100">
-                          <span>Student</span>
-                          <span>Roll</span>
-                          <span>Att. %</span>
-                          <span>Status</span>
-                          <span className="text-center">Attendance</span>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {batchStudents.map((s) => {
-                            const pct = getAtt(s, selectedBatch!)
-                            const isUnblocked = manualUnblocks.includes(s.id)
-                            const st = pct !== null ? (isUnblocked ? { text: 'Active', color: '#3e5e8a' } : statusOf(pct)) : null
-                            const present = isPresent(s.id)
-                            return (
-                              <div key={s.id} className="grid grid-cols-[1fr_110px_90px_110px_140px] items-center px-5 py-3 hover:bg-gray-50">
-                                {/* Name */}
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-gray-600 text-sm shrink-0 rounded-sm">
-                                    {s.name.charAt(0)}
-                                  </div>
-                                  <span className="text-base text-gray-800 truncate">{s.name}</span>
-                                </div>
-                                {/* Roll */}
-                                <span className="text-base text-gray-600 font-inter">{s.roll}</span>
-                                {/* Att % */}
-                                <span className="text-base font-inter" style={{ color: st?.color ?? '#9ca3af' }}>
-                                  {pct !== null ? `${pct}%` : '—'}
-                                </span>
-                                {/* Status badge */}
-                                {st ? (
-                                  <span className="text-base px-2 py-0.5 rounded-full border w-fit" style={{ color: st.color, borderColor: st.color + '55', backgroundColor: st.color + '15' }}>
-                                    {st.text}
-                                  </span>
-                                ) : <span />}
-                                {/* Present / Absent toggle */}
-                                <button
-                                  onClick={() => toggle(s.id)}
-                                  className={`flex items-center justify-center rounded-2xl gap-1.5 p-1 text-md font-medium transition-colors ${
-                                    present
-                                      ? 'bg-green-500 text-white hover:bg-green-700 hover:cursor-pointer'
-                                      : 'bg-red-50 border border-red-300 text-red-600 hover:bg-red-100 hover:cursor-pointer'
-                                  }`}
-                                >
-                                  {present
-                                    ? <><IconCheckCircle className="w-4 h-4" />Present</>
-                                    : <><IconXCircle className="w-4 h-4" />Absent</>
-                                  }
-                                </button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Save row */}
-                    <div className="px-5 py-4 border-t border-gray-200 flex items-center gap-4">
-                      <button
-                        onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 3000) }}
-                        className="px-5 py-2 rounded-xl bg-primary text-white text-lg hover:bg-primary-dark transition-colors"
-                      >
-                        Save Attendance
-                      </button>
-                      <AnimatePresence>
-                        {saved && (
-                          <motion.div
-                            initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
-                            className="flex items-center gap-2 text-green-700 text-base"
-                          >
-                            <IconCheckCircle className="w-4 h-4" />
-                            Saved for {dateLabel}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </motion.div>
-              ) : (
-                /* ── Attendance Summary ── */
-                <motion.div key="summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-3">
-                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                    <div className="grid grid-cols-[1fr_90px_110px_100px] px-5 py-2.5 text-sm uppercase tracking-widest text-gray-600 border-b border-gray-100 bg-gray-100">
-                      <span>Student</span>
-                      <span className="text-right">Att. %</span>
-                      <span className="text-right">Status</span>
-                      <span className="text-right">Action</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {batchStudents.map((s) => {
-                        const pct = getAtt(s, selectedBatch!)
-                        if (pct === null) return null
-                        const isUnblocked = manualUnblocks.includes(s.id)
-                        const st = isUnblocked ? { text: 'Active', color: '#3e5e8a' } : statusOf(pct)
-                        const isBlocked = !isUnblocked && pct < 75
-                        return (
-                          <div key={s.id} className="grid grid-cols-[1fr_90px_110px_100px] px-5 py-3 hover:bg-gray-50 items-center">
-                            <div className="min-w-0">
-                              <span className="text-base text-gray-700 truncate block">{s.name}</span>
-                              <span className="text-base text-gray-600">{s.roll}</span>
-                            </div>
-                            <span className="text-base font-inter pl-11" style={{ color: st.color }}>{pct}%</span>
-                            <span className="text-base pl-14" style={{ color: st.color }}>{st.text}</span>
-                            <div className="text-right">
-                              {(isBlocked || isUnblocked) && (
-                                <button
-                                  onClick={() => toggleUnblock(s.id)}
-                                  className={`text-base px-2.5 py-0.5 border transition-colors ${
-                                    isUnblocked
-                                      ? 'border-gray-300 text-gray-500 hover:bg-gray-200 hover:cursor-pointer'
-                                      : 'border-primary text-primary hover:bg-[#f5f0fa] hover:cursor-pointer'
-                                  }`}
-                                >
-                                  {isUnblocked ? 'Re-block' : 'Unblock'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
+              {activeSection === 'qr' && (
+                <button
+                  onClick={() => setShowAddStudents(true)}
+                  className="text-xs px-3 py-1.5 text-white rounded-md mb-1 transition-colors"
+                  style={{ backgroundColor: ACCENT }}
+                >
+                  + Add students
+                </button>
               )}
-            </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Add Students modal */}
+      {/* ── Main content ───────────────────────────────────────────────────── */}
+      {!hasContext ? (
+        <div className="flex flex-col items-center justify-center py-24 sm:py-32 gap-3 text-zinc-300">
+          <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="5" width="18" height="16" rx="2" />
+            <path d="M3 10h18M8 3v4M16 3v4" strokeLinecap="round" />
+            <circle cx="12" cy="15" r="2" />
+          </svg>
+          <p className="text-sm text-zinc-400">Choose a grade and batch to begin</p>
+        </div>
+      ) : (
+        <AnimatePresence mode="wait">
+
+          {/* ── QR tab ── */}
+          {activeSection === 'qr' && (
+            <motion.div
+              key="qr"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6"
+            >
+              {/* QR session card */}
+              <div className="bg-white rounded-lg border border-zinc-200 p-6 sm:p-8 flex flex-col items-center gap-6">
+                <div className="text-center">
+                  <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-zinc-400 mb-2">Live Session</p>
+                  <p className="text-zinc-900 text-lg font-semibold">
+                    {selectedGrade} · {selectedBatch?.name}
+                  </p>
+                  <p className="text-zinc-500 text-xs mt-1">{dateLabel}</p>
+                </div>
+
+                {/* QR + ring */}
+                <div className="relative" style={{ width: 220, height: 220 }}>
+                  <CountdownRing countdown={countdown} total={refreshSeconds} size={220} />
+                  <div className="absolute inset-3 bg-white rounded-md flex items-center justify-center border border-zinc-200 shadow-sm">
+                    {qrToken ? (
+                      <QRCodeSVG value={qrToken} size={172} bgColor="#ffffff" fgColor="#18181B" level="H" />
+                    ) : (
+                      <div className="w-40 h-40 bg-zinc-100 animate-pulse rounded" />
+                    )}
+                  </div>
+                </div>
+
+                {sessionError ? (
+                  <p className="text-xs text-red-600 text-center">{sessionError}</p>
+                ) : (
+                  <p className="text-zinc-500 text-xs text-center">
+                    Refreshes in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
+                  </p>
+                )}
+
+                {/* Demo simulator */}
+                <div className="w-full pt-5 border-t border-zinc-200 space-y-2">
+                  <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400">
+                    Demo — simulate scan
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      value={selectedStudentIdForScan}
+                      onChange={e => setSelectedStudentIdForScan(e.target.value)}
+                      className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                    >
+                      <option value="">Select student…</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleSimulateScan}
+                      disabled={!selectedStudentIdForScan}
+                      className="px-4 py-2 text-white text-sm rounded-md disabled:opacity-40 transition-colors whitespace-nowrap"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Mark present
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance roster */}
+              <div className="border border-zinc-200 rounded-lg overflow-hidden flex flex-col bg-white">
+                <div className="px-5 py-4 border-b border-zinc-200 flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-900">Today's roster</p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {presentCount} of {students.length} present
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-semibold tabular-nums text-zinc-900">
+                      {students.length > 0 ? Math.round((presentCount / students.length) * 100) : 0}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Live fill bar */}
+                <div className="h-1 bg-zinc-100">
+                  <motion.div
+                    className="h-full"
+                    style={{ backgroundColor: ACCENT }}
+                    animate={{ width: `${students.length > 0 ? (presentCount / students.length) * 100 : 0}%` }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                  />
+                </div>
+
+                <div className="divide-y divide-zinc-100 overflow-y-auto flex-1" style={{ maxHeight: 400 }}>
+                  {students.map(s => {
+                    const present = isPresent(s.id)
+                    return (
+                      <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-sm text-zinc-900 truncate">{s.name}</p>
+                          <p className="text-xs text-zinc-500 font-mono">{s.roll}</p>
+                        </div>
+                        <span
+                          className="text-xs px-2.5 py-0.5 rounded-full font-medium shrink-0"
+                          style={present
+                            ? { backgroundColor: '#F0FDF4', color: '#15803D' }
+                            : { backgroundColor: '#F4F4F5', color: '#71717A' }}
+                        >
+                          {present ? 'Present' : 'Absent'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── Summary tab ── */}
+          {activeSection === 'summary' && (
+            <motion.div
+              key="summary"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+                {/* Header row — hidden on mobile, cards carry their own labels */}
+                <div className="hidden sm:grid grid-cols-[1fr_140px_180px] px-5 py-3 border-b border-zinc-200 bg-zinc-50">
+                  {['Student', 'Attendance', 'Actions'].map((h, i) => (
+                    <span key={h}
+                      className={`text-[10px] font-medium tracking-widest uppercase text-zinc-400 ${i > 0 ? 'text-right' : ''}`}
+                    >
+                      {h}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="divide-y divide-zinc-100">
+                  {students.map(s => {
+                    if (s.attendancePct === null) return null
+                    const pct = s.attendancePct
+                    const st = s.unblocked ? STATUS.active : statusOf(pct)
+                    const isBlocked = !s.unblocked && pct < 75
+
+                    return (
+                      <div
+                        key={s.id}
+                        className="flex flex-col sm:grid sm:grid-cols-[1fr_140px_180px] gap-3 sm:gap-0 px-5 py-3.5 sm:items-center hover:bg-zinc-50 transition-colors"
+                      >
+                        {/* Student */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-zinc-900 truncate">{s.name}</p>
+                            <p className="text-xs text-zinc-500 font-mono">{s.roll}</p>
+                          </div>
+                        </div>
+
+                        {/* Attendance: % + badge merged into one column */}
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 sm:gap-1 sm:text-right pl-[22px] sm:pl-0">
+                          <span className="text-sm font-semibold tabular-nums" style={{ color: st.fg }}>
+                            {pct}%
+                          </span>
+                          <span
+                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                            style={{ color: st.fg, backgroundColor: st.bg }}
+                          >
+                            {st.text}
+                          </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex sm:justify-end gap-1.5 pl-[22px] sm:pl-0">
+                          {(isBlocked || s.unblocked) && (
+                            <button
+                              onClick={() => handleToggleUnblock(s)}
+                              className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
+                                s.unblocked
+                                  ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-100'
+                                  : 'border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100'
+                              }`}
+                            >
+                              {s.unblocked ? 'Re-block' : 'Unblock'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setGraphStudent(s)}
+                            className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors"
+                          >
+                            Trend
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* ── Modals ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showAddStudents && selectedGrade && (
+        {showAddStudents && selectedGrade && selectedBatchId && (
           <AddStudentsModal
             grade={selectedGrade}
-            currentStudentIds={batchStudents.map((s) => s.id)}
-            onAdd={handleAddStudents}
+            batchId={selectedBatchId}
+            onAdded={refetchStudents}
             onClose={() => setShowAddStudents(false)}
           />
+        )}
+        {graphStudent && (
+          <StudentGraphModal student={graphStudent} onClose={() => setGraphStudent(null)} />
         )}
       </AnimatePresence>
     </div>

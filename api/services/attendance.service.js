@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const { supabaseAdmin } = require("../lib/supabaseAdmin");
+const  supabase  = require("../config/supabase");
 const crypto = require("crypto");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ const DEFAULT_REFRESH_INTERVAL = 30; // seconds
  * delivery_type is aliased to `mode` so the frontend type stays consistent.
  */
 async function getBatches() {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("batches")
     .select("id, name, days, start_time, end_time, meet_link, location")
     .order("name", { ascending: true });
@@ -52,17 +52,21 @@ async function getBatches() {
  * Create a new batch.
  * Writes `mode` into the existing `delivery_type` column.
  */
-async function createBatch({ name, days, start_time, end_time, meet_link, location }) {
+async function createBatch({ id, name, days, start_time, end_time, meet_link, location }) {
   if (!name) throw Object.assign(new Error("name is required"), { status: 400 });
 
-  const payload = { name };
+  const payload = { 
+    id: id,  // 👈 THIS WAS MISSING
+    name: name 
+  };
+  
   if (days)        payload.days        = days;
   if (start_time)  payload.start_time  = start_time;
   if (end_time)    payload.end_time    = end_time;
   if (meet_link)   payload.meet_link   = meet_link;
   if (location)    payload.location    = location;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("batches")
     .insert(payload)
     .select("id, name, days, start_time, end_time, meet_link, location")
@@ -75,7 +79,7 @@ async function createBatch({ name, days, start_time, end_time, meet_link, locati
 // ─── Batch existence guard ────────────────────────────────────────────────────
 
 async function assertBatchExists(batchId) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("batches")
     .select("id")
     .eq("id", batchId)
@@ -99,7 +103,7 @@ async function getBatchStudents(batchId) {
   await assertBatchExists(batchId);
 
   // 1. Enrolled students
-  const { data: enrollments, error: enrollErr } = await supabaseAdmin
+  const { data: enrollments, error: enrollErr } = await supabase
     .from("batch_enrollments")
     .select("student_id, students(id, name, admission_number)")
     .eq("batch_id", batchId);
@@ -110,7 +114,7 @@ async function getBatchStudents(batchId) {
   const studentIds = enrollments.map((e) => e.student_id);
 
   // 2. All sessions for this batch
-  const { data: sessions, error: sessErr } = await supabaseAdmin
+  const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id")
     .eq("batch_id", batchId);
@@ -123,7 +127,7 @@ async function getBatchStudents(batchId) {
   // 3. Attendance records for those sessions
   let presentMap = {}; // studentId → count of sessions present
   if (sessionIds.length > 0) {
-    const { data: records, error: recErr } = await supabaseAdmin
+    const { data: records, error: recErr } = await supabase
       .from("attendance_records")
       .select("student_id, present")
       .in("session_id", sessionIds)
@@ -137,7 +141,7 @@ async function getBatchStudents(batchId) {
   }
 
   // 4. Manual overrides
-  const { data: overrides, error: ovErr } = await supabaseAdmin
+  const { data: overrides, error: ovErr } = await supabase
     .from("attendance_overrides")
     .select("student_id, unblocked")
     .eq("batch_id", batchId)
@@ -176,7 +180,7 @@ async function getEligibleStudents(batchId) {
   await assertBatchExists(batchId);
 
   // Already enrolled in THIS batch
-  const { data: enrolled, error: enrErr } = await supabaseAdmin
+  const { data: enrolled, error: enrErr } = await supabase
     .from("batch_enrollments")
     .select("student_id")
     .eq("batch_id", batchId);
@@ -186,7 +190,7 @@ async function getEligibleStudents(batchId) {
   const enrolledIds = (enrolled || []).map((e) => e.student_id);
 
   // All students
-  let query = supabaseAdmin
+  let query = supabase
     .from("students")
     .select("id, name, admission_number");
 
@@ -199,7 +203,7 @@ async function getEligibleStudents(batchId) {
   if (!students || students.length === 0) return [];
 
   // Find if each student is in ANY other batch
-  const { data: allEnrollments, error: allEnrErr } = await supabaseAdmin
+  const { data: allEnrollments, error: allEnrErr } = await supabase
     .from("batch_enrollments")
     .select("student_id, batch_id, batches(name)")
     .neq("batch_id", batchId);
@@ -230,7 +234,7 @@ async function addStudentsToBatch(batchId, studentIds) {
 
   const rows = studentIds.map((sid) => ({ batch_id: batchId, student_id: sid }));
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("batch_enrollments")
     .upsert(rows, { onConflict: "batch_id,student_id", ignoreDuplicates: true });
 
@@ -241,7 +245,7 @@ async function addStudentsToBatch(batchId, studentIds) {
 
 async function setStudentOverride(studentId, batchId, unblocked) {
   // Verify both exist
-  const { data: student, error: stuErr } = await supabaseAdmin
+  const { data: student, error: stuErr } = await supabase
     .from("students")
     .select("id")
     .eq("id", studentId)
@@ -252,7 +256,7 @@ async function setStudentOverride(studentId, batchId, unblocked) {
 
   await assertBatchExists(batchId);
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("attendance_overrides")
     .upsert(
       { student_id: studentId, batch_id: batchId, unblocked, updated_at: new Date().toISOString() },
@@ -272,7 +276,7 @@ async function startSession(batchId, date) {
   await assertBatchExists(batchId);
 
   // Check existing
-  const { data: existing, error: findErr } = await supabaseAdmin
+  const { data: existing, error: findErr } = await supabase
     .from("attendance_sessions")
     .select("*")
     .eq("batch_id", batchId)
@@ -293,7 +297,7 @@ async function startSession(batchId, date) {
   const qrToken   = generateQrToken();
   const expiresAt = expiresFromNow(DEFAULT_REFRESH_INTERVAL);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("attendance_sessions")
     .insert({
       batch_id:                 batchId,
@@ -319,7 +323,7 @@ async function startSession(batchId, date) {
  * POST /sessions/:sessionId/refresh — rotate QR token.
  */
 async function refreshSession(sessionId) {
-  const { data: session, error: findErr } = await supabaseAdmin
+  const { data: session, error: findErr } = await supabase
     .from("attendance_sessions")
     .select("id, refresh_interval_seconds")
     .eq("id", sessionId)
@@ -331,7 +335,7 @@ async function refreshSession(sessionId) {
   const qrToken   = generateQrToken();
   const expiresAt = expiresFromNow(session.refresh_interval_seconds);
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("attendance_sessions")
     .update({ qr_token: qrToken, expires_at: expiresAt })
     .eq("id", sessionId);
@@ -344,7 +348,7 @@ async function refreshSession(sessionId) {
 // ─── Roster ───────────────────────────────────────────────────────────────────
 
 async function getRoster(sessionId) {
-  const { data: session, error: sessErr } = await supabaseAdmin
+  const { data: session, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id")
     .eq("id", sessionId)
@@ -353,7 +357,7 @@ async function getRoster(sessionId) {
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("attendance_records")
     .select("student_id, present")
     .eq("session_id", sessionId);
@@ -367,7 +371,7 @@ async function getRoster(sessionId) {
 
 async function manualMark(sessionId, studentId, present) {
   // Verify session
-  const { data: session, error: sessErr } = await supabaseAdmin
+  const { data: session, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id")
     .eq("id", sessionId)
@@ -377,7 +381,7 @@ async function manualMark(sessionId, studentId, present) {
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
   // Verify student
-  const { data: student, error: stuErr } = await supabaseAdmin
+  const { data: student, error: stuErr } = await supabase
     .from("students")
     .select("id")
     .eq("id", studentId)
@@ -386,7 +390,7 @@ async function manualMark(sessionId, studentId, present) {
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("attendance_records")
     .upsert(
       { session_id: sessionId, student_id: studentId, present, marked_at: new Date().toISOString() },
@@ -405,7 +409,7 @@ async function manualMark(sessionId, studentId, present) {
  */
 async function scanQrToken(qrToken, authUserId) {
   // 1. Resolve student from auth user
-  const { data: student, error: stuErr } = await supabaseAdmin
+  const { data: student, error: stuErr } = await supabase
     .from("students")
     .select("id")
     .eq("auth_user_id", authUserId)
@@ -415,7 +419,7 @@ async function scanQrToken(qrToken, authUserId) {
   if (!student) throw Object.assign(new Error("Student profile not found"), { status: 404 });
 
   // 2. Find the active session for this token (not expired)
-  const { data: session, error: sessErr } = await supabaseAdmin
+  const { data: session, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id, batch_id, expires_at")
     .eq("qr_token", qrToken)
@@ -430,7 +434,7 @@ async function scanQrToken(qrToken, authUserId) {
   }
 
   // 4. Check enrollment
-  const { data: enrollment, error: enrErr } = await supabaseAdmin
+  const { data: enrollment, error: enrErr } = await supabase
     .from("batch_enrollments")
     .select("student_id")
     .eq("batch_id", session.batch_id)
@@ -443,7 +447,7 @@ async function scanQrToken(qrToken, authUserId) {
   }
 
   // 5. Mark present (upsert — idempotent if they scan twice)
-  const { error: markErr } = await supabaseAdmin
+  const { error: markErr } = await supabase
     .from("attendance_records")
     .upsert(
       { session_id: session.id, student_id: student.id, present: true, marked_at: new Date().toISOString() },
@@ -461,7 +465,7 @@ async function scanQrToken(qrToken, authUserId) {
  */
 async function getStudentTrend(studentId, sessionCount = 5) {
   // Resolve student
-  const { data: student, error: stuErr } = await supabaseAdmin
+  const { data: student, error: stuErr } = await supabase
     .from("students")
     .select("id")
     .eq("id", studentId)
@@ -471,7 +475,7 @@ async function getStudentTrend(studentId, sessionCount = 5) {
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
   // Find their batch
-  const { data: enrollment, error: enrErr } = await supabaseAdmin
+  const { data: enrollment, error: enrErr } = await supabase
     .from("batch_enrollments")
     .select("batch_id")
     .eq("student_id", studentId)
@@ -481,7 +485,7 @@ async function getStudentTrend(studentId, sessionCount = 5) {
   if (!enrollment) return []; // Not in any batch → no trend data
 
   // Get last N sessions for that batch
-  const { data: sessions, error: sessErr } = await supabaseAdmin
+  const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id, date")
     .eq("batch_id", enrollment.batch_id)
@@ -494,7 +498,7 @@ async function getStudentTrend(studentId, sessionCount = 5) {
   const sessionIds = sessions.map((s) => s.id);
 
   // Records for those sessions
-  const { data: records, error: recErr } = await supabaseAdmin
+  const { data: records, error: recErr } = await supabase
     .from("attendance_records")
     .select("session_id, present")
     .in("session_id", sessionIds)

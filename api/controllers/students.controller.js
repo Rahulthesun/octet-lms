@@ -1,5 +1,6 @@
 // controllers/student.controller.js
-const studentService = require("../services/student.service");
+const studentService = require("../services/students.service");
+
 
 exports.getAllStudents = async (req, res) => {
   try {
@@ -173,5 +174,59 @@ exports.getDashboardStats = async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+
+/**
+ * GET /api/student/profile?studentId=:userId
+ * 
+ * Returns the authenticated student's profile information.
+ */
+exports.getProfilebyUserID = async (req, res) => {
+  try {
+    const authenticatedUserId = req.user?.id;
+    const userRole = req.user?.app_metadata?.role;
+    const userEmail = req.user?.email;
+    const userMetadata = req.user?.user_metadata;
+
+    console.log("1. User ID from JWT:", authenticatedUserId);
+    console.log("2. User role:", userRole);
+    console.log("3. Full req.user:", req.user);
+
+    if (!authenticatedUserId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // Admin / Developer — no student record needed, return admin profile
+    if (userRole === "admin" || userRole === "developer" || userRole === "both") {
+      return res.status(200).json({
+        name: userMetadata?.full_name || userMetadata?.name || "Admin",
+        email: userEmail,
+        blocked: false,
+        avatar: userMetadata?.avatar_url || null,
+        role: userRole,
+      });
+    }
+
+    // Regular student — fetch from students table
+    const profile = await studentService.getStudentByUserId(authenticatedUserId);
+    console.log("3. Profile returned:", profile);
+
+    if (!profile) {
+      return res.status(404).json({ error: "Student profile not found" });
+    }
+
+    return res.status(200).json(profile);
+
+  } catch (error) {
+    console.log("4. ERROR CAUGHT:", error.message);
+    console.log("5. Full error:", error);
+    
+    if (error.message?.includes("No student profile found")) {
+      return res.status(404).json({ error: "Student profile not found" });
+    }
+    
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

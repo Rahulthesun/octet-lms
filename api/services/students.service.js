@@ -315,6 +315,37 @@ async function getDashboardStats() {
     };
 }
 
+async function getStudentByUserId(userId) {
+  console.log("A. Querying for auth_user_id:", userId);
+  
+  const { data: student, error } = await supabase
+    .from("students")
+    .select("name, email, blocked")
+    .eq("auth_user_id", userId)
+    .single();
+
+  console.log("B. Query result:", { data: student, error: error });
+
+  if (error) {
+    console.log("C. Error code:", error.code);
+    if (error.code === "PGRST116") {
+      throw new NotFoundError(`No student profile found for user ID: ${userId}`);
+    }
+    throw new Error(`Database query failed: ${error.message}`);
+  }
+
+  if (!student) {
+    throw new NotFoundError(`No student profile found for user ID: ${userId}`);
+  }
+
+  return {
+    name: student.name,
+    email: student.email,
+    blocked: student.blocked,
+    avatar: student.avatar,
+  };
+}
+
 module.exports = {
     getAllStudents,
     getPendingStudents,
@@ -326,5 +357,6 @@ module.exports = {
     approveStudent,
     rejectStudent,
     getStudentsByBatch,
-    getDashboardStats
+    getDashboardStats,
+    getStudentByUserId
 };
