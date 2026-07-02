@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
-import * as api from '../../../lib/attendance'
-import type { Student } from '../../../lib/attendance'
+import { supabase } from '../../../lib/supabase/client'
 import {
   useBatches,
   useBatchStudents,
@@ -13,21 +12,58 @@ import {
   useRoster,
   useStudentTrend,
 } from '../../../hooks/useAttendanceData'
+import type { Student } from '../../../hooks/useAttendanceData'
+
+// ─── Shared fetch helper for the few mutations this page calls directly ──────
+const API_BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+async function authedFetch(path: string, init?: RequestInit) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+const manualMark = (sessionId: string, studentId: string, present: boolean) =>
+  authedFetch(`/api/attendance/sessions/${sessionId}/manual-mark`, {
+    method: 'POST',
+    body: JSON.stringify({ studentId, present }),
+  })
+const overrideStudentBlock = (studentId: string, batchId: string, unblocked: boolean) =>
+  authedFetch(`/api/attendance/students/${studentId}/override`, {
+    method: 'POST',
+    body: JSON.stringify({ batchId, unblocked }),
+  })
+const addStudentsToBatch = (batchId: string, studentIds: string[]) =>
+  authedFetch(`/api/attendance/batches/${batchId}/students`, {
+    method: 'POST',
+    body: JSON.stringify({ studentIds }),
+  })
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Section = 'qr' | 'summary'
 
-const GRADES = ['11th', '12th', 'JEE', 'NEET'] as const
+const GRADES = ['12th'] as const
 
-// ─── Status config ────────────────────────────────────────────────────────────
+// ─── Status config — readable text/bg pairs, no white-on-light-tint ──────────
 
 const STATUS = {
-  blocked:  { text: 'Blocked',   color: '#991b1b', light: '#fef2f2', dot: '#dc2626' },
-  warning:  { text: 'Warning',   color: '#9a3412', light: '#fff7ed', dot: '#ea580c' },
-  good:     { text: 'Good',      color: '#166534', light: '#f0fdf4', dot: '#16a34a' },
-  excellent:{ text: 'Excellent', color: '#0f766e', light: '#f0fdfa', dot: '#14b8a6' },
-  active:   { text: 'Active',    color: '#3730a3', light: '#eef2ff', dot: '#6366f1' },
+  blocked:   { text: 'Blocked',   fg: '#B91C1C', bg: '#FEF2F2', dot: '#DC2626' },
+  warning:   { text: 'Warning',   fg: '#B45309', bg: '#FFFBEB', dot: '#D97706' },
+  good:      { text: 'Good',      fg: '#15803D', bg: '#F0FDF4', dot: '#16A34A' },
+  excellent: { text: 'Excellent', fg: '#0F766E', bg: '#F0FDFA', dot: '#0D9488' },
+  active:    { text: 'Active',    fg: '#5B21B6', bg: '#F5F3FF', dot: '#7C3AED' },
 }
 
 function statusOf(pct: number) {
@@ -37,9 +73,12 @@ function statusOf(pct: number) {
   return STATUS.excellent
 }
 
+// Accent — used only for primary actions, dark enough for white text to pass contrast
+const ACCENT = '#5B21B6'
+
 // ─── Countdown ring ───────────────────────────────────────────────────────────
 
-function CountdownRing({ countdown, total, size = 240 }: {
+function CountdownRing({ countdown, total, size = 220 }: {
   countdown: number; total: number; size?: number
 }) {
   const R = size / 2 - 4
@@ -51,10 +90,10 @@ function CountdownRing({ countdown, total, size = 240 }: {
       className="absolute inset-0 pointer-events-none"
       style={{ transform: 'rotate(-90deg)' }}
     >
-      <circle cx={size / 2} cy={size / 2} r={R} fill="none" stroke="hsl(var(--muted))" strokeWidth="2" />
+      <circle cx={size / 2} cy={size / 2} r={R} fill="none" stroke="#E4E4E7" strokeWidth="2" />
       <circle
         cx={size / 2} cy={size / 2} r={R}
-        fill="none" stroke="hsl(var(--primary))" strokeWidth="2"
+        fill="none" stroke={ACCENT} strokeWidth="2"
         strokeDasharray={C} strokeDashoffset={offset}
         strokeLinecap="round"
         style={{ transition: 'stroke-dashoffset 1s linear' }}
@@ -68,20 +107,20 @@ function CountdownRing({ countdown, total, size = 240 }: {
 function MiniChart({ data }: { data: { label: string; val: number }[] }) {
   const maxH = 80
   return (
-    <div className="flex items-end gap-3 w-full" style={{ height: maxH + 28 }}>
+    <div className="flex items-end gap-2.5 w-full" style={{ height: maxH + 28 }}>
       {data.map((row, i) => {
         const barH = Math.round((row.val / 100) * maxH)
         const st = statusOf(row.val)
         return (
           <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5">
-            <span className="text-[11px] tabular-nums text-muted-foreground">{row.val}%</span>
+            <span className="text-[11px] tabular-nums text-zinc-500">{row.val}%</span>
             <motion.div
               initial={{ height: 0 }} animate={{ height: barH }}
               transition={{ duration: 0.35, delay: i * 0.06, ease: 'easeOut' }}
               className="w-full rounded-[2px]"
               style={{ backgroundColor: st.dot }}
             />
-            <span className="text-[10px] text-muted-foreground">{row.label}</span>
+            <span className="text-[10px] text-zinc-400">{row.label}</span>
           </div>
         )
       })}
@@ -110,7 +149,7 @@ function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      await api.addStudentsToBatch(batchId, selected)
+      await addStudentsToBatch(batchId, selected)
       onAdded()
       onClose()
     } catch (e) {
@@ -122,37 +161,37 @@ function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.97, opacity: 0 }}
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-background w-full max-w-md shadow-2xl rounded-lg border overflow-hidden"
+        className="bg-white w-full sm:max-w-md shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-6 py-5 border-b">
-          <h3 className="text-sm font-semibold">Add students to batch</h3>
-          <p className="text-xs text-muted-foreground mt-1">Unassigned {grade} students</p>
+        <div className="px-5 sm:px-6 py-4 border-b border-zinc-200 shrink-0">
+          <h3 className="text-sm font-semibold text-zinc-900">Add students to batch</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Unassigned {grade} students</p>
         </div>
 
         {loading ? (
-          <div className="px-6 py-12 text-center text-sm text-muted-foreground">Loading…</div>
+          <div className="px-6 py-12 text-center text-sm text-zinc-400">Loading…</div>
         ) : loadError ? (
           <div className="px-6 py-12 text-center text-sm text-red-600">{loadError}</div>
         ) : eligible.length === 0 ? (
-          <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+          <div className="px-6 py-12 text-center text-sm text-zinc-400">
             All {grade} students are already in a batch.
           </div>
         ) : (
-          <div className="max-h-72 overflow-y-auto">
+          <div className="overflow-y-auto flex-1">
             {eligible.map((s, i) => (
-              <label key={s.id} className={`flex items-center gap-3 px-6 py-3 hover:bg-accent cursor-pointer ${i !== eligible.length - 1 ? 'border-b' : ''}`}>
+              <label key={s.id} className={`flex items-center gap-3 px-5 sm:px-6 py-3 hover:bg-zinc-50 cursor-pointer ${i !== eligible.length - 1 ? 'border-b border-zinc-100' : ''}`}>
                 <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)}
-                  className="w-4 h-4 accent-foreground rounded-sm" />
-                <div>
-                  <p className="text-sm">{s.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  className="w-4 h-4 rounded-sm accent-violet-700 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-900 truncate">{s.name}</p>
+                  <p className="text-xs text-zinc-500 truncate">
                     {s.roll}{s.currentBatchName ? ` · currently in ${s.currentBatchName}` : ''}
                   </p>
                 </div>
@@ -162,18 +201,19 @@ function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
         )}
 
         {submitError && (
-          <p className="px-6 pt-3 text-xs text-red-600">{submitError}</p>
+          <p className="px-5 sm:px-6 pt-3 text-xs text-red-600 shrink-0">{submitError}</p>
         )}
 
-        <div className="flex gap-2 px-6 py-4 border-t bg-muted/30">
+        <div className="flex gap-2 px-5 sm:px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
           <button onClick={onClose}
-            className="flex-1 py-2 text-sm border rounded-md hover:bg-accent transition-colors">
+            className="flex-1 py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors">
             Cancel
           </button>
           <button
             onClick={confirm}
             disabled={selected.length === 0 || submitting}
-            className="flex-1 py-2 text-sm text-primary-foreground bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="flex-1 py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: ACCENT }}
           >
             {submitting
               ? 'Adding…'
@@ -197,38 +237,38 @@ function StudentGraphModal({ student, onClose }: { student: Student; onClose: ()
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.97, opacity: 0 }}
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-background w-full max-w-sm shadow-2xl rounded-lg border p-6 overflow-hidden"
+        className="bg-white w-full sm:max-w-sm shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 p-6 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-5">
           <div>
-            <p className="text-sm font-semibold">{student.name}</p>
-            <p className="text-xs text-muted-foreground mt-1">{student.roll}</p>
+            <p className="text-sm font-semibold text-zinc-900">{student.name}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{student.roll}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">&times;</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
         </div>
-        <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground mb-4">Last 5 sessions</p>
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400 mb-4">Last 5 sessions</p>
 
         {loading ? (
-          <div className="h-[108px] flex items-center justify-center text-sm text-muted-foreground">Loading…</div>
+          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">Loading…</div>
         ) : error ? (
           <div className="h-[108px] flex items-center justify-center text-sm text-red-600">{error}</div>
         ) : points.length === 0 ? (
-          <div className="h-[108px] flex items-center justify-center text-sm text-muted-foreground">No sessions yet</div>
+          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">No sessions yet</div>
         ) : (
           <MiniChart data={points.map(p => ({ label: p.label, val: p.pct }))} />
         )}
 
         {avg !== null && st && (
-          <div className="mt-4 flex items-center justify-between pt-4 border-t">
-            <span className="text-xs text-muted-foreground">5-session average</span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: st.color }}>{avg}%</span>
+          <div className="mt-4 flex items-center justify-between pt-4 border-t border-zinc-200">
+            <span className="text-xs text-zinc-500">5-session average</span>
+            <span className="text-sm font-bold tabular-nums" style={{ color: st.fg }}>{avg}%</span>
           </div>
         )}
       </motion.div>
@@ -280,7 +320,7 @@ export default function AttendancePage() {
   async function handleSimulateScan() {
     if (!selectedStudentIdForScan || !sessionId) return
     try {
-      await api.manualMark(sessionId, selectedStudentIdForScan, true)
+      await manualMark(sessionId, selectedStudentIdForScan, true)
       refetchRoster()
       setSelectedStudentIdForScan('')
     } catch (e) {
@@ -291,7 +331,7 @@ export default function AttendancePage() {
   async function handleToggleUnblock(s: Student) {
     if (!selectedBatchId) return
     try {
-      await api.overrideStudentBlock(s.id, selectedBatchId, !s.unblocked)
+      await overrideStudentBlock(s.id, selectedBatchId, !s.unblocked)
       refetchStudents()
     } catch (e) {
       console.error(e)
@@ -322,37 +362,38 @@ export default function AttendancePage() {
   })
 
   return (
-    <div className="min-h-screen bg-background p-6 max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-end justify-between pb-2 border-b">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-zinc-200">
         <div>
-          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-muted-foreground mb-1">Attendance</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Session Management</h1>
+          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Attendance</p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Session Management</h1>
         </div>
         <input
           type="date"
           value={date}
           onChange={e => setDate(e.target.value)}
-          className="text-sm border rounded-md px-3 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+          className="text-sm border border-zinc-300 rounded-md px-3 py-2 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 w-full sm:w-auto"
         />
       </div>
 
       {/* ── Grade + Batch selectors ────────────────────────────────────────── */}
       <div className="space-y-4">
         {/* Grade */}
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-medium text-muted-foreground w-12 shrink-0">Grade</span>
-          <div className="flex gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <span className="text-xs font-medium text-zinc-500 sm:w-12 shrink-0">Grade</span>
+          <div className="flex gap-1.5 flex-wrap">
             {GRADES.map(g => (
               <button
                 key={g}
                 onClick={() => handleGradeSelect(g)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   selectedGrade === g
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'text-white'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
+                style={selectedGrade === g ? { backgroundColor: ACCENT } : undefined}
               >
                 {g}
               </button>
@@ -366,18 +407,18 @@ export default function AttendancePage() {
             <motion.div
               initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center gap-4 overflow-hidden"
+              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 overflow-hidden"
             >
-              <span className="text-xs font-medium text-muted-foreground w-12 shrink-0">Batch</span>
-              <div className="flex gap-1 flex-wrap items-center">
+              <span className="text-xs font-medium text-zinc-500 sm:w-12 shrink-0">Batch</span>
+              <div className="flex gap-1.5 flex-wrap items-center">
                 {batches.map(b => (
                   <button
                     key={b.id}
                     onClick={() => setSelectedBatchId(b.id)}
-                    className={`px-3 py-1 rounded-md text-sm transition-all ${
+                    className={`px-3 py-1.5 rounded-md text-sm transition-colors border ${
                       selectedBatchId === b.id
-                        ? 'bg-secondary text-secondary-foreground border border-border font-medium'
-                        : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-transparent'
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-medium'
+                        : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-300'
                     }`}
                   >
                     {b.name}
@@ -386,12 +427,12 @@ export default function AttendancePage() {
                 {!addingBatch ? (
                   <button
                     onClick={() => setAddingBatch(true)}
-                    className="px-3 py-1 rounded-md text-sm border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-all"
+                    className="px-3 py-1.5 rounded-md text-sm border border-dashed border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition-colors"
                   >
                     + New batch
                   </button>
                 ) : (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <input
                       autoFocus type="text" value={newBatchName}
                       onChange={e => setNewBatchName(e.target.value)}
@@ -400,25 +441,27 @@ export default function AttendancePage() {
                         if (e.key === 'Escape') { setAddingBatch(false); setNewBatchName('') }
                       }}
                       placeholder="Batch name"
-                      className="border rounded-md px-3 py-1 text-sm w-32 focus:outline-none focus:ring-1 focus:ring-ring bg-background"
+                      className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 bg-white"
                     />
-                    <div className="flex rounded-md border overflow-hidden text-xs">
+                    <div className="flex rounded-md border border-zinc-300 overflow-hidden text-xs">
                       {(['offline', 'online'] as const).map(m => (
                         <button
                           key={m}
                           onClick={() => setNewBatchMode(m)}
-                          className={`px-2 py-1 capitalize ${newBatchMode === m ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+                          className={`px-2.5 py-1.5 capitalize ${newBatchMode === m ? 'text-white' : 'bg-white text-zinc-500'}`}
+                          style={newBatchMode === m ? { backgroundColor: ACCENT } : undefined}
                         >
                           {m}
                         </button>
                       ))}
                     </div>
                     <button onClick={handleAddBatch}
-                      className="px-3 py-1 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 transition-colors">
+                      className="px-3 py-1.5 text-white text-sm rounded-md transition-colors"
+                      style={{ backgroundColor: ACCENT }}>
                       Save
                     </button>
                     <button onClick={() => { setAddingBatch(false); setNewBatchName('') }}
-                      className="text-muted-foreground hover:text-foreground px-1 text-lg leading-none">&times;</button>
+                      className="text-zinc-400 hover:text-zinc-700 px-1 text-lg leading-none">&times;</button>
                   </div>
                 )}
               </div>
@@ -435,35 +478,18 @@ export default function AttendancePage() {
             transition={{ duration: 0.2 }}
             className="space-y-4"
           >
-            {/* Stat cards */}
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { key: 'blocked',   label: 'Blocked',   count: stats.blocked,   ...STATUS.blocked   },
-                { key: 'warning',   label: 'Warning',   count: stats.warning,   ...STATUS.warning   },
-                { key: 'good',      label: 'Good',      count: stats.good,      ...STATUS.good      },
-                { key: 'excellent', label: 'Excellent', count: stats.excellent, ...STATUS.excellent  },
-              ].map(s => (
-                <div key={s.key} className="border rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.dot }} />
-                  <div>
-                    <p className="text-2xl font-semibold leading-none tabular-nums" style={{ color: s.color }}>{s.count}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
 
             {/* Tab bar */}
-            <div className="flex items-center justify-between border-b">
+            <div className="flex items-center justify-between border-b border-zinc-200 flex-wrap gap-y-2">
               <div className="flex">
                 {(['qr', 'summary'] as Section[]).map(s => (
                   <button
                     key={s}
                     onClick={() => setSection(s)}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
+                    className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                       activeSection === s
-                        ? 'border-foreground text-foreground'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                        ? 'border-zinc-900 text-zinc-900'
+                        : 'border-transparent text-zinc-400 hover:text-zinc-700'
                     }`}
                   >
                     {s === 'qr' ? 'QR Attendance' : 'Summary'}
@@ -473,7 +499,8 @@ export default function AttendancePage() {
               {activeSection === 'qr' && (
                 <button
                   onClick={() => setShowAddStudents(true)}
-                  className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 mb-1 transition-colors"
+                  className="text-xs px-3 py-1.5 text-white rounded-md mb-1 transition-colors"
+                  style={{ backgroundColor: ACCENT }}
                 >
                   + Add students
                 </button>
@@ -485,13 +512,13 @@ export default function AttendancePage() {
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       {!hasContext ? (
-        <div className="flex flex-col items-center justify-center py-32 gap-3 text-muted-foreground/50">
+        <div className="flex flex-col items-center justify-center py-24 sm:py-32 gap-3 text-zinc-300">
           <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <rect x="3" y="5" width="18" height="16" rx="2" />
             <path d="M3 10h18M8 3v4M16 3v4" strokeLinecap="round" />
             <circle cx="12" cy="15" r="2" />
           </svg>
-          <p className="text-sm text-muted-foreground">Choose a grade and batch to begin</p>
+          <p className="text-sm text-zinc-400">Choose a grade and batch to begin</p>
         </div>
       ) : (
         <AnimatePresence mode="wait">
@@ -505,23 +532,23 @@ export default function AttendancePage() {
               className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6"
             >
               {/* QR session card */}
-              <div className="bg-card rounded-lg border p-8 flex flex-col items-center gap-6">
+              <div className="bg-white rounded-lg border border-zinc-200 p-6 sm:p-8 flex flex-col items-center gap-6">
                 <div className="text-center">
-                  <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-muted-foreground mb-2">Live Session</p>
-                  <p className="text-foreground text-lg font-semibold">
+                  <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-zinc-400 mb-2">Live Session</p>
+                  <p className="text-zinc-900 text-lg font-semibold">
                     {selectedGrade} · {selectedBatch?.name}
                   </p>
-                  <p className="text-muted-foreground text-xs mt-1">{dateLabel}</p>
+                  <p className="text-zinc-500 text-xs mt-1">{dateLabel}</p>
                 </div>
 
                 {/* QR + ring */}
-                <div className="relative" style={{ width: 240, height: 240 }}>
-                  <CountdownRing countdown={countdown} total={refreshSeconds} size={240} />
-                  <div className="absolute inset-3 bg-white rounded-md flex items-center justify-center border shadow-sm">
+                <div className="relative" style={{ width: 220, height: 220 }}>
+                  <CountdownRing countdown={countdown} total={refreshSeconds} size={220} />
+                  <div className="absolute inset-3 bg-white rounded-md flex items-center justify-center border border-zinc-200 shadow-sm">
                     {qrToken ? (
-                      <QRCodeSVG value={qrToken} size={188} bgColor="#ffffff" fgColor="#0a0a0a" level="H" />
+                      <QRCodeSVG value={qrToken} size={172} bgColor="#ffffff" fgColor="#18181B" level="H" />
                     ) : (
-                      <div className="w-44 h-44 bg-muted animate-pulse rounded" />
+                      <div className="w-40 h-40 bg-zinc-100 animate-pulse rounded" />
                     )}
                   </div>
                 </div>
@@ -529,21 +556,21 @@ export default function AttendancePage() {
                 {sessionError ? (
                   <p className="text-xs text-red-600 text-center">{sessionError}</p>
                 ) : (
-                  <p className="text-muted-foreground text-xs text-center">
-                    Refreshes in <span className="text-foreground font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
+                  <p className="text-zinc-500 text-xs text-center">
+                    Refreshes in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
                   </p>
                 )}
 
                 {/* Demo simulator */}
-                <div className="w-full pt-5 border-t space-y-2">
-                  <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-muted-foreground">
+                <div className="w-full pt-5 border-t border-zinc-200 space-y-2">
+                  <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400">
                     Demo — simulate scan
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <select
                       value={selectedStudentIdForScan}
                       onChange={e => setSelectedStudentIdForScan(e.target.value)}
-                      className="flex-1 text-sm rounded-md px-3 py-2 outline-none border bg-background focus:ring-1 focus:ring-ring"
+                      className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
                     >
                       <option value="">Select student…</option>
                       {students.map(s => (
@@ -553,7 +580,8 @@ export default function AttendancePage() {
                     <button
                       onClick={handleSimulateScan}
                       disabled={!selectedStudentIdForScan}
-                      className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 disabled:opacity-40 transition-colors whitespace-nowrap"
+                      className="px-4 py-2 text-white text-sm rounded-md disabled:opacity-40 transition-colors whitespace-nowrap"
+                      style={{ backgroundColor: ACCENT }}
                     >
                       Mark present
                     </button>
@@ -562,45 +590,45 @@ export default function AttendancePage() {
               </div>
 
               {/* Attendance roster */}
-              <div className="border rounded-lg overflow-hidden flex flex-col bg-card">
-                <div className="px-5 py-4 border-b flex items-start justify-between">
+              <div className="border border-zinc-200 rounded-lg overflow-hidden flex flex-col bg-white">
+                <div className="px-5 py-4 border-b border-zinc-200 flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-semibold">Today's roster</p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-sm font-semibold text-zinc-900">Today's roster</p>
+                    <p className="text-xs text-zinc-500 mt-1">
                       {presentCount} of {students.length} present
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-semibold tabular-nums">
+                    <p className="text-xl font-semibold tabular-nums text-zinc-900">
                       {students.length > 0 ? Math.round((presentCount / students.length) * 100) : 0}%
                     </p>
                   </div>
                 </div>
 
                 {/* Live fill bar */}
-                <div className="h-1 bg-muted">
+                <div className="h-1 bg-zinc-100">
                   <motion.div
-                    className="h-full bg-primary"
+                    className="h-full"
+                    style={{ backgroundColor: ACCENT }}
                     animate={{ width: `${students.length > 0 ? (presentCount / students.length) * 100 : 0}%` }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                   />
                 </div>
 
-                <div className="divide-y overflow-y-auto flex-1" style={{ maxHeight: 400 }}>
+                <div className="divide-y divide-zinc-100 overflow-y-auto flex-1" style={{ maxHeight: 400 }}>
                   {students.map(s => {
                     const present = isPresent(s.id)
                     return (
-                      <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-accent/50 transition-colors">
+                      <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
                         <div className="min-w-0">
-                          <p className="text-sm truncate">{s.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{s.roll}</p>
+                          <p className="text-sm text-zinc-900 truncate">{s.name}</p>
+                          <p className="text-xs text-zinc-500 font-mono">{s.roll}</p>
                         </div>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                            present
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
+                          className="text-xs px-2.5 py-0.5 rounded-full font-medium shrink-0"
+                          style={present
+                            ? { backgroundColor: '#F0FDF4', color: '#15803D' }
+                            : { backgroundColor: '#F4F4F5', color: '#71717A' }}
                         >
                           {present ? 'Present' : 'Absent'}
                         </span>
@@ -619,18 +647,19 @@ export default function AttendancePage() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <div className="border rounded-lg overflow-hidden bg-card">
-                <div className="grid grid-cols-[1fr_80px_100px_140px] px-5 py-3 border-b bg-muted/40">
-                  {['Student', 'Att.', 'Status', 'Actions'].map((h, i) => (
+              <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+                {/* Header row — hidden on mobile, cards carry their own labels */}
+                <div className="hidden sm:grid grid-cols-[1fr_140px_180px] px-5 py-3 border-b border-zinc-200 bg-zinc-50">
+                  {['Student', 'Attendance', 'Actions'].map((h, i) => (
                     <span key={h}
-                      className={`text-[10px] font-medium tracking-widest uppercase text-muted-foreground ${i > 0 ? 'text-right' : ''}`}
+                      className={`text-[10px] font-medium tracking-widest uppercase text-zinc-400 ${i > 0 ? 'text-right' : ''}`}
                     >
                       {h}
                     </span>
                   ))}
                 </div>
 
-                <div className="divide-y">
+                <div className="divide-y divide-zinc-100">
                   {students.map(s => {
                     if (s.attendancePct === null) return null
                     const pct = s.attendancePct
@@ -640,49 +669,39 @@ export default function AttendancePage() {
                     return (
                       <div
                         key={s.id}
-                        className="grid grid-cols-[1fr_80px_100px_140px] px-5 py-3.5 items-center hover:bg-accent/40 transition-colors"
+                        className="flex flex-col sm:grid sm:grid-cols-[1fr_140px_180px] gap-3 sm:gap-0 px-5 py-3.5 sm:items-center hover:bg-zinc-50 transition-colors"
                       >
                         {/* Student */}
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: st.dot }} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{s.name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">{s.roll}</p>
+                            <p className="text-sm font-medium text-zinc-900 truncate">{s.name}</p>
+                            <p className="text-xs text-zinc-500 font-mono">{s.roll}</p>
                           </div>
                         </div>
 
-                        {/* Att % + mini bar */}
-                        <div className="text-right space-y-1">
-                          <span className="text-sm font-semibold tabular-nums block" style={{ color: st.color }}>
+                        {/* Attendance: % + badge merged into one column */}
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 sm:gap-1 sm:text-right pl-[22px] sm:pl-0">
+                          <span className="text-sm font-semibold tabular-nums" style={{ color: st.fg }}>
                             {pct}%
                           </span>
-                          <div className="h-1 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${pct}%`, backgroundColor: st.dot }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Status badge */}
-                        <div className="text-right">
                           <span
                             className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                            style={{ color: st.color, backgroundColor: st.light }}
+                            style={{ color: st.fg, backgroundColor: st.bg }}
                           >
                             {st.text}
                           </span>
                         </div>
 
                         {/* Actions */}
-                        <div className="flex justify-end gap-1.5">
+                        <div className="flex sm:justify-end gap-1.5 pl-[22px] sm:pl-0">
                           {(isBlocked || s.unblocked) && (
                             <button
                               onClick={() => handleToggleUnblock(s)}
                               className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                                 s.unblocked
-                                  ? 'border-border text-muted-foreground hover:bg-accent'
-                                  : 'border-primary/30 text-primary bg-primary/5 hover:bg-primary/10'
+                                  ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-100'
+                                  : 'border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100'
                               }`}
                             >
                               {s.unblocked ? 'Re-block' : 'Unblock'}
@@ -690,7 +709,7 @@ export default function AttendancePage() {
                           )}
                           <button
                             onClick={() => setGraphStudent(s)}
-                            className="text-xs px-2.5 py-1 rounded-md border border-border text-muted-foreground hover:bg-accent transition-colors"
+                            className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors"
                           >
                             Trend
                           </button>

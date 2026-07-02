@@ -1,8 +1,67 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import * as api from '../lib/attendance'
-import type { Batch, Student, AttendanceEntry, TrendPoint } from '../lib/attendance'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase/client'
+
+const API_BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+
+async function getToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? null
+}
+
+async function authedFetch(path: string, init?: RequestInit) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface Batch {
+  id: string
+  grade: string
+  name: string
+  mode: 'online' | 'offline'
+}
+
+export interface Student {
+  id: string
+  name: string
+  roll: string
+  grade: string
+  attendancePct: number | null
+  unblocked: boolean
+}
+
+export interface EligibleStudent {
+  id: string
+  name: string
+  roll: string
+  currentBatchName: string | null
+}
+
+export interface AttendanceEntry {
+  studentId: string
+  present: boolean
+}
+
+export interface TrendPoint {
+  label: string
+  pct: number
+}
 
 // ─── Batches for a grade ──────────────────────────────────────────────────────
 
@@ -15,8 +74,8 @@ export function useBatches(grade: string | null) {
     if (!grade) { setBatches([]); return }
     setLoading(true)
     setError(null)
-    api.fetchBatches(grade)
-      .then(setBatches)
+    authedFetch(`/api/attendance/batches?grade=${encodeURIComponent(grade)}`)
+      .then(d => setBatches(d.batches))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [grade])
@@ -25,9 +84,12 @@ export function useBatches(grade: string | null) {
 
   const addBatch = useCallback(async (name: string, mode: 'online' | 'offline') => {
     if (!grade) return null
-    const batch = await api.createBatch(grade, name, mode)
-    setBatches(prev => [...prev, batch])
-    return batch
+    const d = await authedFetch(`/api/attendance/batches`, {
+      method: 'POST',
+      body: JSON.stringify({ grade, name, mode }),
+    })
+    setBatches(prev => [...prev, d.batch])
+    return d.batch as Batch
   }, [grade])
 
   return { batches, loading, error, refetch, addBatch }
@@ -44,8 +106,8 @@ export function useBatchStudents(batchId: string | null, date: string) {
     if (!batchId) { setStudents([]); return }
     setLoading(true)
     setError(null)
-    api.fetchBatchStudents(batchId, date)
-      .then(setStudents)
+    authedFetch(`/api/attendance/batches/${batchId}/students?date=${date}`)
+      .then(d => setStudents(d.students))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [batchId, date])
@@ -58,15 +120,15 @@ export function useBatchStudents(batchId: string | null, date: string) {
 // ─── Eligible (unassigned) students, fetched on demand for the Add modal ─────
 
 export function useEligibleStudents(grade: string | null, batchId: string | null) {
-  const [students, setStudents] = useState<api.EligibleStudent[]>([])
+  const [students, setStudents] = useState<EligibleStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!grade || !batchId) return
     setLoading(true)
-    api.fetchEligibleStudents(grade, batchId)
-      .then(setStudents)
+    authedFetch(`/api/attendance/batches/${batchId}/eligible-students?grade=${encodeURIComponent(grade)}`)
+      .then(d => setStudents(d.students))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [grade, batchId])
@@ -92,9 +154,13 @@ export function useAttendanceSession(batchId: string | null, date: string, activ
     let cancelled = false
     let refreshTimer: ReturnType<typeof setInterval>
 
-    api.startSession(batchId, date)
-      .then(session => {
+    authedFetch(`/api/attendance/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ batchId, date }),
+    })
+      .then(d => {
         if (cancelled) return
+        const session = d.session
         setSessionId(session.sessionId)
         setQrToken(session.qrToken)
         setRefreshSeconds(session.refreshIntervalSeconds)
@@ -102,9 +168,11 @@ export function useAttendanceSession(batchId: string | null, date: string, activ
 
         refreshTimer = setInterval(async () => {
           try {
-            const { qrToken: token } = await api.refreshSessionToken(session.sessionId)
+            const r = await authedFetch(`/api/attendance/sessions/${session.sessionId}/refresh`, {
+              method: 'POST',
+            })
             if (!cancelled) {
-              setQrToken(token)
+              setQrToken(r.qrToken)
               setCountdown(session.refreshIntervalSeconds)
             }
           } catch (e: unknown) {
@@ -137,7 +205,9 @@ export function useRoster(sessionId: string | null, pollMs = 4000) {
 
   const refetch = useCallback(() => {
     if (!sessionId) return
-    api.fetchRoster(sessionId).then(setEntries).catch(() => {})
+    authedFetch(`/api/attendance/sessions/${sessionId}/roster`)
+      .then(d => setEntries(d.entries))
+      .catch(() => {})
   }, [sessionId])
 
   useEffect(() => {
@@ -160,8 +230,8 @@ export function useStudentTrend(studentId: string | null) {
   useEffect(() => {
     if (!studentId) return
     setLoading(true)
-    api.fetchStudentTrend(studentId, 5)
-      .then(setPoints)
+    authedFetch(`/api/attendance/students/${studentId}/trend?sessions=5`)
+      .then(d => setPoints(d.points))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [studentId])

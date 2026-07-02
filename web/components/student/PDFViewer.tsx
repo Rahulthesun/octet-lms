@@ -20,40 +20,68 @@ function drawWatermark(
   h: number,
   studentToken: string | null
 ) {
-  const watermarkText = studentToken
-    ? `Chemistry@OCTET · ${studentToken}`
-    : 'Chemistry@OCTET';
+  const brandText = 'Chemistry@OCTET';
+  const separator = studentToken ? ' · ' : '';
+  const tokenText = studentToken ?? '';
 
-  // Smaller font + spacing scaled to the actual rendered text width is what
-  // stops repeats from overlapping each other.
-  const fontSize = Math.max(11, w * 0.018);
+  const brandFontSize = Math.max(12, w * 0.018);
+  const tokenFontSize = Math.max(7, brandFontSize * 0.55); // much smaller than brand text
+
+  const brandFont = `bold ${brandFontSize}px "Inter","Segoe UI",Arial,sans-serif`;
+  const tokenFont = `bold ${tokenFontSize}px "Inter","Segoe UI",Arial,sans-serif`;
 
   ctx.save();
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.4;
   ctx.fillStyle = '#4B2D8F';
-  ctx.font = `bold ${fontSize}px "Inter","Segoe UI",Arial,sans-serif`;
-  ctx.textAlign = 'center';
   ctx.translate(w / 2, h / 2);
   ctx.rotate(-Math.PI / 6);
 
-  const textWidth = ctx.measureText(watermarkText).width;
-  const stepX = textWidth + fontSize * 4;   // gap scales with actual text length
-  const stepY = fontSize * 7.5;             // taller vertical gap so rows don't crowd
+  // Measure combined width (brand + separator, at brand size; token at token size)
+  ctx.font = brandFont;
+  const brandWidth = ctx.measureText(brandText).width;
+  const sepWidth = ctx.measureText(separator).width;
+  ctx.font = tokenFont;
+  const tokenWidth = studentToken ? ctx.measureText(tokenText).width : 0;
+  const totalWidth = brandWidth + sepWidth + tokenWidth;
 
-  // Stagger alternate rows so the diagonal repeat doesn't line up into a
-  // single dense column, which is what reads as "overlapping".
+  // Gap between repeated watermark instances, scaled to combined text width
+  const stepX = totalWidth + brandFontSize * 4;
+  // Increased from *7.5 → *10.5 to drop from ~7 visible tilted lines to ~5
+  const stepY = brandFontSize * 10;
+
+  const drawInstance = (cx: number, cy: number) => {
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    let x = cx - totalWidth / 2;
+
+    ctx.font = brandFont;
+    ctx.fillText(brandText, x, cy);
+    x += brandWidth;
+
+    if (studentToken) {
+      ctx.font = brandFont; // keep separator visually consistent with brand text
+      ctx.fillText(separator, x, cy);
+      x += sepWidth;
+
+      ctx.font = tokenFont;
+      // nudge baseline down slightly so the smaller token text optically
+      // sits centered against the taller brand text rather than looking "high"
+      ctx.fillText(tokenText, x, cy + (brandFontSize - tokenFontSize) * 0.15);
+    }
+  };
+
   let row = 0;
   for (let y = -h * 1.5; y < h * 1.5; y += stepY) {
-    const rowOffset = (row % 2 === 0) ? 0 : stepX / 2;
+    const rowOffset = row % 2 === 0 ? 0 : stepX / 2;
     for (let x = -w * 1.5 + rowOffset; x < w * 1.5; x += stepX) {
-      ctx.fillText(watermarkText, x, y);
+      drawInstance(x, y);
     }
     row++;
   }
   ctx.restore();
 
   ctx.save();
-  ctx.globalAlpha = 0.16;
+  ctx.globalAlpha = 0.36;
   ctx.fillStyle = '#4B2D8F';
   ctx.font = `${Math.max(9, w * 0.016)}px Arial,sans-serif`;
   ctx.textAlign = 'left';
@@ -80,7 +108,7 @@ function AnimatedLogoWatermark({
 }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [coords, setCoords] = useState({ x: 0, y: 0 });
-  const LOGO_SIZE = 380;
+  const LOGO_SIZE = 300;
 
   // Track the visible viewport size (the scroll container's own clientWidth/Height,
   // NOT scrollHeight) so the logo only roams within what's currently on screen.
@@ -131,7 +159,7 @@ function AnimatedLogoWatermark({
           top: 0,
           left: 0,
           width: LOGO_SIZE,
-          opacity: 0.45,
+          opacity: 0.65,
           transform: `translate3d(${coords.x}px, ${coords.y}px, 0)`,
           transition: "transform 1.2s ease",
           willChange: "transform",
@@ -155,7 +183,7 @@ function AnimatedLogoWatermark({
               textShadow: "0 1px 2px rgba(255,255,255,0.6)",
             }}
           >
-            C@O · {studentToken}
+            Chemistry@OCTET · {studentToken}
           </div>
         )}
       </div>

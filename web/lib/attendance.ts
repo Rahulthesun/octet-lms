@@ -1,7 +1,6 @@
 // Assumes authedFetch lives at '@/lib/api/authedFetch' and already attaches
 // the Bearer token + Content-Type: application/json. Fix the import path
 // below if that's not where it lives in your codebase.
-//import { authedFetch } from '@/lib/api/authedFetch'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 // These are the shapes your Express controllers need to return.
@@ -50,9 +49,8 @@ export interface TrendPoint {
 }
 
 // ─── Shared request helper ───────────────────────────────────────────────────
-{/* 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await authedFetch(path, init)
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init)
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
@@ -61,8 +59,6 @@ export interface TrendPoint {
   if (res.status === 204) return undefined as T
   return res.json()
 }
-   */}
-
 
 // ─── Batches ──────────────────────────────────────────────────────────────────
 
