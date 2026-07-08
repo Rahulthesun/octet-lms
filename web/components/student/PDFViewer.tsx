@@ -6,6 +6,7 @@ import { useIsMobileDevice, usePdfViewerLockdown } from "@/hooks/usePdfViewerLoc
 import type { LockdownStatus } from "@/hooks/usePdfViewerLockDown";
 import { MobileBlockedScreen } from "../MobileBlockedScreen";
 import { useWatermarkToken } from "@/hooks/useWatermarkToken";
+import { getSession } from "@/lib/auth";
 
 interface PdfViewerProps {
   url: string | null;
@@ -229,7 +230,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
   const [rendering, setRendering] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [watermarkCanvas, setWatermarkCanvas] = useState<HTMLCanvasElement | null>(null);
-
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -251,14 +252,21 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     return () => clearTimeout(t);
   }, [status, countdown]);
 
+
+
   // ── Lockdown hook ─────────────────────────────────────────────────────────
   usePdfViewerLockdown(containerRef, {
     devtoolsGracePeriodMs: GRACE_SECONDS * 1000,
     onStatusChange: setStatus,
-    onSecurityEvent: (event) => {
+    onSecurityEvent: async (event) => {
+      const session = await getSession();
+      if (!session?.access_token) return;
+
       fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/security/security-log`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' , 
+          'Authorization': `Bearer ${session.access_token}`
+         },
         body: JSON.stringify({ event, ts: Date.now() }),
       }).catch(() => {});
     },
