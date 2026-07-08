@@ -10,12 +10,18 @@ import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { supabase } from '../../lib/supabase/client';
 import ChemistryOctetLogo from '../../components/ui/ChemistryOctetLogo';
 import { useAnalyticsAccess } from '../../hooks/admin/useAnalyticsAccess';
+import type { ReactElement } from "react";
 
 const playfair = Playfair_Display({ subsets: ['latin'], weight: ['600', '700'], display: 'swap' });
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '700'], display: 'swap' });
 
 const PAGE_BG = '#f0efea';
 const displayFont = { fontFamily: playfair.style.fontFamily };
+
+interface AnalyticsUser {
+  email: string;
+  role: string;
+}
 
 interface FeedbackItem {
   id: string;
@@ -163,7 +169,7 @@ const LOG_LEVEL_CONFIG = {
 
 function Icon({ name, className = 'w-4 h-4' }: { name: string; className?: string }) {
   const svgClass = `${className} text-current`;
-  const icons: Record<string, JSX.Element> = {
+  const icons: Record<string, ReactElement> = {
     bug: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={svgClass}>
         <path d="M9 7h6M9 17h6M5 10h2M17 10h2M5 14h2M17 14h2M9 7c0-1.7 1.3-3 3-3s3 1.3 3 3M7 10v7a5 5 0 0010 0v-7a3 3 0 00-3-3h-4a3 3 0 00-3 3z" />

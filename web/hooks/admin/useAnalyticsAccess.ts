@@ -16,10 +16,14 @@ import { supabase } from '../../lib/supabase/client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL;
 
+interface AnalyticsUser {
+  email: string;
+  role: string;
+}
+
 export function useAnalyticsAccess() {
   const [status, setStatus] = useState('checking'); // 'checking' | 'authorized' | 'denied'
-  const [user, setUser] = useState(null);
-
+  const [user, setUser] = useState<AnalyticsUser | null>(null);
   useEffect(() => {
     let isMounted = true;
 
