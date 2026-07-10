@@ -1,80 +1,93 @@
 /**
  * controllers/video.controller.js
  * ─────────────────────────────────────────────────────────────
- * Handles video upload, metadata, and streaming.
+ * All video handlers. Thin layer — validation + service call only.
+ * No business logic here, no R2/DB calls directly.
  *
- * Key concept — video streaming:
- *  Unlike a regular file download, video streaming sends the file
- *  in chunks so the browser can start playing before the full
- *  download finishes. This requires:
- *
- *  1. Reading the Range header from the request
- *     (the browser says "give me bytes 0–999999")
- *  2. Responding with status 206 Partial Content (not 200)
- *  3. Setting Content-Range and Accept-Ranges headers
- *  4. Piping just that byte range from the file/storage
- *
- *  The streamVideo handler below shows the skeleton for this.
+ * Endpoints summary:
+ *  POST   /upload              → admin: upload new video
+ *  GET    /                    → admin: list all videos
+ *  GET    /chapter/:chapterId  → auth: list videos for a chapter
+ *  GET    /:id                 → auth: video metadata
+ *  GET    /:id/stream          → auth: presigned URL (no bytes through Express)
+ *  GET    /:id/session         → auth: student's resume position
+ *  POST   /:id/heartbeat       → auth: upsert watch progress (called every ~15s)
+ *  GET    /:id/analytics       → admin: per-video engagement stats
+ *  PUT    /:id                 → admin: update metadata
+ *  DELETE /:id                 → admin: delete video + R2 files
  * ─────────────────────────────────────────────────────────────
  */
 
 const videoService = require("../services/video.service");
 
-/**
- * POST /api/content/video/upload
- *
- * Expects: multipart/form-data
- *   file fields  : video file + thumbnail image
- *   body fields  : title, subtopicId, duration, isVisible
- *
- * duration: ideally extracted server-side using ffprobe (fluent-ffmpeg)
- * thumbnail: can be auto-generated from a video frame or uploaded manually
- */
+// ─────────────────────────────────────────────────────────────
+// uploadVideo
+// ─────────────────────────────────────────────────────────────
 const uploadVideo = async (req, res) => {
   try {
-    const { title, subtopicId, isVisible } = req.body;
+    const { title, chapterId, isVisible } = req.body;
 
-    if (!title || !subtopicId) {
-      return res.status(400).json({ error: "title and subtopicId are required" });
+    if (!title || !chapterId) {
+      return res
+        .status(400)
+        .json({ error: "title and chapterId are required" });
     }
 
-    // req.files (plural) when using multer's .fields() – lets you
-    // accept multiple named file inputs in one request
-    const videoFile     = req.files?.video?.[0];
+    const videoFile = req.files?.video?.[0];
     const thumbnailFile = req.files?.thumbnail?.[0];
+
+    if (!videoFile) {
+      return res.status(400).json({ error: "Video file is required" });
+    }
 
     const newVideo = await videoService.createVideo({
       title,
-      subtopicId,
-      isVisible,
+      chapterId,
+      // isVisible comes in as a form string ("true"/"false") from multipart
+      isVisible:
+        isVisible !== undefined
+          ? isVisible === "true" || isVisible === true
+          : true,
+      uploadedBy: req.user.id,
       videoFile,
       thumbnailFile,
     });
 
     res.status(201).json(newVideo);
   } catch (err) {
+    console.error("uploadVideo error:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
 
-/**
- * GET /api/content/video
- * Returns all videos, optionally filtered by query params.
- */
+// ─────────────────────────────────────────────────────────────
+// getAllVideos
+// ─────────────────────────────────────────────────────────────
 const getAllVideos = async (req, res) => {
   try {
-    const filters = req.query;
-    const videos = await videoService.getAllVideos(filters);
+    const videos = await videoService.getAllVideos(req.query);
     res.status(200).json(videos);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-/**
- * GET /api/content/video/:id
- * Returns video metadata (NOT the video file itself – use /stream for that).
- */
+// ─────────────────────────────────────────────────────────────
+// getVideosByChapterId
+// ─────────────────────────────────────────────────────────────
+const getVideosByChapterId = async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const videos = await videoService.getVideosByChapterId(chapterId);
+    res.status(200).json(videos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// getVideoById
+// ─────────────────────────────────────────────────────────────
 const getVideoById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,78 +99,40 @@ const getVideoById = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// streamVideo
+// ─────────────────────────────────────────────────────────────
 /**
- * GET /api/content/video/:id/stream
+ * Returns { url, expiresIn } — a short-lived presigned R2 URL.
  *
- * Streams the video file to the browser with Range support.
+ * The client sets <video src={url}> and the browser makes range
+ * requests directly to R2. Zero video bytes touch Express.
+ * The server's only cost per view is this one auth + presign call.
  *
- * How HTTP Range requests work:
- *  → Browser sends:  Range: bytes=0-999999
- *  ← Server replies: 206 Partial Content
- *                    Content-Range: bytes 0-999999/5000000
- *                    (the file chunk)
- *
- *  This lets the browser seek, pause, and buffer efficiently.
- *  Without Range support, seeking would require re-downloading
- *  the entire video from the start.
+ * Client should call this on player mount (not cache across sessions).
+ * URL TTL is 10 minutes — enough for buffering, short enough to deter sharing.
  */
 const streamVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const video = await videoService.getVideoById(id);
-
-    if (!video) return res.status(404).json({ error: "Video not found" });
-
-    // TODO: add access control check here
-    // e.g. verify JWT token, check if user has permission to view
-
-    const fileSize = video.sizeBytes; // total bytes of the video file
-    const range    = req.headers.range; // e.g. "bytes=0-1000000"
-
-    if (!range) {
-      // If no Range header, the client wants the whole file.
-      // Fine for small files, but for large videos prefer range.
-      return res.status(400).json({ error: "Range header required for video streaming" });
-    }
-
-    // Parse range string: "bytes=START-END"
-    const [startStr, endStr] = range.replace(/bytes=/, "").split("-");
-    const start = parseInt(startStr, 10);
-    // If no end specified, send up to 1MB chunk at a time
-    const end   = endStr ? parseInt(endStr, 10) : Math.min(start + 1024 * 1024, fileSize - 1);
-    const chunkSize = end - start + 1;
-
-    // Set response headers for partial content
-    res.writeHead(206, {
-      "Content-Range":  `bytes ${start}-${end}/${fileSize}`,
-      "Accept-Ranges":  "bytes",
-      "Content-Length": chunkSize,
-      "Content-Type":   "video/mp4", // adjust based on actual mime type
-    });
-
-    // TODO: pipe the actual file stream from your storage solution
-    // e.g. from local disk:
-    //   const fileStream = fs.createReadStream(video.filePath, { start, end });
-    //   fileStream.pipe(res);
-    // or from S3:
-    //   const s3Stream = s3.getObject({ Bucket, Key, Range: `bytes=${start}-${end}` }).createReadStream();
-    //   s3Stream.pipe(res);
-
-    res.end(); // placeholder – remove when you plug in real streaming
+    const result = await videoService.getVideoStreamUrl(id);
+    res.status(200).json(result);
   } catch (err) {
+    if (err.message === "VIDEO_NOT_FOUND")
+      return res.status(404).json({ error: "Video not found" });
+    if (err.message === "VIDEO_NOT_VISIBLE")
+      return res.status(403).json({ error: "Video is not available" });
     res.status(500).json({ error: err.message });
   }
 };
 
-/**
- * PUT /api/content/video/:id
- * Update video metadata: title, visibility, thumbnail, etc.
- */
+// ─────────────────────────────────────────────────────────────
+// updateVideo
+// ─────────────────────────────────────────────────────────────
 const updateVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    const updated = await videoService.updateVideo(id, updates);
+    const updated = await videoService.updateVideo(id, req.body);
     if (!updated) return res.status(404).json({ error: "Video not found" });
     res.status(200).json(updated);
   } catch (err) {
@@ -165,10 +140,9 @@ const updateVideo = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/content/video/:id
- * Removes video record + file from storage.
- */
+// ─────────────────────────────────────────────────────────────
+// deleteVideo
+// ─────────────────────────────────────────────────────────────
 const deleteVideo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -180,11 +154,111 @@ const deleteVideo = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// heartbeat
+// ─────────────────────────────────────────────────────────────
+/**
+ * Called by the video player every ~15 seconds while a student watches.
+ * Also fires on pause and on page unload (navigator.sendBeacon).
+ *
+ * Body (JSON):
+ *  watchedSecs       {number} — cumulative unique seconds watched so far
+ *                               (client tracks this; scrubbing back doesn't
+ *                                re-count already-watched segments)
+ *  lastPositionSecs  {number} — current playback cursor (for resume)
+ *  completed         {boolean} — true if student crossed the 90% mark
+ *
+ * Response is intentionally minimal — the client doesn't need the
+ * full session object back, just confirmation the write succeeded.
+ */
+const heartbeat = async (req, res) => {
+  try {
+    const { id: videoId } = req.params;
+    const userId = req.user.id;
+    const {
+      watchedSecs = 0,
+      lastPositionSecs = 0,
+      completed = false,
+    } = req.body;
+
+    await videoService.upsertWatchSession({
+      videoId,
+      userId,
+      watchedSecs: Math.max(0, parseInt(watchedSecs, 10) || 0),
+      lastPositionSecs: Math.max(0, parseInt(lastPositionSecs, 10) || 0),
+      completed: Boolean(completed),
+    });
+
+    // 204 — success, no body needed. Keeps the response tiny for a
+    // route that fires every 15 seconds from every active student.
+    res.status(204).send();
+  } catch (err) {
+    // Don't let a failed heartbeat crash the player — log and swallow.
+    console.error("heartbeat error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// getWatchSession
+// ─────────────────────────────────────────────────────────────
+/**
+ * Returns the student's existing watch session for a video.
+ * Called on player mount to restore resume position.
+ *
+ * If no session exists (first time watching), returns zeroed defaults
+ * so the client doesn't need to handle null.
+ */
+const getWatchSession = async (req, res) => {
+  try {
+    const { id: videoId } = req.params;
+    const userId = req.user.id;
+
+    const session = await videoService.getWatchSession(videoId, userId);
+
+    // Return zeroed defaults if no session exists yet
+    res.status(200).json(
+      session ?? {
+        video_id: videoId,
+        user_id: userId,
+        watched_secs: 0,
+        last_position_secs: 0,
+        completed: false,
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// getVideoAnalytics
+// ─────────────────────────────────────────────────────────────
+/**
+ * Admin-only: per-video engagement breakdown.
+ * Powers the analytics dashboard cards and per-student table.
+ */
+const getVideoAnalytics = async (req, res) => {
+  try {
+    const { id: videoId } = req.params;
+    const analytics = await videoService.getVideoAnalytics(videoId);
+    res.status(200).json(analytics);
+  } catch (err) {
+    if (err.message === "VIDEO_NOT_FOUND")
+      return res.status(404).json({ error: "Video not found" });
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   uploadVideo,
   getAllVideos,
+  getVideosByChapterId,
   getVideoById,
   streamVideo,
   updateVideo,
   deleteVideo,
+  heartbeat,
+  getWatchSession,
+  getVideoAnalytics,
 };
