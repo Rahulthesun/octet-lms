@@ -109,8 +109,6 @@ function AnimatedLogoWatermark({
 }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [coords, setCoords] = useState({ x: 0, y: 0 });
-  const LOGO_SIZE = 300;
-
   // Track the visible viewport size (the scroll container's own clientWidth/Height,
   // NOT scrollHeight) so the logo only roams within what's currently on screen.
   useEffect(() => {
@@ -122,6 +120,11 @@ function AnimatedLogoWatermark({
     obs.observe(el);
     return () => obs.disconnect();
   }, [viewportRef]);
+
+  const LOGO_SIZE = Math.max(
+  90,
+  Math.min(size.w, size.h) * 0.36   // pick a % that looks right at your normal laptop res
+);
 
   const pickNewSpot = useCallback(() => {
     if (size.w === 0 || size.h === 0) return;
@@ -413,8 +416,8 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
   }, [url, loading]);
 
   const zoomIn  = () => setScale((s) => Math.min(+(s * 1.25).toFixed(3), 4.0));
-  const zoomOut = () => setScale((s) => Math.max(+(s / 1.25).toFixed(3), 0.25));
-  const zoomFit = () => setScale(fitScale);
+  const zoomOut = () =>
+  setScale((s) => Math.max(+(s / 1.25).toFixed(3), fitScale));  const zoomFit = () => setScale(fitScale);
   const scalePct = Math.round(scale * 100);
 
   // ── Gates — must be after all hooks ──────────────────────────────────────
@@ -473,7 +476,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
             <span className="text-xs text-gray-500 truncate">{filename ?? "Document"}</span>
           </div>
           <div className="flex items-center gap-0.5 shrink-0 border-l border-gray-100 pl-2">
-            <button onClick={zoomOut} disabled={scale <= 0.25 || loading} className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+            <button onClick={zoomOut} disabled={scale <= fitScale || loading} className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <svg className="w-3 h-3" viewBox="0 0 10 10" fill="none"><path d="M2 5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <span className="text-[11px] text-gray-500 tabular-nums w-10 text-center">
@@ -563,7 +566,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
                   <canvas
                     data-page={i + 1}
                     className="block rounded-sm"
-                    style={{ display: "block", maxWidth: "100%", pointerEvents: "none" }}
+                    style={{ display: "block",  pointerEvents: "none" }}
                   />
                 </div>
               ))}

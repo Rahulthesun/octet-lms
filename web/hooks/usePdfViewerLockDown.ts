@@ -93,6 +93,11 @@ export function usePdfViewerLockdown(
   const blockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const suspiciousWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const suspiciousKeyCountRef = useRef(0)
+  const baselineRef = useRef<{ width: number; height: number; ready: boolean }>({
+      width: 0,
+      height: 0,
+      ready: false,
+  }) //For Check Dev Tools Function
 
   const setStatus = (s: LockdownStatus) => {
     if (statusRef.current === s) return
@@ -212,45 +217,67 @@ export function usePdfViewerLockdown(
     document.addEventListener('visibilitychange', handleVisibility)
 
     // ── DevTools detection — window size delta ────────────────────────────
-    const THRESHOLD = 100
+    // ── DevTools detection — adaptive baseline instead of fixed threshold ─────
+    // outerWidth-innerWidth / outerHeight-innerHeight include normal browser
+    // chrome overhead (address bar, scaling artifacts, etc.), which varies by
+    // OS/zoom/monitor and can already exceed a fixed px threshold on large or
+    // scaled displays. We track the smallest observed delta as "normal" and
+    // only flag devtools when the delta grows well beyond that baseline —
+    // roughly the footprint of an actual devtools panel.
+    const DEVTOOLS_MARGIN = 150
+    
 
     const checkDevtools = () => {
-      // Don't interfere if already hard-blocked
       if (isHardBlocked()) return
 
+      const widthDelta = window.outerWidth - window.innerWidth
+      const heightDelta = window.outerHeight - window.innerHeight
+
+      if (!baselineRef.current.ready) {
+        // First read establishes the starting baseline for this session.
+        baselineRef.current = { width: widthDelta, height: heightDelta, ready: true }
+        return
+      }
+
+      // Baseline only ever moves DOWN toward the smallest overhead we've seen.
+      // Real devtools panels only ever push the delta UP, so this can't be
+      // "fooled" by devtools staying open — it just never lowers the bar for it.
+      baselineRef.current.width = Math.min(baselineRef.current.width, widthDelta)
+      baselineRef.current.height = Math.min(baselineRef.current.height, heightDelta)
+
       const isOpen =
-        window.outerWidth - window.innerWidth > THRESHOLD ||
-        window.outerHeight - window.innerHeight > THRESHOLD
+        widthDelta - baselineRef.current.width > DEVTOOLS_MARGIN ||
+        heightDelta - baselineRef.current.height > DEVTOOLS_MARGIN
 
       if (isOpen) {
-        if (devtoolsOpenSince.current === null) {
-          devtoolsOpenSince.current = Date.now()
-          setStatus('devtools-warning')
-          onSecurityEventRef.current?.('devtools_open')
-          applyBlur()
+            if (devtoolsOpenSince.current === null) {
+              devtoolsOpenSince.current = Date.now()
+              setStatus('devtools-warning')
+              onSecurityEventRef.current?.('devtools_open')
+              applyBlur()
 
-          blockTimerRef.current = setTimeout(() => {
-            if (statusRef.current === 'devtools-warning') {
-              setStatus('devtools-blocked')
-              onSecurityEventRef.current?.('devtools_blocked')
+              blockTimerRef.current = setTimeout(() => {
+                if (statusRef.current === 'devtools-warning') {
+                  setStatus('devtools-blocked')
+                  onSecurityEventRef.current?.('devtools_blocked')
+                }
+              }, devtoolsGracePeriodRef.current)
             }
-          }, devtoolsGracePeriodRef.current)
-        }
       } else {
-        if (devtoolsOpenSince.current !== null) {
-          devtoolsOpenSince.current = null
+            if (devtoolsOpenSince.current !== null) {
+              devtoolsOpenSince.current = null
 
-          if (blockTimerRef.current) {
-            clearTimeout(blockTimerRef.current)
-            blockTimerRef.current = null
-          }
+              if (blockTimerRef.current) {
+                clearTimeout(blockTimerRef.current)
+                blockTimerRef.current = null
+              }
 
-          if (statusRef.current === 'devtools-warning') {
-            setStatus('clean')
-            removeBlur()
-          }
-          // devtools-blocked stays blocked — session is done
-        }
+              if (statusRef.current === 'devtools-warning') {
+                setStatus('clean')
+                removeBlur()
+              }
+              // devtools-blocked stays blocked — session is done
+            }
       }
     }
 
