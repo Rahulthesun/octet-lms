@@ -295,6 +295,8 @@ export default function ContentPage() {
   } | null>(null);
   const [deletingFile, setDeletingFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+
 
   // ── Derived: selected path ─────────────────────────────────────────────────
   const selectedPath = (() => {
@@ -326,13 +328,25 @@ export default function ContentPage() {
   // Requires NEXT_PUBLIC_R2_PUBLIC_URL in .env.local
   // Proxy through Express — avoids CORS and keeps the real R2 URL off the client.
   // Falls back to null for locally-optimistic files (id starts with "local-").
-  const pdfPreviewUrl: string | null =
-    selectedPath?.contentType === "pdf" &&
-    selectedFile?.id &&
-    isPreviewablePdf(selectedFile) &&
-    !selectedFile.id.startsWith("local-")
-      ? `${BASE_URL}/api/content/pdf/${selectedFile.id}/stream`
-      : null;
+
+    useEffect(() => {
+      if (
+        selectedPath?.contentType !== "pdf" ||
+        !selectedFile?.id ||
+        !isPreviewablePdf(selectedFile) ||
+        selectedFile.id.startsWith("local-")
+      ) {
+        setPdfPreviewUrl(null);
+        return;
+      }
+
+      setPdfPreviewUrl(null);
+
+      fetch(`${BASE_URL}/api/content/pdf/${selectedFile.id}/stream`)
+        .then((res) => res.json())
+        .then((data) => setPdfPreviewUrl(data.url))
+        .catch(() => setPdfPreviewUrl(null));
+    }, [selectedPath?.contentType, selectedFile]);
 
   // ── Search visibility ──────────────────────────────────────────────────────
   const visibility = (() => {
