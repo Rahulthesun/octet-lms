@@ -206,9 +206,11 @@ async function scanQrToken(req, res) {
   const authUserId = req.user?.id;
 
   if (!qrToken) {
+    console.log("[attendance] scanQrToken: missing qrToken in request body");
     return res.status(400).json({ error: "qrToken is required" });
   }
   if (!authUserId) {
+    console.log("[attendance] scanQrToken: missing auth user ID (verifyToken middleware issue?)");
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -217,6 +219,7 @@ async function scanQrToken(req, res) {
     res.json({ success: true });
   } catch (err) {
     handleError(res, err);
+    console.log(`[attendance] scanQrToken: error scanning QR token for user ${authUserId}: ${err.message}`)
   }
 }
 
