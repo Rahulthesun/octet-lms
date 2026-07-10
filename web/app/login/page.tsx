@@ -25,7 +25,7 @@ export default function LoginPage() {
       {/* Left panel — auth form */}
       <div className="w-full lg:w-1/2 flex flex-col h-full">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-8 py-3.5 border-b border-accent1 shrink-0">
+        <div className="flex items-center justify-between px-8 py-3.5 shrink-0">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-11 h-11 shrink-0">
               <ChemistryOctetLogo size={44} />
@@ -48,26 +48,26 @@ export default function LoginPage() {
             transition={{ duration: 0.5 }}
             className="w-full max-w-md"
           >
-            <div className="bg-white rounded-2xl border border-accent3/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-8">
+            <div className="bg-transparent rounded-2xl">
               <h1 className="text-2xl text-primary mb-1">Welcome back</h1>
               <p className="text-muted text-[15px] mb-6">Sign in to access your student portal</p>
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-primary text-[15px] mb-1.5">Email address</label>
+                  <label className="block text-primary text-md mb-1.5">Email address</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@email.com"
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
+                    className="w-full px-4 py-3 rounded-md border border-border text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
                   />
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-primary text-[15px]">Password</label>
-                    <a href="#" className="text-muted text-[14px] hover:text-primary transition-colors">
+                    <label className="text-primary text-md">Password</label>
+                    <a href="#" className="text-muted text-md hover:text-primary transition-colors">
                       Forgot password?
                     </a>
                   </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-[#fdfcf8] text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
+                    className="w-full px-4 py-3 rounded-md border border-border text-primary text-base placeholder:text-border focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
                   />
                 </div>
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
                   type="submit"
                   disabled={loading}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-1"
+                  className="w-full py-3 bg-primary text-white text-base rounded-md hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-1"
                 >
                   {loading ? (
                     <>
@@ -109,9 +109,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <p className="text-border text-[14px] text-center mt-3">
-              Demo mode: any email & password will sign you in
-            </p>
           </motion.div>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { landingReviews } from '@/lib/mockData'
+import SectionDecor from '@/components/landing/SectionDecor'
 
 const accentColors = ['#e9deb5', '#daeae4', '#d4c5e2', '#c8e0da', '#f0e8f8', '#daeae4', '#e9deb5', '#c8e0da']
 
@@ -64,8 +65,9 @@ export default function Reviews() {
   const secondRow = landingReviews.slice(4)
 
   return (
-    <section id="reviews" className="py-24 overflow-hidden" style={{ backgroundColor: '#f0ebe8' }}>
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="reviews" className="relative py-18 overflow-hidden section-fx" style={{ backgroundColor: '#e7dff0' }}>
+      <SectionDecor variant={4} />
+      <div className="relative z-10 max-w-7xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -85,7 +87,7 @@ export default function Reviews() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.7, delay: 0.2 }}
-        className="space-y-5"
+        className="relative z-10 space-y-5"
       >
         <MarqueeRow reviews={firstRow} direction={1} speed={45} />
         <MarqueeRow reviews={secondRow} direction={-1} speed={50} />

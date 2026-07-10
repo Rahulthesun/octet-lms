@@ -25,7 +25,7 @@ export default function RegisterPage() {
     router.push('/student')
   }
 
-  const inputClass = "w-full px-4 py-2.5 rounded-xl border border-[#c8b8d8] bg-[#fdfcf8] text-[#5e4075] text-base placeholder:text-[#c8b8d8] focus:outline-none focus:border-[#5e4075]/60 focus:ring-2 focus:ring-[#5e4075]/10 transition-all duration-200"
+  const inputClass = "w-full px-4 py-2 rounded-md border border-[#c8b8d8] bg-transparent text-[#5e4075] text-base placeholder:text-[#c8b8d8] focus:outline-none focus:border-[#5e4075]/60 focus:ring-2 focus:ring-[#5e4075]/10 transition-all duration-200"
 
   return (
     <div className="h-screen flex overflow-hidden bg-bg">
@@ -37,11 +37,27 @@ export default function RegisterPage() {
         className="hidden lg:flex w-1/2 relative flex-col items-center justify-center p-16 overflow-hidden"
         style={{ backgroundColor: '#d4c5e2' }}
       >
-        <div className="absolute top-8 left-8 opacity-15">
-          <CompoundSVG width={220} height={160} color="#5e4075" />
+        {/* Transparent header — branding over the pastel */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-10 py-6">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-11 h-11 shrink-0">
+              <ChemistryOctetLogo size={50} />
+            </div>
+            <span className="text-primary text-base">Chemistry<span className="text-muted">@</span>OCTET</span>
+          </Link>
+          <Link href="/" className="inline-flex items-center gap-2 text-muted text-base hover:text-primary transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M 13,8 L 3,8 M 7,4 L 3,8 L 7,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back to Home
+          </Link>
         </div>
-        <div className="absolute bottom-8 right-8 opacity-15">
-          <AtomSVG width={180} height={180} color="#5e4075" />
+
+        <div className="absolute top-20 left-6 opacity-15">
+          <CompoundSVG width={170} height={120} color="#5e4075" />
+        </div>
+        <div className="absolute bottom-4 right-4 opacity-15">
+          <AtomSVG width={140} height={140} color="#5e4075" />
         </div>
 
         <div className="relative z-10 max-w-md text-center">
@@ -72,8 +88,8 @@ export default function RegisterPage() {
 
       {/* Right panel — register form */}
       <div className="w-full lg:w-1/2 flex flex-col h-full">
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-8 py-3.5 border-b border-accent1 shrink-0">
+        {/* Top bar — mobile only (branding moves into the left panel on desktop) */}
+        <div className="lg:hidden flex items-center justify-between px-8 py-3.5 border-b border-accent1 shrink-0">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-11 h-11 shrink-0">
               <ChemistryOctetLogo size={44} />
@@ -96,25 +112,25 @@ export default function RegisterPage() {
             transition={{ duration: 0.5 }}
             className="w-full max-w-md"
           >
-            <div className="bg-white rounded-2xl border border-accent3/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-7">
+            <div className="bg-transparent">
               <h1 className="text-xl text-primary mb-1">Create your account</h1>
-              <p className="text-muted text-[15px] mb-4">Start your chemistry journey today</p>
+              <p className="text-muted text-[16px] mb-3">Start your chemistry journey today</p>
 
-              <form onSubmit={handleRegister} className="space-y-3">
+              <form onSubmit={handleRegister} className="space-y-2">
                 <div>
-                  <label className="block text-primary text-[15px] mb-1">Full Name</label>
+                  <label className="block text-primary text-md mb-1">Full Name</label>
                   <input name="name" type="text" value={form.name} onChange={handleChange} placeholder="Arjun Sharma" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-primary text-[15px] mb-1">Email Address</label>
+                  <label className="block text-primary text-md mb-1">Email Address</label>
                   <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="you@email.com" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-primary text-[15px] mb-1">Mobile Number</label>
+                  <label className="block text-primary text-md mb-1">Mobile Number</label>
                   <input name="mobile" type="tel" value={form.mobile} onChange={handleChange} placeholder="+91 98765 43210" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-primary text-[15px] mb-1">Grade</label>
+                  <label className="block text-primary text-md mb-1">Grade</label>
                   <select name="grade" value={form.grade} onChange={handleChange} className={inputClass + ' appearance-none'}>
                     <option value="" disabled>Select your grade</option>
                     <option value="11">11th Grade</option>
@@ -123,11 +139,11 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-primary text-[15px] mb-1">Password</label>
+                    <label className="block text-primary text-md mb-1">Password</label>
                     <input name="password" type="password" value={form.password} onChange={handleChange} placeholder="••••••••" className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-primary text-[15px] mb-1">Confirm</label>
+                    <label className="block text-primary text-md mb-1">Confirm Password</label>
                     <input name="confirmPassword" type="password" value={form.confirmPassword} onChange={handleChange} placeholder="••••••••" className={inputClass} />
                   </div>
                 </div>
@@ -136,7 +152,7 @@ export default function RegisterPage() {
                   type="submit"
                   disabled={loading}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 bg-primary text-white text-base rounded-xl hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-1"
+                  className="w-full py-2.5 bg-primary text-white text-base rounded-md hover:bg-[#3d2652] transition-all duration-200 shadow-[0_4px_16px_rgba(94,64,117,0.3)] disabled:opacity-70 flex items-center justify-center gap-2 mt-4"
                 >
                   {loading ? (
                     <>
@@ -147,7 +163,7 @@ export default function RegisterPage() {
                 </motion.button>
               </form>
 
-              <p className="text-muted text-[15px] text-center mt-4">
+              <p className="text-muted text-[15px] text-center mt-3">
                 Already have an account?{' '}
                 <Link href="/login" className="text-primary hover:underline">Sign in</Link>
               </p>

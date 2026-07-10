@@ -685,7 +685,7 @@ function EnrollCTA() {
                 Enroll Now
               </Link>
               <Link
-                href="/#courses"
+                href="/courses"
                 className="px-8 py-3 border border-primary/30 text-primary text-base rounded-xl hover:bg-accent1/40 transition-all duration-200"
               >
                 Explore Courses

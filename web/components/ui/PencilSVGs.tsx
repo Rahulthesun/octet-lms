@@ -6,6 +6,7 @@ interface SVGProps {
   width?: number
   height?: number
   color?: string
+  strokeWidth?: number
   className?: string
 }
 
@@ -37,12 +38,12 @@ function CalFilter({ id, color }: { id: string; color: string }) {
   )
 }
 
-export function AtomSVG({ width = 120, height = 120, color = '#5e4075', className = '' }: SVGProps) {
+export function AtomSVG({ width = 120, height = 120, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-atom-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 120 120" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none">
         <ellipse cx="60" cy="60" rx="48" ry="18" />
         <ellipse cx="60" cy="60" rx="48" ry="18" transform="rotate(60 60 60)" />
         <ellipse cx="60" cy="60" rx="48" ry="18" transform="rotate(120 60 60)" />
@@ -55,12 +56,12 @@ export function AtomSVG({ width = 120, height = 120, color = '#5e4075', classNam
   )
 }
 
-export function FlaskSVG({ width = 110, height = 130, color = '#5e4075', className = '' }: SVGProps) {
+export function FlaskSVG({ width = 110, height = 130, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-flask-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 110 130" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none">
         <path d="M 42,8 L 42,52 L 12,105 Q 8,118 20,122 L 90,122 Q 102,118 98,105 L 68,52 L 68,8 Z" />
         <line x1="36" y1="8" x2="74" y2="8" />
         <path d="M 15,95 Q 25,88 40,92 Q 55,96 70,90 Q 85,84 95,90" />
@@ -73,12 +74,12 @@ export function FlaskSVG({ width = 110, height = 130, color = '#5e4075', classNa
   )
 }
 
-export function TestTubeSVG({ width = 70, height = 130, color = '#5e4075', className = '' }: SVGProps) {
+export function TestTubeSVG({ width = 70, height = 130, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-tube-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 70 130" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none">
         <path d="M 22,5 L 22,90 Q 22,118 35,118 Q 48,118 48,90 L 48,5" />
         <line x1="16" y1="5" x2="54" y2="5" />
         <path d="M 22,80 Q 28,75 35,78 Q 42,81 48,76" />
@@ -90,12 +91,12 @@ export function TestTubeSVG({ width = 70, height = 130, color = '#5e4075', class
   )
 }
 
-export function MicroscopeSVG({ width = 120, height = 130, color = '#5e4075', className = '' }: SVGProps) {
+export function MicroscopeSVG({ width = 120, height = 130, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-micro-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 120 130" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none">
         <rect x="50" y="8" width="22" height="10" rx="2.5" />
         <line x1="61" y1="18" x2="61" y2="32" />
         <rect x="46" y="32" width="30" height="14" rx="2.5" />
@@ -110,12 +111,12 @@ export function MicroscopeSVG({ width = 120, height = 130, color = '#5e4075', cl
   )
 }
 
-export function CompoundSVG({ width = 130, height = 100, color = '#5e4075', className = '' }: SVGProps) {
+export function CompoundSVG({ width = 130, height = 100, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-compound-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 130 100" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none">
         <circle cx="65" cy="50" r="11" />
         <circle cx="25" cy="30" r="10" />
         <circle cx="105" cy="30" r="10" />
@@ -136,12 +137,12 @@ export function CompoundSVG({ width = 130, height = 100, color = '#5e4075', clas
   )
 }
 
-export function BeakerSVG({ width = 100, height = 120, color = '#5e4075', className = '' }: SVGProps) {
+export function BeakerSVG({ width = 100, height = 120, color = '#5e4075', strokeWidth = 1.9, className = '' }: SVGProps) {
   const fid = `cal-beaker-${color.replace('#', '')}`
   return (
     <svg width={width} height={height} viewBox="0 0 100 120" fill="none" className={className}>
       <defs><CalFilter id={fid} color={color} /></defs>
-      <g filter={`url(#${fid})`} stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g filter={`url(#${fid})`} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none">
         <path d="M 20,10 L 20,105 Q 20,115 50,115 Q 80,115 80,105 L 80,10 Z" />
         <line x1="14" y1="10" x2="86" y2="10" />
         <path d="M 20,80 Q 35,73 50,78 Q 65,83 80,76" />

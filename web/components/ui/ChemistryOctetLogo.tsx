@@ -7,6 +7,13 @@ interface ChemistryOctetLogoProps {
   size?: number;
   /** Background color behind the inner circle. Default: '#f0ede3' */
   background?: string;
+  /**
+   * Thickness of the coloured outer ring/band, 1 = default.
+   * Values < 1 give a thinner ring (and proportionally smaller band text) —
+   * the outer diameter and the atom inside stay unchanged. Used by the footer
+   * watermark; leave at 1 everywhere else.
+   */
+  bandScale?: number;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -14,6 +21,7 @@ interface ChemistryOctetLogoProps {
 export default function ChemistryOctetLogo({
   size = 400,
   background = "#f0ede3",
+  bandScale = 1,
   className,
   style,
 }: ChemistryOctetLogoProps) {
@@ -32,14 +40,18 @@ export default function ChemistryOctetLogo({
     const cx = 220,
       cy = 220;
 
-    const rOut = 208;
-    const rIn = 150;
+    // Atom geometry is fixed; only the coloured band's thickness responds to
+    // `bandScale`. The band is thinned from its INNER edge, so the outer
+    // diameter (rOut) and the atom inside (rAtom) never move.
+    const rAtom = 150;                    // inner disc: clip + electron orbits
+    const rOut = 208;                     // outer edge of the band (fixed)
+    const rIn = rOut - 58 * bandScale;    // inner edge of the band (default 150)
     const rBand = (rIn + rOut) / 2;
 
     const RINGS = [
-      { rx: rIn - 10, ry: 56, tilt: 0 },
-      { rx: rIn - 10, ry: 56, tilt: Math.PI / 3 },
-      { rx: rIn - 10, ry: 56, tilt: -Math.PI / 3 },
+      { rx: rAtom - 10, ry: 56, tilt: 0 },
+      { rx: rAtom - 10, ry: 56, tilt: Math.PI / 3 },
+      { rx: rAtom - 10, ry: 56, tilt: -Math.PI / 3 },
     ];
     const RING_SPEEDS = [
       (2 * Math.PI) / 4,
@@ -208,12 +220,12 @@ export default function ChemistryOctetLogo({
 
       // Band border circles
       fCtx.strokeStyle = "#7a6898";
-      fCtx.lineWidth = 3;
+      fCtx.lineWidth = 3 * bandScale;
       fCtx.globalAlpha = 0.6;
       fCtx.beginPath();
       fCtx.arc(cx, cy, rOut, 0, Math.PI * 2);
       fCtx.stroke();
-      fCtx.lineWidth = 2.0;
+      fCtx.lineWidth = 2.0 * bandScale;
       fCtx.beginPath();
       fCtx.arc(cx, cy, rIn, 0, Math.PI * 2);
       fCtx.stroke();
@@ -226,7 +238,7 @@ export default function ChemistryOctetLogo({
 
       // "@" at 12 o'clock
       fCtx.fillStyle = "#ffffff";
-      fCtx.font = '700 40px "DM Sans", sans-serif';
+      fCtx.font = `700 ${40 * bandScale}px "DM Sans", sans-serif`;
       fCtx.textAlign = "center";
       fCtx.textBaseline = "middle";
       {
@@ -242,17 +254,10 @@ export default function ChemistryOctetLogo({
       // LEFT: "Chemistry"
       {
         const text = "Chemistry";
-        const styles = [
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-          { wt: "700", sz: 37 },
-        ];
+        const styles = Array.from({ length: text.length }, () => ({
+          wt: "700",
+          sz: 37 * bandScale,
+        }));
         const span = halfSpan - GAP;
         const step = span / text.length;
         fCtx.textAlign = "center";
@@ -280,7 +285,7 @@ export default function ChemistryOctetLogo({
         fCtx.textBaseline = "middle";
         fCtx.fillStyle = "#ffffff";
         for (let i = 0; i < text.length; i++) {
-          fCtx.font = '700 37px "DM Sans", sans-serif';
+          fCtx.font = `700 ${37 * bandScale}px "DM Sans", sans-serif`;
           const ang = TOP_CX + GAP + (i + 0.5) * step;
           const tx = cx + rBand * Math.cos(ang);
           const ty = cy + rBand * Math.sin(ang);
@@ -296,11 +301,11 @@ export default function ChemistryOctetLogo({
       fCtx.fillStyle = "#ffffff";
       arcTextBottom(fCtx, "SPREAD TRUE SCIENCE", rBand, Math.PI / 2, Math.PI - 2 * PAD, {
         wt: "700",
-        sz: 40.0,
+        sz: 40.0 * bandScale,
       });
 
       // Stars at 3 o'clock and 9 o'clock
-      fCtx.font = '900 30px "DM Sans", sans-serif';
+      fCtx.font = `900 ${30 * bandScale}px "DM Sans", sans-serif`;
       fCtx.fillStyle = "#ffffff";
       fCtx.textAlign = "center";
       fCtx.textBaseline = "middle";
@@ -325,7 +330,7 @@ export default function ChemistryOctetLogo({
       // Clip to inner circle
       ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, rIn, 0, Math.PI * 2);
+      ctx.arc(cx, cy, rAtom, 0, Math.PI * 2);
       ctx.clip();
 
       // Background fill
@@ -374,7 +379,7 @@ export default function ChemistryOctetLogo({
     return () => {
       cancelAnimationFrame(rafId);
     };
-  }, [background]);
+  }, [background, bandScale]);
 
   return (
     <canvas

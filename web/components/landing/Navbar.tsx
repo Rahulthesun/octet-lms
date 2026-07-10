@@ -12,8 +12,8 @@ const navLinks = [
     sub: [
       { label: '11th Grade Chemistry', href: '/courses#grade-11' },
       { label: '12th Grade Chemistry', href: '/courses#grade-12' },
-      { label: 'JEE Chemistry',        href: '/courses#jee'      },
-      { label: 'NEET Chemistry',       href: '/courses#neet'     },
+      { label: 'Board Excellence',     href: '/courses#board'    },
+      { label: 'NEET Chemistry (Soon)', href: '/courses#neet'    },
     ],
   },
   {
@@ -92,6 +92,12 @@ export default function Navbar() {
 
         {/* Desktop Nav Links */}
         <div className="hidden lg:flex items-center gap-1">
+          <a
+            href="/"
+            className="px-4 py-3 text-base text-primary hover:text-[#3d2652] transition-colors duration-200"
+          >
+            Home
+          </a>
           {navLinks.map((link) => (
             <div
               key={link.label}
@@ -107,7 +113,7 @@ export default function Navbar() {
               >
                 {link.label}
                 <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${activeLink === link.label ? 'rotate-180' : ''}`}
+                  className={`w-2.5 h-2.5 transition-transform duration-200 ${activeLink === link.label ? 'rotate-180' : ''}`}
                   viewBox="0 0 12 12"
                   fill="none"
                 >
@@ -181,6 +187,13 @@ export default function Navbar() {
             className="lg:hidden bg-bg/98 backdrop-blur-md border-t border-accent1 overflow-hidden"
           >
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
+              <a
+                href="/"
+                className="block py-3.5 text-base text-primary border-b border-accent1/50"
+                onClick={() => setMobileOpen(false)}
+              >
+                Home
+              </a>
               {navLinks.map((link) => (
                 <a
                   key={link.label}

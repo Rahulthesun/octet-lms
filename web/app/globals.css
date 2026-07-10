@@ -116,3 +116,35 @@ html.lenis body {
 .font-data {
   font-family: 'Space Grotesk', var(--font-data), system-ui, sans-serif;
 }
+
+/* ── Landing page decorative textures & section backgrounds ───────────────── */
+
+/* Faint plum dot-grid (over light sections) */
+.tx-dots {
+  background-image: radial-gradient(rgba(94, 64, 117, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Hero — solid cream with just a faint corner tint (~15-20% hint, not a full wash).
+   Only the hero uses this; every other landing section is a flat solid colour. */
+.bg-hero-mesh {
+  background-color: #f8f9ed;
+  background-image:
+    radial-gradient(48% 44% at 8% 10%, rgba(212, 197, 226, 0.28), transparent 72%),
+    radial-gradient(50% 45% at 90% 8%, rgba(212, 197, 226, 0.20), transparent 72%),
+    radial-gradient(46% 46% at 6% 94%, rgba(200, 224, 218, 0.16), transparent 72%);
+}
+
+/* Every landing section keeps its own solid `background-color` (set inline) and
+   layers on the SAME faint gradient shade as the hero (`bg-hero-mesh`) plus a
+   small plum dot-grid. Solid colour shows through the transparent parts. */
+.section-fx {
+  background-image:
+    radial-gradient(48% 44% at 8% 10%, rgba(212, 197, 226, 0.28), transparent 72%),
+    radial-gradient(50% 45% at 90% 8%, rgba(212, 197, 226, 0.20), transparent 72%),
+    radial-gradient(46% 46% at 6% 94%, rgba(200, 224, 218, 0.16), transparent 72%),
+    radial-gradient(rgba(94, 64, 117, 0.06) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 22px 22px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}

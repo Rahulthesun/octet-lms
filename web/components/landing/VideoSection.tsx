@@ -2,13 +2,46 @@
 
 import { motion } from 'framer-motion'
 import { useState } from 'react'
+import SectionDecor from '@/components/landing/SectionDecor'
+
+const features = [
+  {
+    label: 'XI–XII CBSE Chemistry',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+        <path d="M 3,6 L 10,3 L 17,6 L 10,9 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M 6,7.5 L 6,12 Q 10,14 14,12 L 14,7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: 'English Medium',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+        <path d="M 4,15 L 8,5 L 12,15 M 5.5,11.5 L 10.5,11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 13,15 Q 13,8 16,8 Q 17.5,8 17.5,10 Q 17.5,12 13,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      </svg>
+    ),
+  },
+  {
+    label: '24/7 Doubt Support',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+        <path d="M 3,14 L 3,7 Q 3,4 10,4 Q 17,4 17,7 L 17,11 Q 17,14 10,14 L 7,14 L 4,16.5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M 8,8.5 Q 8,7 10,7 Q 12,7 12,8.7 Q 12,10 10,10.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        <circle cx="10" cy="12" r="0.7" fill="currentColor" />
+      </svg>
+    ),
+  },
+]
 
 export default function VideoSection() {
   const [playing, setPlaying] = useState(false)
 
   return (
-    <section id="video" className="py-24 px-6 bg-bg">
-      <div className="max-w-5xl mx-auto">
+    <section id="video" className="relative py-18 px-6 overflow-hidden section-fx" style={{ backgroundColor: '#f8f9ed' }}>
+      <SectionDecor variant={3} />
+      <div className="relative z-10 max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -23,7 +56,7 @@ export default function VideoSection() {
             <span className="text-muted">Differently</span>
           </h2>
           <p className="text-muted text-base max-w-md mx-auto">
-            A 3-minute demo of a live lecture. No memorisation, pure understanding.
+            A demo of a live lecture. No memorisation, pure understanding.
           </p>
         </motion.div>
 
@@ -36,10 +69,10 @@ export default function VideoSection() {
         >
           {/* Decorative corners */}
           <svg className="absolute -top-4 -left-4 w-16 h-16 opacity-70" viewBox="0 0 64 64" fill="none">
-            <path d="M 8,56 L 8,8 L 56,8" stroke="#e9deb5" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 8,56 L 8,8 L 56,8" stroke="#bab291" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
           <svg className="absolute -bottom-4 -right-4 w-16 h-16 opacity-70" viewBox="0 0 64 64" fill="none">
-            <path d="M 56,8 L 56,56 L 8,56" stroke="#daeae4" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 56,8 L 56,56 L 8,56" stroke="#aebbb6" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
 
           <div className="relative rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(94,64,117,0.18)] border border-accent3/50">
@@ -70,7 +103,7 @@ export default function VideoSection() {
                       <path d="M 10,7 L 26,16 L 10,25 Z" fill="#5e4075" />
                     </svg>
                   </div>
-                  <span className="text-white/80 text-base tracking-wide">Watch 3-min Demo</span>
+                  <span className="text-white/80 text-base tracking-wide">Watch Demo Video</span>
                 </motion.div>
                 <div className="absolute bottom-5 left-6 right-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -94,21 +127,21 @@ export default function VideoSection() {
           </div>
         </motion.div>
 
+        {/* Feature row — qualitative, no fabricated numbers */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="grid grid-cols-3 gap-6 mt-12"
+          className="flex flex-wrap items-center justify-center gap-3 md:gap-4 mt-12"
         >
-          {[
-            { num: '500+', label: 'Video Lectures' },
-            { num: '2000+', label: 'Students Taught' },
-            { num: '92%', label: 'Score 85+ in Boards' },
-          ].map(({ num, label }) => (
-            <div key={label} className="text-center">
-              <p className="text-3xl md:text-4xl text-primary font-mono">{num}</p>
-              <p className="text-muted text-base mt-1">{label}</p>
+          {features.map((f) => (
+            <div
+              key={f.label}
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white border border-accent3/50 text-primary shadow-[0_2px_10px_rgba(94,64,117,0.06)]"
+            >
+              <span className="text-muted shrink-0">{f.icon}</span>
+              <span className="text-[15px]">{f.label}</span>
             </div>
           ))}
         </motion.div>

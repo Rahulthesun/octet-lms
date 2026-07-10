@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Navbar from '@/components/landing/Navbar'
 import Footer from '@/components/landing/Footer'
-import { IconCheck, IconStar, IconGlobe } from '@/components/ui/SvgIcons'
+import { IconCheck, IconStar, IconGlobe, IconBook } from '@/components/ui/SvgIcons'
 import {
   AtomSVG,
   FlaskSVG,
@@ -14,22 +14,191 @@ import {
   CompoundSVG,
 } from '@/components/ui/PencilSVGs'
 
+// ─── Local line-art icons (match the PencilSVGs / SvgIcons stroke style) ───────
+
+type LineIconProps = { className?: string }
+const I = (className = 'w-5 h-5') => ({
+  className,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+})
+
+function IconSeedling({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M12 21 L12 10" />
+      <path d="M12 13 C 8 13, 5 10, 5 6 C 9 6, 12 9, 12 13 Z" />
+      <path d="M12 11 C 16 11, 19 8, 19 5 C 15 5, 12 8, 12 11 Z" />
+      <path d="M7 21 L17 21" />
+    </svg>
+  )
+}
+
+function IconSugarcane({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M9 21 L9 5" />
+      <path d="M9 9 l-2.4 0 M9 13 l-2.4 0 M9 17 l-2.4 0" />
+      <path d="M14.5 21 L14.5 7" />
+      <path d="M14.5 11 l2.4 0 M14.5 15 l2.4 0 M14.5 19 l2.4 0" />
+      <path d="M9 5 C 11 3, 13.5 3, 15 4.5" />
+    </svg>
+  )
+}
+
+function IconCoconut({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M11.5 21 C 11.5 15, 12 11, 13 8.5" />
+      <path d="M13 8 C 9 6, 6 6.5, 4 8.5" />
+      <path d="M13 8 C 11 4.5, 9 3.5, 6 3.5" />
+      <path d="M13 8 C 16.5 5.5, 19.5 5.5, 21 7.5" />
+      <path d="M13 8 C 14.5 4.5, 16.5 3.5, 19.5 4.5" />
+      <circle cx="11.6" cy="9.6" r="1" />
+      <circle cx="14.2" cy="9.6" r="1" />
+      <path d="M8 21 L16 21" />
+    </svg>
+  )
+}
+
+function IconTeak({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M12 21 L12 13" />
+      <path d="M12 13 C 7 13, 5 10, 6 7 C 7 4.5, 10 3, 12 4 C 14 3, 17 4.5, 18 7 C 19 10, 17 13, 12 13 Z" />
+      <path d="M9 21 L15 21" />
+    </svg>
+  )
+}
+
+function IconShield({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M12 3 L19 6 L19 11 C 19 16, 15 19, 12 21 C 9 19, 5 16, 5 11 L5 6 Z" />
+      <path d="M9 11.5 l2 2 l4 -4.5" />
+    </svg>
+  )
+}
+
+function IconGradCap({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M2 9 L12 5 L22 9 L12 13 Z" />
+      <path d="M6 10.8 L6 16 C 6 17.2, 18 17.2, 18 16 L18 10.8" />
+      <path d="M22 9 L22 14" />
+      <circle cx="22" cy="15" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function IconTemple({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M3 21 L21 21" />
+      <path d="M12 3 L20 9 L4 9 Z" />
+      <path d="M6 9 L6 20 M10 9 L10 20 M14 9 L14 20 M18 9 L18 20" />
+      <path d="M4 20 L20 20" />
+    </svg>
+  )
+}
+
+function IconVase({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M9 4 L15 4" />
+      <path d="M9.5 4 C 7 8, 6 11, 8 14 C 9.5 16, 9.5 18, 8.5 20 L15.5 20 C 14.5 18, 14.5 16, 16 14 C 18 11, 17 8, 14.5 4" />
+      <path d="M8.5 11 C 11 12.5, 13 12.5, 15.5 11" />
+    </svg>
+  )
+}
+
+function IconFlame({ className }: LineIconProps) {
+  return (
+    <svg {...I(className)}>
+      <path d="M13 2.5 C 13.5 6.5, 17.5 8.5, 16.5 13.5 C 16 18, 13.5 20.5, 12 20.5 C 10.5 20.5, 7.5 18, 7.5 13.5 C 7.5 10.5, 9.5 9, 10.5 7 C 11.5 9.5, 13 8.5, 13 2.5 Z" />
+      <path d="M12 13 C 13 14.5, 13 16.5, 12 17.5 C 11 16.5, 11 14.5, 12 13 Z" />
+    </svg>
+  )
+}
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const milestones = [
-  { year: '2010', text: 'Founded with a single batch of 12 students in Tamil Nadu' },
-  { year: '2014', text: 'Expanded to a full-time 11th & 12th grade programme' },
-  { year: '2018', text: 'Launched online classes, reaching students across the state' },
-  { year: '2024', text: '500+ students enrolled, 92% average score improvement recorded' },
+  { year: 'Loyola', text: 'B.Sc & M.Sc in Chemistry at Loyola College, Chennai; degree in Education (B.Ed) from MKU, Madurai.' },
+  { year: 'Sherwood', text: 'PG Teacher of Chemistry at Sherwood Hall Senior Secondary School, Chetpet, Chennai for over a decade.' },
+  { year: 'Balavidya', text: 'A year as PG Teacher in Chemistry at Balavidya Mandir Senior Secondary School, Adyar, Chennai.' },
+  { year: 'TN Govt', text: 'Two decades of Tamil Nadu Government service as a PG Teacher — over three decades of teaching in all.' },
+  { year: 'OCTET', text: 'Founded Chemistry@OCTET to spread true science with comfortable, fear-free, error-free learning.' },
 ]
 
-const credentials = ['M.Sc. Chemistry', '15+ Years Teaching', 'JEE / NEET Specialist']
+const credentials = ['M.Sc. Chemistry — Loyola', '30+ Years Teaching', 'Best Teacher Award']
 
 const values = [
-  'Conceptual First',
-  'Student-Centred',
-  'Continuous Improvement',
-  'Accessibility',
+  'Error-Free',
+  'Fear-Free',
+  'Conceptual',
+  'Accessible',
+]
+
+// "To Parents" — the investment ladder
+const investmentLadder: {
+  span: string
+  asset: string
+  Icon: (p: LineIconProps) => React.ReactElement
+  accent: string
+  highlight?: boolean
+}[] = [
+  { span: '6 Months',    asset: 'Paddy',          Icon: IconSeedling,  accent: '#e9deb5' },
+  { span: '1 Year',      asset: 'Sugarcane',      Icon: IconSugarcane, accent: '#daeae4' },
+  { span: 'A Decade',    asset: 'Coconut',        Icon: IconCoconut,   accent: '#d4c5e2' },
+  { span: '25 Years',    asset: 'Teak',           Icon: IconTeak,      accent: '#c8e0da' },
+  { span: 'A Lifetime',  asset: 'Insurance',      Icon: IconShield,    accent: '#f0e8f8' },
+  { span: 'Generations', asset: 'TRUE EDUCATION', Icon: IconGradCap,   accent: '#5e4075', highlight: true },
+]
+
+// "To Students"
+const studentNotes: {
+  Icon: (p: LineIconProps) => React.ReactElement
+  title: string
+  text: string
+  accent: string
+  wide?: boolean
+}[] = [
+  {
+    Icon: IconTemple,
+    title: 'An Adorable Place',
+    text: 'OCTET Institute is an adorable place — give it the respect you would a temple, a church, or a mosque.',
+    accent: '#e9deb5',
+  },
+  {
+    Icon: IconVase,
+    title: 'Respect Your Teacher',
+    text: 'Your teacher is the sculptor carving you to fit society — the potter who moulds your life.',
+    accent: '#d4c5e2',
+  },
+  {
+    Icon: IconBook,
+    title: 'Respect the Book',
+    text: 'The book in your hand is the hard work of scientists across the world. Add your contribution if you can, and carefully hand it to future generations.',
+    accent: '#daeae4',
+  },
+  {
+    Icon: IconFlame,
+    title: 'Education Is Fire',
+    text: 'Playing with education is like playing with FIRE.',
+    accent: '#c8e0da',
+  },
+  {
+    Icon: IconGlobe,
+    title: 'An Unseen Responsibility',
+    text: "There is an unseen burden on your shoulders today, because your future generations' lives depend on your present education. Those who have ears, hear.",
+    accent: '#f0e8f8',
+    wide: true,
+  },
 ]
 
 const galleryCards = [
@@ -70,7 +239,7 @@ const galleryCards = [
   },
   {
     label: 'Student Achievement',
-    sub: 'JEE, NEET & Board toppers',
+    sub: 'Our CBSE chemistry board toppers',
     accent: '#e9deb5',
     Svg: null,
     Icon: IconStar,
@@ -140,8 +309,8 @@ function AboutHero() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="text-base text-muted max-w-2xl mx-auto mb-12 leading-relaxed"
         >
-          Chemistry@OCTET was founded with a single belief — that every student deserves to
-          understand chemistry, not just memorise it.
+          Chemistry@OCTET takes its name from the octet rule — the stability an atom gains by
+          completing its outer shell. We exist to give students that same completeness in chemistry.
         </motion.p>
 
         {/* Stat badges */}
@@ -152,9 +321,9 @@ function AboutHero() {
           className="flex items-center justify-center gap-3 flex-wrap"
         >
           {[
-            { value: '15+',  label: 'Years of Teaching' },
-            { value: '500+', label: 'Students Enrolled'  },
-            { value: '2010', label: 'Year Founded'        },
+            { value: '30+',     label: 'Years of Teaching' },
+            { value: 'XI & XII', label: 'CBSE Chemistry'    },
+            { value: '100%',    label: 'English Medium'      },
           ].map((s) => (
             <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-accent3/60 flex items-center gap-2.5">
               <span className="text-xl font-mono text-primary">{s.value}</span>
@@ -182,7 +351,7 @@ function OurStory() {
               transition={{ duration: 0.5 }}
               className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
             >
-              How It Began
+              About OCTET
             </motion.p>
             <motion.h2
               initial={{ opacity: 0, y: 24 }}
@@ -191,13 +360,13 @@ function OurStory() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-3xl md:text-4xl text-primary leading-tight mb-8"
             >
-              A Classroom That Changed Everything
+              Stability, Completeness, Satisfaction
             </motion.h2>
 
             {[
-              `Mr. A. Raju started Chemistry@OCTET in 2010 from a single classroom in Tamil Nadu. Frustrated by how textbooks reduced chemistry to formulas to memorise, he set out to teach it differently — through logic, structure, and genuine curiosity.`,
-              `What began as a weekend coaching batch of 12 students grew into one of the most sought-after chemistry institutes in the region. Students who once dreaded the periodic table began to see beauty in molecular structure and elegance in chemical reactions.`,
-              `The name "OCTET" is deliberate — chemistry's octet rule describes how atoms achieve stability by completing their outer shell. Chemistry@OCTET exists to help every student reach that same completeness in understanding.`,
+              `The name OCTET comes from the octet rule in chemistry — atoms combine to attain an octet of electrons in their valence shell, and once they do, they reach stability. OCTET stands for that same stability, completeness, fulfilment, and satisfaction.`,
+              `OCTET Institute is a comfortable, interest-driven, fear-free and error-free zone to learn chemistry. Our tagline is "Spread True Science" — so every teaching-learning material is screened, verified, authenticated, and proof-read before it is uploaded. Students may ask doubts during class and after class hours, round the clock; clearing small doubts then and there, throughout the day, is how you truly get into the subject.`,
+              `OCTET Institute is designed for CBSE 11th and 12th grade students all over the world — comfortable, enjoyable chemistry learning and board-exam training. We teach only in English medium with English-medium materials, focus only on chemistry, and will extend to NEET chemistry coaching within a year.`,
             ].map((para, i) => (
               <motion.p
                 key={i}
@@ -221,7 +390,7 @@ function OurStory() {
               transition={{ duration: 0.5 }}
               className="text-[14px] tracking-[0.25em] text-muted uppercase mb-8"
             >
-              Our Milestones
+              Three Decades of Teaching
             </motion.p>
 
             <div className="relative">
@@ -275,7 +444,7 @@ function Founder() {
               transition={{ duration: 0.5 }}
               className="text-[14px] tracking-[0.25em] text-muted uppercase mb-10 self-start"
             >
-              The Founder
+              Director cum Instructor
             </motion.p>
 
             {/* Avatar */}
@@ -316,8 +485,8 @@ function Founder() {
               </div>
 
               {/* Name + role */}
-              <h3 className="text-xl text-primary mt-6 mb-1">Mr. A. Raju</h3>
-              <p className="text-[15px] text-muted">Founder &amp; Lead Educator</p>
+              <h3 className="text-xl text-primary mt-6 mb-1">Raju A</h3>
+              <p className="text-[15px] text-muted">Director cum Instructor</p>
 
               {/* Credential badges */}
               <div className="flex flex-wrap justify-center gap-2 mt-5">
@@ -346,9 +515,9 @@ function Founder() {
             </motion.h2>
 
             {[
-              `Mr. A. Raju holds an M.Sc. in Chemistry and spent his early career teaching at prominent coaching institutes across Tamil Nadu. He observed that the students who excelled were almost always the ones who asked "why" — and that the broader education system rarely made space for that curiosity.`,
-              `In 2010, he left institutional teaching to build something from scratch: a place where chemistry was explained, not just delivered. Where a student's confusion was treated as a question worth answering, not a sign of weakness.`,
-              `Today, Mr. Raju leads every batch personally. His teaching style — calm, methodical, and deeply conceptual — has become the defining identity of Chemistry@OCTET, and the reason hundreds of students have walked into their exams with genuine confidence.`,
+              `Raju A is the Director and Teacher of OCTET. He completed his B.Sc and M.Sc in Chemistry at Loyola College, Chennai, and then earned his degree in Education (B.Ed) from MKU, Madurai.`,
+              `Soon after, he joined as a PG Teacher at Sherwood Hall Senior Secondary School, Chetpet, Chennai — under then-principal Mrs. Olga Frolich — for more than a decade. As he puts it, "Loyola College made me a chemist, but Sherwood Hall moulded me into the best chemist." He then taught for a year at Balavidya Mandir Senior Secondary School, Adyar, Chennai.`,
+              `This was followed by two decades of Tamil Nadu Government service as a PG Teacher — over three decades of teaching in all. During his service, he received the Best Teacher award from the Chennai Collector.`,
             ].map((para, i) => (
               <motion.p
                 key={i}
@@ -371,11 +540,11 @@ function Founder() {
               className="border-l-4 border-accent1 pl-6 py-2 mt-10"
             >
               <p className="text-lg text-primary leading-relaxed italic mb-3">
-                &ldquo;Chemistry is not a collection of facts. It is a language — and I want every
-                student to become fluent in it.&rdquo;
+                &ldquo;My aim is simple — to spread true science, and to make chemistry a fear-free,
+                error-free joy for every student.&rdquo;
               </p>
               <cite className="text-[14px] text-muted not-italic">
-                — Mr. A. Raju, Founder
+                — Raju A, Director cum Instructor
               </cite>
             </motion.blockquote>
           </div>
@@ -430,11 +599,11 @@ function VisionMission() {
                 Vision
               </p>
               <h3 className="text-2xl text-white leading-snug mb-5">
-                A Tamil Nadu Where No Student Fears Chemistry.
+                A World Where No Student Fears Chemistry.
               </h3>
               <p className="text-[15px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-                We envision a future where every 11th and 12th grade student walks into their
-                exam hall with confidence — not because they crammed harder, but because they
+                We envision every 11th and 12th grade student, anywhere in the world, walking into
+                their exam hall with confidence — not because they crammed harder, but because they
                 understood deeper.
               </p>
             </div>
@@ -459,9 +628,10 @@ function VisionMission() {
                 Conceptual Chemistry for Every Student.
               </h3>
               <p className="text-[15px] text-muted leading-relaxed">
-                To make chemistry education accessible, engaging, and genuinely effective — for JEE,
-                NEET, CBSE, and TN Board students — through patient teaching, structured resources,
-                and a commitment to understanding over memorisation.
+                To give CBSE 11th and 12th students worldwide a comfortable, fear-free, error-free
+                way to master chemistry — through verified materials, English-medium teaching,
+                round-the-clock doubt support, and a commitment to spreading true science. NEET
+                chemistry coaching is coming soon.
               </p>
             </div>
           </motion.div>
@@ -621,6 +791,229 @@ function AboutCTA() {
   )
 }
 
+function ToParents() {
+  return (
+    <section id="parents" className="relative py-24 px-6 bg-white overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <svg className="absolute -top-10 -left-10" style={{ opacity: 0.05 }} width="240" height="240" viewBox="0 0 240 240" fill="none">
+          <circle cx="120" cy="120" r="110" stroke="#5e4075" strokeWidth="1" strokeDasharray="4 9" />
+          <circle cx="120" cy="120" r="78" stroke="#8b6fa0" strokeWidth="0.8" strokeDasharray="3 10" />
+        </svg>
+        <div className="absolute top-12 right-[5%]" style={{ opacity: 0.07, transform: 'rotate(12deg)' }}>
+          <CompoundSVG width={150} height={120} color="#5e4075" />
+        </div>
+        <div className="absolute bottom-10 left-[6%]" style={{ opacity: 0.06, transform: 'rotate(-10deg)' }}>
+          <AtomSVG width={120} height={120} color="#8b6fa0" />
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto">
+        <div className="text-center mb-10 max-w-3xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.5 }}
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
+          >
+            To Parents
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-3xl md:text-5xl text-primary leading-tight"
+          >
+            Planning Ahead for Your Children
+          </motion.h2>
+        </div>
+
+        <div className="max-w-3xl mx-auto">
+          {[
+            `It is every parent's duty to give a good education. Education is for transformation — physical, mental, and emotional. Not admitting a child to every available course simply because the neighbours are doing so.`,
+            `Children are not mark-scoring machines; they have feelings, likes, and dislikes. Identify their talents and train them according to their own will and interest. Planning ahead for your children is very, very important.`,
+          ].map((para, i) => (
+            <motion.p
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.5, delay: 0.15 + i * 0.12 }}
+              className="text-lg text-muted leading-relaxed mb-5"
+            >
+              {para}
+            </motion.p>
+          ))}
+        </div>
+
+        {/* Investment ladder — icon card grid */}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-40px' }}
+          transition={{ duration: 0.5 }}
+          className="text-center text-[15px] tracking-[0.15em] text-muted uppercase mt-12 mb-7"
+        >
+          The further you plan, the wiser the investment
+        </motion.p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {investmentLadder.map(({ span, asset, Icon, accent, highlight }, i) => (
+            <motion.div
+              key={span}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, delay: i * 0.07 }}
+              className={`rounded-2xl p-7 flex flex-col gap-5 transition-transform duration-200 hover:-translate-y-1 ${
+                highlight
+                  ? 'bg-primary shadow-[0_10px_36px_rgba(94,64,117,0.3)]'
+                  : 'bg-white border border-accent3/50 shadow-[0_2px_16px_rgba(94,64,117,0.05)]'
+              }`}
+            >
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: highlight ? 'rgba(255,255,255,0.14)' : accent }}
+              >
+                <Icon className={`w-9 h-9 ${highlight ? 'text-white' : 'text-primary'}`} />
+              </div>
+              <div>
+                <p
+                  className={`text-[13px] tracking-[0.2em] uppercase font-mono mb-2 ${
+                    highlight ? 'text-accent1' : 'text-muted'
+                  }`}
+                >
+                  If you plan for {span}
+                </p>
+                <p className={`text-2xl leading-tight ${highlight ? 'text-white' : 'text-primary'}`}>
+                  {highlight && <span className="mr-1.5">★</span>}
+                  Invest on {asset}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Closing lines */}
+        <div className="max-w-3xl mx-auto">
+          <motion.blockquote
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="border-l-4 border-accent1 pl-6 py-2 mt-14"
+          >
+            <p className="text-xl md:text-2xl text-primary leading-relaxed italic">
+              &ldquo;Who gives true education is a question. Finding out is the greatest task — it is
+              like searching for truth in a sea of errors, where the truth has sunk.&rdquo;
+            </p>
+          </motion.blockquote>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="text-lg text-muted leading-relaxed mt-8"
+          >
+            Encourage your children when they improve even a little, and give a small gift — it makes
+            them realise that their parents are watching, caring, and looking after them. They learn
+            the meaning of appreciation, of being with family, and of being truthful to their parents.
+          </motion.p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ToStudents() {
+  return (
+    <section id="students" className="relative py-24 px-6 bg-bg overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <svg className="absolute top-10 right-[-4%]" style={{ opacity: 0.05 }} width="220" height="220" viewBox="0 0 220 220" fill="none">
+          <circle cx="110" cy="110" r="100" stroke="#5e4075" strokeWidth="1" strokeDasharray="5 9" />
+        </svg>
+        <div className="absolute bottom-24 left-[4%]" style={{ opacity: 0.06, transform: 'rotate(-8deg)' }}>
+          <BeakerSVG width={120} height={140} color="#5e4075" />
+        </div>
+        <div className="absolute top-20 left-[40%]" style={{ opacity: 0.05, transform: 'rotate(10deg)' }}>
+          <TestTubeSVG width={90} height={150} color="#8b6fa0" />
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto">
+        <div className="text-center mb-12 max-w-3xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.5 }}
+            className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3"
+          >
+            To Students
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-3xl md:text-5xl text-primary leading-tight"
+          >
+            Respect the Place, the Teacher, the Book
+          </motion.h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {studentNotes.map(({ Icon, title, text, accent, wide }, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20, scale: 0.97 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, delay: i * 0.07 }}
+              className={`flex gap-5 items-start bg-white border border-accent3/50 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.05)] transition-transform duration-200 hover:-translate-y-1 ${
+                wide ? 'sm:col-span-2' : ''
+              }`}
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: accent }}
+              >
+                <Icon className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl text-primary mb-2 leading-snug">{title}</h3>
+                <p className="text-base text-muted leading-relaxed">{text}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-40px' }}
+          transition={{ duration: 0.6, delay: 0.25 }}
+          className="relative bg-primary rounded-3xl p-12 mt-6 text-center overflow-hidden"
+        >
+          <div className="absolute top-4 right-4" style={{ opacity: 0.15 }}>
+            <AtomSVG width={130} height={130} color="#ffffff" />
+          </div>
+          <div className="absolute bottom-2 left-4" style={{ opacity: 0.1 }}>
+            <IconGradCap className="w-24 h-24 text-white" />
+          </div>
+          <p className="relative z-10 text-2xl md:text-3xl text-white leading-snug max-w-2xl mx-auto">
+            If you are not studying at OCTET, you are missing something in your life.
+          </p>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AboutPage() {
@@ -630,6 +1023,8 @@ export default function AboutPage() {
       <AboutHero />
       <OurStory />
       <Founder />
+      <ToParents />
+      <ToStudents />
       <VisionMission />
       <Gallery />
       <AboutCTA />

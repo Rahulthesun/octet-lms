@@ -37,7 +37,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       {collapsed && (
         <button
           onClick={() => setCollapsed(false)}
-          className="absolute z-20 w-6 h-6 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center bg-white border border-[#e2e5ec] rounded-md shadow-md text-[#64748b] hover:text-[#7A6B96] hover:border-[#7A6B96] transition-colors"
+          className="absolute z-20 w-6 h-6 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center bg-white rounded-md shadow-md text-[#64748b] hover:text-brand hover:border-brand transition-colors cursor-pointer"
           style={{ left: 64, top: 28 }}
           title="Expand sidebar"
         >

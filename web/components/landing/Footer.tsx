@@ -48,18 +48,18 @@ const socialLinks = [
 export default function Footer() {
   return (
     <footer id="footer" className="relative bg-primary text-bg overflow-hidden">
-      {/* Logo watermark — swap src to actual logo once available */}
+      {/* Real Chemistry@OCTET logo rendered as a faint monochrome watermark.
+          brightness(0) invert(1) flattens the colourful canvas into a white
+          silhouette (rings + band text included); the transparent background
+          keeps the inner disc see-through so the plum shows through. */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-        <svg
-          viewBox="0 0 36 36"
-          fill="none"
-          className="w-[55vw] md:w-[38vw] opacity-[0.05]"
-        >
-          <circle cx="18" cy="18" r="16" stroke="#f8f9ed" strokeWidth="1.2" />
-          <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#f8f9ed" strokeWidth="1" transform="rotate(60 18 18)" />
-          <ellipse cx="18" cy="18" rx="14" ry="6" stroke="#f8f9ed" strokeWidth="1" transform="rotate(-60 18 18)" />
-          <circle cx="18" cy="18" r="3" fill="#f8f9ed" />
-        </svg>
+        {/* Watermark tuning knobs:
+              size      → overall watermark size (px)
+              bandScale → outer-ring thickness (1 = full; lower = thinner ring)
+              opacity-[…] on the wrapper → how faint the watermark is */}
+        <div className="opacity-[0.07]" style={{ filter: 'brightness(0) invert(1)' }}>
+          <ChemistryOctetLogo size={460} bandScale={0.5} background="rgba(0,0,0,0)" />
+        </div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-8 lg:px-12 pt-20 pb-12">
@@ -76,7 +76,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-border text-[15px] leading-relaxed mb-7">
-              Where curiosity meets chemistry. We make 11th and 12th grade chemistry the subject your child masters.
+              A comfortable, fear-free, error-free zone to learn CBSE 11th &amp; 12th chemistry — verified materials, English medium, doubts welcome round the clock.
             </p>
             <p className="text-accent1 text-[14px] tracking-[0.2em] uppercase">✦ Spread True Science ✦</p>
           </div>
@@ -85,9 +85,9 @@ export default function Footer() {
           <div>
             <h4 className="text-bg text-base tracking-wider uppercase mb-7">Courses</h4>
             <ul className="space-y-4">
-              {['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'JEE Preparation', 'NEET Preparation', 'Board Excellence'].map((c) => (
+              {['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Board Excellence', 'Quick Revision & Tests', 'NEET Chemistry (Coming Soon)'].map((c) => (
                 <li key={c}>
-                  <a href="#courses" className="text-border text-[15px] hover:text-bg transition-colors duration-150">
+                  <a href="/courses" className="text-border text-[15px] hover:text-bg transition-colors duration-150">
                     {c}
                   </a>
                 </li>
@@ -153,7 +153,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-5 pt-10">
           <p className="text-muted text-[14px]">
-            © 2024 Chemistry@OCTET. All rights reserved.
+            © 2026 Chemistry@OCTET. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
             {['Privacy Policy', 'Terms of Service', 'Refund Policy'].map((link) => (

@@ -184,33 +184,36 @@ export default function TestsPage() {
     : tests.filter((t) => t.status === filter)
 
   const summary = [
-    { label: 'Total Tests', val: tests.length, color: 'text-slate-700' },
-    { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: 'text-emerald-600' },
-    { label: 'Upcoming', val: tests.filter((t) => t.status === 'upcoming').length, color: 'text-amber-600' },
-    { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: 'text-rose-600' },
+    { label: 'Total Tests', val: tests.length, color: 'text-slate-700', stroke: '#475569' },
+    { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: 'text-emerald-600', stroke: '#059669' },
+    { label: 'Upcoming', val: tests.filter((t) => t.status === 'upcoming').length, color: 'text-amber-600', stroke: '#d97706' },
+    { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: 'text-rose-600', stroke: '#e11d48' },
   ]
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
-        <p className="text-muted text-base">Track your upcoming, completed, and missed tests</p>
-      </motion.div>
+    <div className="p-6 lg:p-6 max-w-7xl mx-auto">
+      {/* Heading + compact stats, side by side */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
+          <p className="text-muted text-base">Track your upcoming, completed, and missed tests</p>
+        </motion.div>
 
-      {/* Summary tiles */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-      >
-        {summary.map(({ label, val, color }) => (
-          <div key={label} className={`${card} p-5`}>
-            <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
-            <p className="text-muted text-sm">{label}</p>
-          </div>
-        ))}
-      </motion.div>
+        {/* Summary tiles — compact, color-stroked, parallel to the heading */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-2 w-full lg:flex-1 lg:max-w-4xl"
+        >
+          {summary.map(({ label, val, color, stroke }) => (
+            <div key={label} className={`${card} border-l-3 pl-5 pr-4 py-3`} style={{ borderLeftColor: stroke }}>
+              <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
+              <p className="text-muted text-sm">{label}</p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Test list */}
