@@ -17,9 +17,9 @@
  *  buffers regardless of video size.
  *
  * SCHEMA NOTE:
- *  The `videos` DB table uses `subtopic_id` (legacy name for chapter).
+ *  The `videos` DB table uses `chapter_id` (legacy name for chapter).
  *  The frontend useContentTree hook expects `chapter_id` in the Video type.
- *  Every response from this service maps subtopic_id → chapter_id so the
+ *  Every response from this service maps chapter_id → chapter_id so the
  *  frontend works without a DB rename. Do not spread raw DB rows to clients.
  * ─────────────────────────────────────────────────────────────
  */
@@ -85,16 +85,16 @@ const uploadTempFileTor2 = async (file, r2Key) => {
 
 /**
  * Normalize a raw DB video row for API responses.
- * - Adds chapter_id alias (maps from subtopic_id)
+ * - Adds chapter_id alias (maps from chapter_id)
  * - Attaches fresh presigned signedUrl and thumbnailUrl
- * - Removes the raw subtopic_id so the client only sees chapter_id
+ * - Removes the raw chapter_id so the client only sees chapter_id
  */
 const formatVideo = async (row, urlTtl = 3600) => {
-  const { subtopic_id, thumbnail_key, r2_key, ...rest } = row;
+  const { chapter_id, thumbnail_key, r2_key, ...rest } = row;
   return {
     ...rest,
     r2_key,           // keep for internal use, frontend ignores it
-    chapter_id: subtopic_id,
+    chapter_id: chapter_id,
     signedUrl: await presign(r2_key, urlTtl),
     thumbnailUrl: thumbnail_key ? await presign(thumbnail_key, urlTtl) : null,
   };
@@ -140,12 +140,12 @@ const createVideo = async ({
   }
 
   // ── 3. Save metadata to Supabase ────────────────────────
-  // DB column is subtopic_id — we receive chapterId from the API.
+  // DB column is chapter_id — we receive chapterId from the API.
   const { data, error } = await supabase
     .from("videos")
     .insert({
       title,
-      subtopic_id: chapterId,
+      chapter_id: chapterId,
       filename: videoFile.originalname,
       r2_key: videoR2Key,
       thumbnail_key: thumbnailKey,
@@ -183,7 +183,7 @@ const getAllVideos = async (filters = {}) => {
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (filters.chapterId) query = query.eq("subtopic_id", filters.chapterId);
+  if (filters.chapterId) query = query.eq("chapter_id", filters.chapterId);
   if (filters.isVisible !== undefined)
     query = query.eq("is_visible", filters.isVisible === "true");
 
@@ -200,7 +200,7 @@ const getVideosByChapterId = async (chapterId) => {
   const { data, error } = await supabase
     .from("videos")
     .select("*")
-    .eq("subtopic_id", chapterId)
+    .eq("chapter_id", chapterId)
     .eq("is_visible", true)
     .order("created_at", { ascending: true });
 
@@ -263,7 +263,7 @@ const updateVideo = async (id, updates) => {
   const allowed = {};
   if (updates.title !== undefined) allowed.title = updates.title;
   if (updates.isVisible !== undefined) allowed.is_visible = updates.isVisible;
-  if (updates.chapterId !== undefined) allowed.subtopic_id = updates.chapterId;
+  if (updates.chapterId !== undefined) allowed.chapter_id = updates.chapterId;
   if (updates.durationSecs !== undefined)
     allowed.duration_secs = updates.durationSecs;
   allowed.updated_at = new Date().toISOString();
