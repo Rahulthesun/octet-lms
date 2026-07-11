@@ -21,7 +21,6 @@ interface Pdf {
   size_bytes: number;
   created_at?: string;
 }
-
 interface Video {
   id: string;
   chapter_id: string;
@@ -29,6 +28,8 @@ interface Video {
   filename: string;
   r2_key: string;
   thumbnail_key?: string;
+  thumbnailUrl?: string;
+  signedUrl?: string;
   mime_type?: string;
   size_bytes: number;
   duration_secs?: number;
@@ -193,9 +194,9 @@ export function useContentTree(autoLoadChapters = true) {
         );
       }
 
-      {/* ------- VIDEO LOAD --------
-        
-        if (videosMap[chapterId] === undefined) {
+      {/* ------- VIDEO LOAD -------- */}
+
+      if (videosMap[chapterId] === undefined) {
         fetches.push(
           fetch(`${BASE}/api/content/video/chapter/${chapterId}`)
             .then(async (r) => ({ ok: r.ok, data: await r.json() }))
@@ -207,7 +208,7 @@ export function useContentTree(autoLoadChapters = true) {
               setVideosMap((prev) => ({ ...prev, [chapterId]: [] })),
             ),
         );
-      } */}
+      }
 
       
 
