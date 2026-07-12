@@ -5,7 +5,7 @@
 // Stack: Supabase (DB + Auth) | Fly.io (API + Firecracker) | Vercel (Frontend) | Sentry (Errors)
 // No emojis. No placeholders. No templates. Everything is live.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo , ReactElement} from 'react';
 import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { supabase } from '../../lib/supabase/client';
 import ChemistryOctetLogo from '../../components/ui/ChemistryOctetLogo';
@@ -163,7 +163,7 @@ const LOG_LEVEL_CONFIG = {
 
 function Icon({ name, className = 'w-4 h-4' }: { name: string; className?: string }) {
   const svgClass = `${className} text-current`;
-  const icons: Record<string, JSX.Element> = {
+  const icons: Record<string, ReactElement> = {
     bug: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={svgClass}>
         <path d="M9 7h6M9 17h6M5 10h2M17 10h2M5 14h2M17 14h2M9 7c0-1.7 1.3-3 3-3s3 1.3 3 3M7 10v7a5 5 0 0010 0v-7a3 3 0 00-3-3h-4a3 3 0 00-3 3z" />
@@ -249,7 +249,12 @@ function Icon({ name, className = 'w-4 h-4' }: { name: string; className?: strin
 }
 
 export default function AnalyticsPage() {
-  const { status, user } = useAnalyticsAccess();
+  const analyticsAccess = useAnalyticsAccess();
+  const { status } = analyticsAccess;
+  const user = analyticsAccess.user as {
+    email?: string;
+    role?: string;
+  } | null;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'bugs' | 'sentry' | 'fly' | 'logs' | 'vercel'>('overview');
 

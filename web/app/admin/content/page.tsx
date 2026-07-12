@@ -18,6 +18,7 @@ import { getSession } from "@/lib/auth";
 interface BackendSubject {
   id: string;
   name: string;
+  unit_prefix : number;
 }
 interface BackendChapter {
   id: string;
