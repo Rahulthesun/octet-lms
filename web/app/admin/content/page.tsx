@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/SvgIcons";
 import { useContentTree } from "../../../hooks/admin/useContentTree";
 import { PdfViewer } from "../../../components/admin/PDFViewer";
+import { getSession } from "@/lib/auth";
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
 
 interface BackendSubject {
   id: string;
   name: string;
+  unit_prefix : number;
 }
 interface BackendChapter {
   id: string;
@@ -168,7 +170,7 @@ function getResponseError(data: any, fallback: string) {
 }
 
 function getContentFileError(file: File | null) {
-  if (!file) return "Please choose a PDF or PPTX file.";
+  if (!file) return "Please choose a PDF file.";
   const extension = file.name.split(".").pop()?.toLowerCase();
   const validByExtension = extension === "pdf"; //|| extension === "pptx";
   const validByMime = !file.type || ALLOWED_CONTENT_MIME_TYPES.has(file.type);
@@ -296,6 +298,7 @@ export default function ContentPage() {
   const [deletingFile, setDeletingFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+
 
 
   // ── Derived: selected path ─────────────────────────────────────────────────
@@ -490,10 +493,49 @@ export default function ContentPage() {
     setUploadError(null);
     setUploaded(false);
 
+    //Added Video Upload Features to handleUpload()
     if (contentType === "video") {
-      setUploadError(
-        "Video uploads are disabled right now. Please upload PDF or PPTX content only.",
-      );
+      const videoExt = uploadFile.name.split(".").pop()?.toLowerCase();
+      const validVideoExts = ["mp4", "webm", "mkv", "mov", "avi"];
+      if (!videoExt || !validVideoExts.includes(videoExt)) {
+        setUploadError("Only MP4, WebM, MKV, MOV, and AVI files are supported.");
+        return;
+      }
+
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("title", uploadTitle.trim());
+      formData.append("chapterId", chapter.id);
+      formData.append("video", uploadFile); // field name must be "video" not "file"
+      if (uploadDesc.trim()) formData.append("description", uploadDesc.trim());
+        const session = await getSession();
+      try {
+        const res = await fetch(`${BASE_URL}/api/content/video/upload`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${session?.access_token}` },
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(getResponseError(err, `Upload failed (${res.status})`));
+        }
+
+        const newVideo = await res.json();
+        updateVideos(chapter.id, (videos: BackendVideo[]) => [...videos, newVideo as BackendVideo]);
+        getStorage();
+        setUploaded(true);
+        setUploadFile(null);
+        setUploadTitle("");
+        setUploadDesc("");
+        setTimeout(() => setUploaded(false), 4000);
+      } catch (err) {
+        setUploadError(
+          err instanceof Error ? err.message : "An unexpected error occurred while uploading.",
+        );
+      } finally {
+        setUploading(false);
+      }
       return;
     }
 
@@ -553,12 +595,36 @@ export default function ContentPage() {
     if (!selectedFile || !selectedPath || !editTitle.trim() || savingEdit)
       return;
     const { chapter, contentType } = selectedPath;
+    const session = await getSession();
 
     setEditError(null);
     setEditSaved(false);
 
     if (contentType === "video") {
-      setEditError("Video management is disabled right now.");
+      setSavingEdit(true);
+      try {
+        const res = await fetch(`${BASE_URL}/api/content/video/${selectedFile.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ title: editTitle.trim() }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(getResponseError(err, `Failed to save changes (${res.status})`));
+        }
+
+        const updated = await res.json();
+        updateVideos(chapter.id, (videos: BackendVideo[]) =>
+          videos.map((v) => (v.id === selectedFile.id ? { ...v, ...updated } : v)),
+        );
+        setEditSaved(true);
+        setTimeout(() => setEditSaved(false), 4000);
+      } catch (err) {
+        setEditError(err instanceof Error ? err.message : "Failed to save changes.");
+      } finally {
+        setSavingEdit(false);
+      }
       return;
     }
 
@@ -753,9 +819,9 @@ export default function ContentPage() {
   };
   // ── Render vars ────────────────────────────────────────────────────────────
   const isVideo = selectedPath?.contentType === "video";
-  const fileAccept = isVideo ? "" : CONTENT_ACCEPT;
+  const fileAccept = isVideo ? ".mp4,.webm,.mkv,.mov,.avi" : CONTENT_ACCEPT;
   const fileHint = isVideo
-    ? "Video uploads are disabled right now"
+    ? "MP4, WebM, MKV, MOV or AVI — max 4 GB"
     : "PDF or PPTX — max 50 MB";
 
   const noMatches =
@@ -781,7 +847,7 @@ export default function ContentPage() {
               Content Manager
             </h1>
             <p className="text-base text-gray-600 mt-1">
-              Select a subject and chapter — then upload PDF or PPTX content.
+              Select a subject and chapter — then upload PDF or Video content.            
             </p>
           </div>
           <div className="lg:w-100 shrink-0">
@@ -938,7 +1004,7 @@ export default function ContentPage() {
                                       }`}
                                     >
                                       <span className="text-sm text-gray-400 shrink-0 w-auto">
-                                        Chap - {idx + 1}
+                                        Unit - {idx + subject.unit_prefix + 1}
                                       </span>
                                       <span className="flex-1 text-md text-gray-700 leading-snug">
                                         {chapter.name}
@@ -986,7 +1052,23 @@ export default function ContentPage() {
                                                       : "border-gray-300 text-gray-500 hover:border-gray-400"
                                                   }`}
                                                 >
-                                                  PDF Files
+                                                  PDF Notes
+                                                </button>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    switchContentType(
+                                                      chapter.id,
+                                                      "video",
+                                                    );
+                                                  }}
+                                                  className={`px-3 py-0.5 text-xs rounded-full border transition-colors cursor-pointer ${
+                                                    contentType === "video"
+                                                      ? "bg-primary text-white border-primary"
+                                                      : "border-gray-300 text-gray-500 hover:border-gray-400"
+                                                  }`}
+                                                >
+                                                  Videos
                                                 </button>
 
                                                 {/* Spacer */}
@@ -1006,6 +1088,20 @@ export default function ContentPage() {
                                                 >
                                                   <PlusIcon className="w-3 h-3" />
                                                   <IconDocument className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openUploadFor(
+                                                      chapter.id,
+                                                      "video",
+                                                    );
+                                                  }}
+                                                  title="Upload Video"
+                                                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors px-1.5 py-1 rounded hover:bg-gray-100 cursor-pointer"
+                                                >
+                                                  <PlusIcon className="w-3 h-3" />
+                                                  <IconPlay className="w-3.5 h-3.5" />
                                                 </button>
 
                                                 {/* Delete chapter button */}
@@ -1609,7 +1705,7 @@ export default function ContentPage() {
                   Select a chapter from the left panel
                 </p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Then upload PDF or PPTX content.
+                  Then upload PDF or Video content.
                 </p>
               </div>
             </div>
@@ -1710,9 +1806,13 @@ export default function ContentPage() {
                         setDragging(false);
                         const f = e.dataTransfer.files[0];
                         if (f) {
-                          const err = getContentFileError(f);
-                          setUploadError(err);
-                          if (!err) setUploadFile(f);
+                          if (isVideo) {
+                            setUploadFile(f);
+                          } else {
+                            const err = getContentFileError(f);
+                            setUploadError(err);
+                            if (!err) setUploadFile(f);
+                          }
                         }
                       }}
                       onClick={() => fileRef.current?.click()}
@@ -1735,9 +1835,13 @@ export default function ContentPage() {
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (f) {
-                            const err = getContentFileError(f);
-                            setUploadError(err);
-                            if (!err) setUploadFile(f);
+                            if (isVideo) {
+                              setUploadFile(f);
+                            } else {
+                              const err = getContentFileError(f);
+                              setUploadError(err);
+                              if (!err) setUploadFile(f);
+                            }
                           }
                           e.target.value = "";
                         }}
@@ -1756,7 +1860,7 @@ export default function ContentPage() {
                   <button
                     onClick={handleUpload}
                     disabled={
-                      !uploadTitle.trim() || !uploadFile || uploading || isVideo
+                      !uploadTitle.trim() || !uploadFile || uploading
                     }
                     className="px-6 py-2.5 bg-primary text-white text-base hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                   >

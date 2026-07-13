@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/auth";
 import { useState, useEffect, useCallback } from "react";
 
 // Add these type definitions at the top of the file
@@ -21,7 +22,6 @@ interface Pdf {
   size_bytes: number;
   created_at?: string;
 }
-
 interface Video {
   id: string;
   chapter_id: string;
@@ -29,6 +29,8 @@ interface Video {
   filename: string;
   r2_key: string;
   thumbnail_key?: string;
+  thumbnailUrl?: string;
+  signedUrl?: string;
   mime_type?: string;
   size_bytes: number;
   duration_secs?: number;
@@ -80,6 +82,14 @@ function toArray<T>(payload: ArrayResponse<T>): T[] {
   return [];
 }
 
+// Define-once auth header helper — only the video routes require this today.
+async function authHeaders(): Promise<Record<string, string>> {
+  const session = await getSession();
+  return session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {};
+}
+
 export function useContentTree(autoLoadChapters = true) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chaptersMap, setChaptersMap] = useState<ChaptersMap>({});
@@ -94,13 +104,13 @@ export function useContentTree(autoLoadChapters = true) {
     totalVideoBytes: 0,
   });
   const [error, setError] = useState<string | null>(null);
-
+  const [session, setSession] = useState<Awaited<ReturnType<typeof getSession>> | null>(null);
   const BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8000";
 
   // Fetch subjects on mount
   useEffect(() => {
     let cancelled = false;
-
+      
     async function fetchSubjects() {
       try {
         const res = await fetch(`${BASE}/api/subjects/`);
@@ -155,6 +165,7 @@ export function useContentTree(autoLoadChapters = true) {
     return () => {
       cancelled = true;
     };
+
   }, [BASE, autoLoadChapters]);
 
   // ... the rest of your hook (loadChapters, loadChapterContent, etc.) remains unchanged
@@ -193,21 +204,21 @@ export function useContentTree(autoLoadChapters = true) {
         );
       }
 
-      {/* ------- VIDEO LOAD --------
-        
-        if (videosMap[chapterId] === undefined) {
+      {/* ------- VIDEO LOAD -------- */}
+
+      if (videosMap[chapterId] === undefined) {
         fetches.push(
-          fetch(`${BASE}/api/content/video/chapter/${chapterId}`)
-            .then(async (r) => ({ ok: r.ok, data: await r.json() }))
-            .then(({ ok, data }) => {
-              const arr = ok ? toArray<Video>(data) : [];
-              setVideosMap((prev) => ({ ...prev, [chapterId]: arr }));
-            })
-            .catch(() =>
-              setVideosMap((prev) => ({ ...prev, [chapterId]: [] })),
-            ),
+          authHeaders().then((headers) =>
+            fetch(`${BASE}/api/content/video/chapter/${chapterId}`, { headers })
+              .then(async (r) => ({ ok: r.ok, data: await r.json() }))
+              .then(({ ok, data }) => {
+                const arr = ok ? toArray<Video>(data) : [];
+                setVideosMap((prev) => ({ ...prev, [chapterId]: arr }));
+              })
+              .catch(() => setVideosMap((prev) => ({ ...prev, [chapterId]: [] }))),
+          ),
         );
-      } */}
+      }
 
       
 

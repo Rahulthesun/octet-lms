@@ -8,6 +8,8 @@ import { MobileBlockedScreen } from "../MobileBlockedScreen";
 import { useWatermarkToken } from "@/hooks/useWatermarkToken";
 import { getSession } from "@/lib/auth";
 
+const pdfjsLib = (await import("pdfjs-dist")) as any;
+
 interface PdfViewerProps {
   url: string | null;
   filename?: string;
@@ -290,6 +292,31 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     return Math.max(0.3, Math.min((cw - 40) / vp.width, 4.0));
   }, []);
 
+  async function loadPdfWithRetry(pdfjsLib: any, url: string) {
+      let lastError;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          return await pdfjsLib.getDocument({
+            url,
+            withCredentials: false,
+          }).promise;
+        } catch (err) {
+          lastError = err;
+
+          console.warn(`PDF load attempt ${attempt} failed`, err);
+
+          if (attempt < 3) {
+            await new Promise(resolve =>
+              setTimeout(resolve, attempt * 500)
+            );
+          }
+        }
+      }
+
+      throw lastError;
+    }
+
   // ── Load PDF ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!url) { setLoading(false); return; }
@@ -301,10 +328,8 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
 
     (async () => {
       try {
-        const pdfjsLib = (await import("pdfjs-dist")) as any;
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-        const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        const doc = await loadPdfWithRetry(pdfjsLib, url);
         if (cancelled) return;
         const fit = await computeFitScale(doc, 1);
         setPdfDoc(doc);

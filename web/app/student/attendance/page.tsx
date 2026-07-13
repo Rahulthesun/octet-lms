@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import jsQR from 'jsqr'
 import { supabase } from '@/lib/supabase/client'
 import { attendance } from '@/lib/mockData'
+import { CalendarCheck2, CalendarX2, Wifi, MapPin } from 'lucide-react'
+import {formatDate}  from '../../../lib/helpers'
+
 
 // ─── Auth fetch helper ─────────────────────────────────────────────────────
 const API_BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
@@ -26,7 +29,7 @@ async function authedFetch(path: string, init?: RequestInit) {
   return res.status === 204 ? null : res.json()
 }
 const submitScan = (token: string) =>
-  authedFetch('/api/attendance/scan', { method: 'POST', body: JSON.stringify({ token }) })
+  authedFetch('/api/attendance/scan', { method: 'POST', body: JSON.stringify({ qrToken: token }) })
 
 // ─── Scan states ────────────────────────────────────────────────────────────
 type ScanState = 'idle' | 'requesting' | 'scanning' | 'success' | 'error'
@@ -98,9 +101,15 @@ function QRScanner({ onClose }: { onClose: () => void }) {
         }
         setState('scanning')
         rafRef.current = requestAnimationFrame(tick)
-      } catch {
-        setErrorMsg('Camera access denied. Enable it in your browser settings to scan.')
-        setState('error')
+      } catch (err) {
+        console.error("Camera error:", err);
+        console.log("isSecureContext:", window.isSecureContext);
+        console.log("mediaDevices:", navigator.mediaDevices);
+
+        setErrorMsg(
+          err instanceof Error ? err.message : "Failed to access camera"
+        );
+        setState("error");
       }
     }
     start()
@@ -187,32 +196,53 @@ function QRScanner({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ─── Day arrow — bigger & longer ────────────────────────────────────────────
 
-function DayArrow({ day, status, isToday }: { day: number; status: 'present' | 'absent' | null; isToday: boolean }) {
+// ─── Month arrow timeline ───────────────────────────────────────────────────
+
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+function DayDot({
+  day,
+  status,
+  isToday,
+}: {
+  day: number
+  status: 'present' | 'absent' | null
+  isToday: boolean
+}) {
+  const dotColor =
+    status === 'present' ? 'bg-emerald-500' :
+    status === 'absent'  ? 'bg-rose-500' :
+    'bg-gray-400'
+
+  // Marked days get a solid, clearly-visible dot with depth.
+  // No-class days are visibly smaller AND lower contrast, but still legible.
+  const dotSize = status ? 'w-4 h-4 shadow-sm' : 'w-2.5 h-2.5'
+
   return (
-    <div className="flex flex-col items-center gap-2 shrink-0" style={{ width: 44 }}>
-      {status === 'present' && (
-        <svg width="26" height="56" viewBox="0 0 26 56" fill="none">
-          <path d="M13 53V6M13 6L4 16M13 6l9 10" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-      {status === 'absent' && (
-        <svg width="26" height="56" viewBox="0 0 26 56" fill="none">
-          <path d="M13 3v47M13 50l-9-10M13 50l9-10" stroke="#e11d48" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-      {status === null && (
-        <div className="h-[56px] flex items-center">
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
-        </div>
-      )}
-      <span className={`text-xs font-data ${isToday ? 'text-brand font-semibold' : 'text-muted'}`}>{day}</span>
+    <div
+      className={`flex flex-col items-center justify-center gap-2 py-3 rounded-lg transition-colors ${
+        isToday ? 'bg-primary/5' : 'hover:bg-gray-50'
+      }`}
+      title={`Day ${day}`}
+    >
+      <div className="relative flex items-center justify-center w-4 h-4">
+        {isToday && (
+          <span className="absolute inset-0 rounded-full ring-2 ring-primary ring-offset-2" />
+        )}
+        <div className={`rounded-full ${dotSize} ${dotColor}`} />
+      </div>
+      <span
+        className={`text-[12px] tabular-nums ${
+          isToday ? 'font-bold text-primary' : 'font-medium text-gray-500'
+        }`}
+      >
+        {day}
+      </span>
+      
     </div>
   )
 }
-
-// ─── Month arrow timeline ───────────────────────────────────────────────────
 
 function MonthTimeline() {
   const now = new Date()
@@ -242,6 +272,13 @@ function MonthTimeline() {
   const totalMarked = Object.keys(dayStatus).length
   const pct = totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : null
 
+  // Leading blanks so day 1 lands on its correct weekday column (Sun-start)
+  const leadingBlanks = viewDate.getDay()
+  const cells: (number | null)[] = [
+    ...Array(leadingBlanks).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
   return (
     <div className="bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)] overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5ec]">
@@ -270,32 +307,52 @@ function MonthTimeline() {
         )}
       </div>
 
-      <div className="flex gap-3 px-5 py-6 overflow-x-auto">
-        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
-          <DayArrow
-            key={day}
-            day={day}
-            status={dayStatus[day] ?? null}
-            isToday={isCurrentMonth && day === now.getDate()}
-          />
-        ))}
+      <div className="px-5 py-6">
+        {/* Weekday header row */}
+        <div className="grid grid-cols-7">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <div key={i} className="text-center text-[11px] font-medium text-muted/70">
+              {label}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid — full width, wraps naturally by week */}
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) =>
+            day === null ? (
+              <div key={`blank-${i}`} />
+            ) : (
+              <DayDot
+                key={day}
+                day={day}
+                status={dayStatus[day] ?? null}
+                isToday={isCurrentMonth && day === now.getDate()}
+              />
+            )
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-5 px-5 py-3 border-t border-[#e2e5ec] text-[13px] text-muted">
         <div className="flex items-center gap-1.5">
-          <svg width="14" height="14" viewBox="0 0 26 56" fill="none"><path d="M13 53V6M13 6L4 16M13 6l9 10" stroke="#10b981" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
           Present
         </div>
         <div className="flex items-center gap-1.5">
-          <svg width="14" height="14" viewBox="0 0 26 56" fill="none"><path d="M13 3v47M13 50l-9-10M13 50l9-10" stroke="#e11d48" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
           Absent
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-gray-300" />
+          No class
         </div>
       </div>
     </div>
   )
 }
-
 // ─── Detailed history list (toggleable) ─────────────────────────────────────
+
 
 function HistoryList() {
   const [open, setOpen] = useState(false)
@@ -323,44 +380,45 @@ function HistoryList() {
             className="overflow-hidden border-t border-[#e2e5ec]"
           >
             <div className="divide-y divide-[#F4F1F8]">
-              {attendance.history.map(record => (
-                <div key={record.id} className="flex items-center gap-4 px-5 py-3.5">
-                  <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ${
-                    record.status === 'present' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                  }`}>
-                    {record.status === 'present' ? (
-                      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M6.5 10l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    )}
+              {attendance.history.map(record => {
+                const isPresent = record.status === 'present'
+                const isOnline = record.type === 'online'
+
+                return (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors"
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ${
+                        isPresent
+                          ? 'bg-emerald-50 text-emerald-600 ring-emerald-100'
+                          : 'bg-rose-50 text-rose-600 ring-rose-100'
+                      }`}
+                    >
+                      {isPresent ? (
+                        <CalendarCheck2 className="w-5 h-5" strokeWidth={1.75} />
+                      ) : (
+                        <CalendarX2 className="w-5 h-5" strokeWidth={1.75} />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-primary text-[15px]">
+                        Marked{' '}
+                        <span className={isPresent ? 'text-emerald-600' : 'text-rose-600'}>
+                          {record.status}
+                        </span>{' '}
+                        for <span className="text-muted">{record.type}</span> class
+                      </p>
+                      <p className="text-border text-[13px] text-gray-500 font-data mt-0.5">
+                        {formatDate(record.date)} at {record.time}
+                      </p>
+                    </div>
+
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-primary text-[15px]">
-                      Marked{' '}
-                      <span className={record.status === 'present' ? 'text-emerald-600' : 'text-rose-600'}>
-                        {record.status}
-                      </span>{' '}
-                      for <span className="text-muted">{record.type}</span> class
-                    </p>
-                    <p className="text-border text-[13px] font-data mt-0.5">
-                      {record.date} at {record.time}
-                    </p>
-                  </div>
-                  <span className={`text-[13px] px-3 py-1 rounded-md shrink-0 ${
-                    record.type === 'online'
-                      ? 'bg-[#F1EEF5] text-brand'
-                      : 'bg-amber-50 text-amber-700'
-                  }`}>
-                    {record.type}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </motion.div>
         )}

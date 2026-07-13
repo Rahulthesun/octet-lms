@@ -5,7 +5,7 @@
 // Stack: Supabase (DB + Auth) | Fly.io (API + Firecracker) | Vercel (Frontend) | Sentry (Errors)
 // No emojis. No placeholders. No templates. Everything is live.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo , ReactElement} from 'react';
 import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { supabase } from '../../lib/supabase/client';
 import ChemistryOctetLogo from '../../components/ui/ChemistryOctetLogo';
@@ -255,7 +255,12 @@ function Icon({ name, className = 'w-4 h-4' }: { name: string; className?: strin
 }
 
 export default function AnalyticsPage() {
-  const { status, user } = useAnalyticsAccess();
+  const analyticsAccess = useAnalyticsAccess();
+  const { status } = analyticsAccess;
+  const user = analyticsAccess.user as {
+    email?: string;
+    role?: string;
+  } | null;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'bugs' | 'sentry' | 'fly' | 'logs' | 'vercel'>('overview');
 
