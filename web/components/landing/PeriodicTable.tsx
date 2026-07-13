@@ -294,7 +294,7 @@ const STYLES = `
        the max (42px) caps cell size, the middle (5.05cqw) is the
        width-proportional size, the min (13px) is the smallest it may shrink. --- */
 .pt-grid {
-  --cell: clamp(14px, 5.4cqw, 46px);
+  --cell: clamp(12px, 5.4cqw, 46px);
   --rh: calc(var(--cell) * 1.06);
   display: grid;
   grid-template-columns: repeat(18, var(--cell));

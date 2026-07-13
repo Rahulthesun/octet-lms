@@ -110,7 +110,7 @@ export default function VideoSection() {
                     <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                     <span className="text-white/70 text-[14px]">LIVE LECTURE EXCERPT</span>
                   </div>
-                  <span className="text-white/60 text-[14px]">Physical Chemistry — Atomic Structure</span>
+                  <span className="hidden sm:inline text-white/60 text-[14px]">Physical Chemistry — Atomic Structure</span>
                 </div>
               </div>
             ) : (

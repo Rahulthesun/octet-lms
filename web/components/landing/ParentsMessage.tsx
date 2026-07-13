@@ -83,7 +83,7 @@ export default function ParentsMessage() {
                   transition={{ duration: 0.45, delay: i * 0.08 }}
                   className="flex items-center gap-3"
                 >
-                  <span className="shrink-0">
+                  <span className="shrink-0 w-14 flex justify-center">
                     <row.Icon width={row.w} height={row.h} color="#7e57ab" />
                   </span>
                   <p className="text-lg md:text-2xl leading-snug">
@@ -100,7 +100,7 @@ export default function ParentsMessage() {
                 transition={{ duration: 0.5, delay: 0.45 }}
                 className="flex items-start gap-3 pt-3"
               >
-                <span className="shrink-0 mt-1">
+                <span className="shrink-0 w-14 flex justify-center mt-1">
                   <MicroscopeSVG width={50} height={54} color="#7e57ab" />
                 </span>
                 <p className="text-2xl md:text-4xl leading-tight">

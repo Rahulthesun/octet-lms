@@ -39,15 +39,15 @@ type Banner = {
  * Adjacent banners use different colours so the row reads clearly.
  */
 const BANNERS: Banner[] = [
-  { letter: "C", color: "#e9deb5", formula: "CH₄",    motif: "atom" },     // gold
-  { letter: "H", color: "#c8e0da", formula: "H₂O",    motif: "molecule" }, // teal
-  { letter: "E", color: "#d4c5e2", formula: "C₆H₆",   motif: "benzene" },  // lilac
-  { letter: "M", color: "#b89cd0", formula: "NaCl",   motif: "atom" },     // deep lilac
-  { letter: "I", color: "#daeae4", formula: "H₂SO₄",  motif: "molecule" }, // mint
-  { letter: "S", color: "#cbb3df", formula: "CO₂",    motif: "benzene" },  // plum tint
-  { letter: "T", color: "#a98fc4", formula: "O₂",     motif: "atom" },     // muted plum
+  { letter: "C", color: "#e9deb5", formula: "CH₄", motif: "atom" }, // gold
+  { letter: "H", color: "#c8e0da", formula: "H₂O", motif: "molecule" }, // teal
+  { letter: "E", color: "#d4c5e2", formula: "C₆H₆", motif: "benzene" }, // lilac
+  { letter: "M", color: "#b89cd0", formula: "NaCl", motif: "atom" }, // deep lilac
+  { letter: "I", color: "#daeae4", formula: "H₂SO₄", motif: "molecule" }, // mint
+  { letter: "S", color: "#cbb3df", formula: "CO₂", motif: "benzene" }, // plum tint
+  { letter: "T", color: "#a98fc4", formula: "O₂", motif: "atom" }, // muted plum
   { letter: "R", color: "#c8e0da", formula: "C₂H₅OH", motif: "molecule" }, // teal
-  { letter: "Y", color: "#e9deb5", formula: "NH₃",    motif: "benzene" },  // gold
+  { letter: "Y", color: "#e9deb5", formula: "NH₃", motif: "benzene" }, // gold
 ];
 
 /**
@@ -62,7 +62,10 @@ type ChemistryBannerProps = {
   className?: string;
 };
 
-export default function ChemistryBanner({ word, className = "" }: ChemistryBannerProps) {
+export default function ChemistryBanner({
+  word,
+  className = "",
+}: ChemistryBannerProps) {
   // Build the banner list. If a custom word is supplied, cycle the styling.
   const banners: Banner[] = word
     ? word
@@ -100,11 +103,41 @@ export default function ChemistryBanner({ word, className = "" }: ChemistryBanne
         aria-hidden="true"
       >
         {/* soft shadow just under the rope */}
-        <path d="M 0 36 Q 500 116 1000 36" className="cb-rope-shadow" fill="none" />
+        <path
+          d="M 0 36 Q 500 116 1000 36"
+          className="cb-rope-shadow"
+          fill="none"
+        />
         {/* main twine + a thin highlight strand for a braided feel */}
-        <path d="M 0 30 Q 500 110 1000 30" className="cb-rope-main" fill="none" />
-        <path d="M 0 30 Q 500 110 1000 30" className="cb-rope-strand" fill="none" />
+        <path
+          d="M 0 30 Q 500 110 1000 30"
+          className="cb-rope-main"
+          fill="none"
+        />
+        <path
+          d="M 0 30 Q 500 110 1000 30"
+          className="cb-rope-strand"
+          fill="none"
+        />
       </svg>
+
+      {/* faint DOT grid across the WHOLE banner (above + below the rope) — uses
+          the canonical page-wide dots (.dots-fx) so it matches AND aligns with
+          the Hero above and ElementsSection below, leaving no seam at the edges. */}
+      <div
+        className="dots-fx"
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+        aria-hidden="true"
+      />
+
+      {/* NOTE: the banner has NO gradient at all — only the two solid tones
+          (cream above the rope, #e6eeeb below) + the shared .dots-fx grid, so
+          it matches the Hero above and ElementsSection below with no seam. */}
 
       <div className="cb-stage" role="img" aria-label={label}>
         {/* The banners. */}
@@ -121,7 +154,12 @@ export default function ChemistryBanner({ word, className = "" }: ChemistryBanne
             } as CSSProperties;
 
             return (
-              <li key={i} className="cb-peg" style={styleVars} aria-hidden="true">
+              <li
+                key={i}
+                className="cb-peg"
+                style={styleVars}
+                aria-hidden="true"
+              >
                 {/* Wooden clothespin clipping the cloth to the rope. */}
                 <span className="cb-pin">
                   <span className="cb-pin-spring" />
@@ -134,13 +172,17 @@ export default function ChemistryBanner({ word, className = "" }: ChemistryBanne
                 <div className="cb-cloth">
                   <div className="cb-swing">
                     <div className="cb-cloth-inner">
-                    {/* subtle decorations */}
-                    <span className="cb-formula cb-formula-top">{b.formula}</span>
-                    <Motif kind={b.motif} />
-                    <span className="cb-formula cb-formula-bottom">{b.formula}</span>
+                      {/* subtle decorations */}
+                      <span className="cb-formula cb-formula-top">
+                        {b.formula}
+                      </span>
+                      <Motif kind={b.motif} />
+                      <span className="cb-formula cb-formula-bottom">
+                        {b.formula}
+                      </span>
 
-                    {/* the golden 3D letter */}
-                    <span className="cb-letter">{b.letter}</span>
+                      {/* the golden 3D letter */}
+                      <span className="cb-letter">{b.letter}</span>
                     </div>
                   </div>
                 </div>
@@ -165,16 +207,44 @@ function Motif({ kind }: { kind: Banner["motif"] }) {
           stroke="currentColor"
           strokeWidth="2"
         />
-        <circle cx="30" cy="30" r="11" fill="none" stroke="currentColor" strokeWidth="2" />
+        <circle
+          cx="30"
+          cy="30"
+          r="11"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
       </svg>
     );
   }
   if (kind === "molecule") {
     return (
       <svg className="cb-motif" viewBox="0 0 60 60" aria-hidden="true">
-        <line x1="14" y1="40" x2="30" y2="22" stroke="currentColor" strokeWidth="2" />
-        <line x1="30" y1="22" x2="46" y2="40" stroke="currentColor" strokeWidth="2" />
-        <line x1="30" y1="22" x2="30" y2="6" stroke="currentColor" strokeWidth="2" />
+        <line
+          x1="14"
+          y1="40"
+          x2="30"
+          y2="22"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <line
+          x1="30"
+          y1="22"
+          x2="46"
+          y2="40"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <line
+          x1="30"
+          y1="22"
+          x2="30"
+          y2="6"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
         <circle cx="14" cy="40" r="6" fill="currentColor" />
         <circle cx="46" cy="40" r="6" fill="currentColor" />
         <circle cx="30" cy="22" r="7" fill="currentColor" />
@@ -186,7 +256,15 @@ function Motif({ kind }: { kind: Banner["motif"] }) {
   return (
     <svg className="cb-motif" viewBox="0 0 60 60" aria-hidden="true">
       <circle cx="30" cy="30" r="4" fill="currentColor" />
-      <ellipse cx="30" cy="30" rx="22" ry="9" fill="none" stroke="currentColor" strokeWidth="2" />
+      <ellipse
+        cx="30"
+        cy="30"
+        rx="22"
+        ry="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
       <ellipse
         cx="30"
         cy="30"
@@ -222,7 +300,7 @@ const STYLES = `
   width: 100%;
   padding: 0 1rem clamp(0.75rem, 2.2vw, 1.6rem);
   overflow: hidden;
-  background-color: #e7dff0; /* the colour BELOW the rope (matches Why-Choose-Us) */
+  background-color: #e6eeeb; /* the colour BELOW the rope */
 }
 
 .cb-stage {
@@ -421,10 +499,16 @@ const STYLES = `
   transform: rotate(9deg) translateY(-2px);
 }
 
-/* tighten things up on small screens so all 9 stay in one row */
-@media (max-width: 520px) {
+/* Small screens: scale the cloth, letters and pins DOWN so all 9 pennants fit
+   in one row without being clipped by the banner's overflow — right down to
+   ~320px. (The base clamp floors were too large: 9 x 54px min overflowed a
+   phone.) */
+@media (max-width: 600px) {
+  .cb-cloth  { width: clamp(28px, 8vw, 60px); }
+  .cb-letter { font-size: clamp(14px, 4.2vw, 30px); }
+  .cb-pin    { width: clamp(6px, 1.6vw, 10px); height: clamp(15px, 4vw, 24px); }
   .cb-formula { opacity: 0.13; }
   .cb-motif { opacity: 0.11; }
-  .cb-row { gap: 2px; }
+  .cb-row { gap: clamp(1px, 0.6vw, 4px); }
 }
 `;

@@ -126,13 +126,15 @@ html.lenis body {
 }
 
 /* Hero — solid cream with just a faint corner tint (~15-20% hint, not a full wash).
-   Only the hero uses this; every other landing section is a flat solid colour. */
+   Only the hero uses this; every other landing section is a flat solid colour.
+   The bottom-left mint blob was removed so the hero's BOTTOM edge stays clean
+   cream where it meets the ChemistryBanner — no gradient seam at that boundary.
+   (To restore it, add back: radial-gradient(46% 46% at 6% 94%, rgba(200,224,218,0.16), transparent 72%)) */
 .bg-hero-mesh {
   background-color: #f8f9ed;
   background-image:
     radial-gradient(48% 44% at 8% 10%, rgba(212, 197, 226, 0.28), transparent 72%),
-    radial-gradient(50% 45% at 90% 8%, rgba(212, 197, 226, 0.20), transparent 72%),
-    radial-gradient(46% 46% at 6% 94%, rgba(200, 224, 218, 0.16), transparent 72%);
+    radial-gradient(50% 45% at 90% 8%, rgba(212, 197, 226, 0.20), transparent 72%);
 }
 
 /* Every landing section keeps its own solid `background-color` (set inline) and
@@ -143,8 +145,21 @@ html.lenis body {
     radial-gradient(48% 44% at 8% 10%, rgba(212, 197, 226, 0.28), transparent 72%),
     radial-gradient(50% 45% at 90% 8%, rgba(212, 197, 226, 0.20), transparent 72%),
     radial-gradient(46% 46% at 6% 94%, rgba(200, 224, 218, 0.16), transparent 72%),
-    radial-gradient(rgba(94, 64, 117, 0.06) 1px, transparent 1px);
+    radial-gradient(rgba(94, 64, 117, 0.05) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 22px 22px;
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-position: 0 0, 0 0, 0 0, 0 0;
+  /* All layers scroll with the page. (The dot grid was briefly
+     background-attachment:fixed to share one origin across sections, but fixed
+     backgrounds force a full repaint on every scroll frame and caused scroll
+     lag — the uniform 0.05 dot opacity already keeps boundaries seam-free.) */
+}
+
+/* Canonical page-wide dot grid — identical opacity + the same viewport origin as
+   the dot layer baked into .section-fx above, so dots line up across EVERY
+   section boundary. Use on sections/overlays that need dots without the gradient. */
+.dots-fx {
+  background-image: radial-gradient(rgba(94, 64, 117, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
 }

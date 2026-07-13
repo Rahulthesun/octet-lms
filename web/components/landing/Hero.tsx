@@ -7,42 +7,60 @@ import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 import { AtomSVG, CompoundSVG, ChemIcon } from '@/components/ui/PencilSVGs'
 
 type Slide = {
-  quote: string
-  sub: string
+  tagline: string // heading — the main line
+  desc: string // short excerpt of the real content
+  href: string // "Read more" → the section with the full content
   caption: string
   icon: string
-  from: string
-  src?: string // drop a real photo path here later, e.g. '/classroom.jpg'
+  from: string // gradient colour for the fallback panel
+  src?: string // stock photo (swap for your own later)
 }
+
+/* Taglines + descriptions are drawn from the client's content document; each
+   "Read more" jumps to the section that holds the fuller version. Photos are
+   free Unsplash stock — if one fails to load, the gradient panel shows. */
+const IMG = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1000&q=70`
 
 const slides: Slide[] = [
   {
-    quote: "Chemistry Isn't Hard — It Just Hasn't Been Taught Right.",
-    sub: 'A calm, fear-free space where 11th & 12th chemistry finally clicks.',
-    caption: 'Live Classroom',
+    tagline: 'Chemistry, Made Comfortable and Enjoyable',
+    desc:
+      'OCTET is built for CBSE 11th & 12th students worldwide — English-medium teaching that makes chemistry comfortable, fear-free and enjoyable, and trains them for the board exams.',
+    href: '#about',
+    caption: 'In the Classroom',
     icon: 'microscope',
     from: '#d4c5e2',
+    src: IMG('photo-1509062522246-3755977927d7'),
   },
   {
-    quote: 'Every Doubt Is Welcome — Any Hour of the Day.',
-    sub: 'Round-the-clock doubt clearing, so nothing slows your child down.',
-    caption: 'Doubt Sessions',
+    tagline: 'Spread True Science — Verified, Error-Free Notes',
+    desc:
+      'Every material is screened, authenticated and proof-read before it reaches your child, and doubts are welcome round the clock, right through the day.',
+    href: '#about',
+    caption: 'Trusted Materials',
     icon: 'flask',
     from: '#daeae4',
+    src: IMG('photo-1532094349884-543bc11b234d'),
   },
   {
-    quote: 'Verified, Error-Free Material. True Science, Spread With Care.',
-    sub: 'Every note and paper is screened before it reaches your child.',
-    caption: 'Trusted Notes',
+    tagline: 'Three Decades of Chemistry, One Teacher',
+    desc:
+      'Learn from Raju A — M.Sc. from Loyola College, 30+ years in the classroom and a Best Teacher Award from the Chennai Collector.',
+    href: '#instructor',
+    caption: 'Your Instructor',
     icon: 'compound',
     from: '#e9deb5',
+    src: IMG('photo-1524178232363-1fb2b075b655'),
   },
   {
-    quote: 'Progress You Can See — Every Single Month.',
-    sub: "Periodic tests, clear reports, and a parents' meet the first Sunday.",
-    caption: "Parents' Meet",
+    tagline: 'Education Is for Transformation',
+    desc:
+      'Children are not mark-scoring machines. We help you spot their talents and invest in true education — the kind that lasts for generations.',
+    href: '#parents',
+    caption: 'For Parents',
     icon: 'beaker',
     from: '#c8e0da',
+    src: IMG('photo-1544717305-2782549b5136'),
   },
 ]
 
@@ -82,7 +100,7 @@ export default function Hero() {
     const id = setTimeout(() => {
       setDirection(1)
       setIndex((i) => (i + 1) % slides.length)
-    }, 5000)
+    }, 6000)
     return () => clearTimeout(id)
   }, [index])
 
@@ -90,8 +108,9 @@ export default function Hero() {
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center overflow-hidden pt-28 pb-16 px-6 bg-hero-mesh">
-      {/* Texture + molecular decorations */}
-      <div className="absolute inset-0 tx-dots opacity-50 pointer-events-none" />
+      {/* Texture + molecular decorations — canonical page-wide dot grid so the
+          hero's dots match (and align with) every other section's dots. */}
+      <div className="absolute inset-0 dots-fx pointer-events-none" />
       <div className="absolute top-24 left-6 opacity-[0.07] pointer-events-none hidden lg:block">
         <AtomSVG width={150} height={150} color="#5e4075" />
       </div>
@@ -101,9 +120,9 @@ export default function Hero() {
 
       <div className="relative z-10 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8 items-center">
-          {/* Left — rotating quote + CTAs */}
+          {/* Left — rotating tagline + description + read more */}
           <div className="order-2 lg:order-1">
-            <div className="relative h-[188px] md:h-[200px] overflow-hidden">
+            <div className="relative h-[300px] md:h-[264px] overflow-hidden">
               <AnimatePresence custom={direction}>
                 <motion.div
                   key={index}
@@ -115,12 +134,21 @@ export default function Hero() {
                   transition={slideTransition}
                   className="absolute inset-0 flex flex-col justify-center text-center lg:text-left"
                 >
-                  <h1 className="text-3xl md:text-[2.6rem] text-primary leading-[1.15] tracking-tight max-w-xl mx-auto lg:mx-0">
-                    {slide.quote}
+                  <h1 className="text-3xl md:text-[2.4rem] text-primary leading-[1.15] tracking-tight max-w-xl mx-auto lg:mx-0">
+                    {slide.tagline}
                   </h1>
                   <p className="text-muted text-base md:text-lg leading-relaxed mt-4 max-w-lg mx-auto lg:mx-0">
-                    {slide.sub}
+                    {slide.desc}
                   </p>
+                  <a
+                    href={slide.href}
+                    className="inline-flex items-center gap-1.5 text-primary text-[15px] mt-4 mx-auto lg:mx-0 w-fit hover:gap-2.5 transition-all duration-200"
+                  >
+                    Read more
+                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                      <path d="M 3,8 L 13,8 M 9,4 L 13,8 L 9,12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </a>
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -185,24 +213,32 @@ export default function Hero() {
                   transition={slideTransition}
                   className="absolute inset-0"
                 >
-                  {slide.src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={slide.src} alt={slide.caption} className="w-full h-full object-cover" />
-                  ) : (
-                    <div
-                      className="relative w-full h-full flex items-center justify-center overflow-hidden"
-                      style={{ background: `linear-gradient(150deg, ${slide.from} 0%, #ffffff 95%)` }}
-                    >
-                      <div className="absolute inset-0 tx-dots opacity-40" />
-                      <div className="absolute -top-6 -right-6 opacity-20">
-                        <AtomSVG width={130} height={130} color="#5e4075" />
-                      </div>
-                      <div className="absolute -bottom-8 -left-8 opacity-15">
-                        <CompoundSVG width={150} height={120} color="#5e4075" />
-                      </div>
-                      <ChemIcon icon={slide.icon} width={168} height={168} color="#5e4075" />
+                  {/* gradient + icon panel is the base; the photo layers over it
+                      and, if it fails to load, hides itself to reveal the panel */}
+                  <div
+                    className="relative w-full h-full flex items-center justify-center overflow-hidden"
+                    style={{ background: `linear-gradient(150deg, ${slide.from} 0%, #ffffff 95%)` }}
+                  >
+                    <div className="absolute inset-0 tx-dots opacity-40" />
+                    <div className="absolute -top-6 -right-6 opacity-20">
+                      <AtomSVG width={130} height={130} color="#5e4075" />
                     </div>
-                  )}
+                    <div className="absolute -bottom-8 -left-8 opacity-15">
+                      <CompoundSVG width={150} height={120} color="#5e4075" />
+                    </div>
+                    <ChemIcon icon={slide.icon} width={168} height={168} color="#5e4075" />
+                    {slide.src && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={slide.src}
+                        alt={slide.caption}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                   <span className="absolute bottom-4 left-4 z-10 px-4 py-1.5 rounded-full bg-white/85 backdrop-blur-sm text-primary text-[14px] shadow-sm">
                     {slide.caption}
                   </span>
@@ -210,9 +246,10 @@ export default function Hero() {
               </AnimatePresence>
             </div>
 
-            {/* Center logo — bridges the seam between the sliding panels (desktop) */}
+            {/* Center logo — bridges the seam between the sliding panels (desktop).
+                Size knob: adjust the `size` value below. */}
             <div className="hidden lg:block absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-              <ChemistryOctetLogo size={300} background="#f8f9ed" />
+              <ChemistryOctetLogo size={290} background="#f8f9ed" />
             </div>
 
             {/* Floating feature chips */}

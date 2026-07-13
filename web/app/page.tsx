@@ -17,13 +17,13 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <ChemistryBanner />
-      <AboutUs />
       <ElementsSection />
       <Instructor />
       <VideoSection />
       <Reviews />
       <ParentsMessage />
       <ToStudents />
+      <AboutUs />
       <CTASection />
       <Footer />
     </main>

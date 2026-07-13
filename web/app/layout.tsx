@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import LenisProvider from '@/components/providers/LenisProvider'
-import AnimatedFavicon from '@/components/ui/AnimatedFavicon'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: ['400', '600', '700'], variable: '--font-data', display: 'swap' })
@@ -23,12 +22,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
-        {/* Static icon (shown before JS / in inactive tabs); AnimatedFavicon
-            takes over with the live atom while the page is open. */}
+        {/* Static, stationary favicon — the animated canvas version added page
+            latency, so it's intentionally left non-animating. */}
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body>
-        <AnimatedFavicon />
         <LenisProvider>
           {children}
         </LenisProvider>

@@ -60,8 +60,15 @@ const meanings: { word: string; Icon: () => ReactNode }[] = [
 ]
 
 export default function ElementsSection() {
+  // NO section-fx here: this section carries no gradient of its own, so the
+  // banner's below-the-rope wash flows into it seamlessly. Only #e6eeeb + the
+  // matching dot grid.
   return (
-    <section id="elements" className="relative overflow-hidden section-fx" style={{ backgroundColor: '#f8f9ed' }}>
+    <section
+      id="elements"
+      className="relative overflow-hidden dots-fx"
+      style={{ backgroundColor: '#e6eeeb' }}
+    >
       <SectionDecor variant={1} />
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 md:py-24">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">

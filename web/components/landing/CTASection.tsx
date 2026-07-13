@@ -46,7 +46,7 @@ export default function CTASection() {
             <motion.h2 variants={item} className="text-3xl md:text-5xl text-white leading-tight mb-5">
               Enroll Your Student at
               <br />
-              Chemistry<span className="text-accent1">@</span>OCTET Today.
+              Chemistry@OCTET Today.
             </motion.h2>
             <motion.p variants={item} className="text-white/75 text-base md:text-lg max-w-xl mx-auto mb-10">
               CBSE 11th &amp; 12th chemistry, English medium — verified materials, round-the-clock doubts, and monthly progress you can see.

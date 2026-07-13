@@ -23,7 +23,7 @@ function ReviewCard({ review }: { review: typeof landingReviews[0] }) {
   const color = accentColors[colorIdx % accentColors.length]
 
   return (
-    <div className="relative shrink-0 bg-white border border-accent3/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden" style={{ width: 340 }}>
+    <div className="relative shrink-0 w-[min(340px,82vw)] bg-white border border-accent3/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden">
       {/* Colored corner accent */}
       <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-3xl opacity-50" style={{ backgroundColor: color }} />
       <div className="relative z-10">
@@ -76,7 +76,7 @@ export default function Reviews() {
           className="text-center mb-14"
         >
           <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">What People Say</p>
-          <h2 className="text-3xl md:text-4xl text-primary mb-4 whitespace-nowrap">
+          <h2 className="text-3xl md:text-4xl text-primary mb-4">
             Real Students. Real Parents. <span className="text-muted">Real Results.</span>
           </h2>
         </motion.div>
