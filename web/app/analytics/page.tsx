@@ -10,7 +10,6 @@ import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { supabase } from '../../lib/supabase/client';
 import ChemistryOctetLogo from '../../components/ui/ChemistryOctetLogo';
 import { useAnalyticsAccess } from '../../hooks/admin/useAnalyticsAccess';
-import type { ReactElement } from "react";
 
 const playfair = Playfair_Display({ subsets: ['latin'], weight: ['600', '700'], display: 'swap' });
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '700'], display: 'swap' });
