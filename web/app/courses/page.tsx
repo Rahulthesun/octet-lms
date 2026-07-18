@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Navbar from '@/components/landing/Navbar'
 import Footer from '@/components/landing/Footer'
 import { IconCheck } from '@/components/ui/SvgIcons'
-import { AtomSVG, FlaskSVG, BeakerSVG, CompoundSVG, TestTubeSVG } from '@/components/ui/PencilSVGs'
+import { AtomSVG, FlaskSVG, BeakerSVG, CompoundSVG } from '@/components/ui/PencilSVGs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -374,78 +374,8 @@ export default function CoursesPage() {
     <main className="bg-bg min-h-screen">
       <Navbar />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
-        <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
-          <TestTubeSVG width={180} height={180} color="#5e4075" />
-        </div>
-        <div className="absolute bottom-8 right-10 opacity-[0.07] pointer-events-none">
-          <AtomSVG width={220} height={220} color="#5e4075" />
-        </div>
-        <div className="absolute top-52 right-[18%] opacity-[0.05] pointer-events-none">
-          <CompoundSVG width={140} height={140} color="#5e4075" />
-        </div>
-
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-2.5 mb-5"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
-              Course Catalogue
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
-          >
-            Every Chapter.
-            <br />
-            <span className="text-muted">Every Concept.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
-          >
-            A complete chemistry curriculum mapped to NCERT, CBSE, TN State Board, JEE and NEET.
-            Browse the full chapter and topic list for each programme below.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-4"
-          >
-            {[
-              { value: '60+', label: 'Total Chapters' },
-              { value: '400+', label: 'Topics Covered' },
-              { value: '4', label: 'Programmes' },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
-              >
-                <div className="text-xl text-primary">{s.value}</div>
-                <div className="text-[14px] text-muted">{s.label}</div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
       {/* ── Tabs + Content ───────────────────────────────────── */}
-      <section id="tab-section" className="pb-24 px-6">
+      <section id="tab-section" className="pt-32 pb-24 px-6">
         <div className="max-w-5xl mx-auto">
 
           {/* Tab Pills */}

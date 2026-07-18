@@ -10,7 +10,6 @@ import {
   FlaskSVG,
   BeakerSVG,
   TestTubeSVG,
-  MicroscopeSVG,
   CompoundSVG,
 } from '@/components/ui/PencilSVGs'
 
@@ -248,97 +247,9 @@ const galleryCards = [
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
-function AboutHero() {
-  return (
-    <section className="relative flex flex-col items-center justify-center bg-bg overflow-hidden pt-40 pb-28 px-6 text-center">
-      {/* Background decorations */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <svg
-          className="absolute top-10 right-10"
-          style={{ opacity: 0.06 }}
-          width="220" height="220" viewBox="0 0 220 220" fill="none"
-        >
-          <circle cx="110" cy="110" r="100" stroke="#5e4075" strokeWidth="1" strokeDasharray="4 8" />
-          <circle cx="110" cy="110" r="70"  stroke="#8b6fa0" strokeWidth="0.8" strokeDasharray="3 10" />
-        </svg>
-        <svg
-          className="absolute bottom-16 left-8"
-          style={{ opacity: 0.05 }}
-          width="180" height="180" viewBox="0 0 180 180" fill="none"
-        >
-          <circle cx="90" cy="90" r="80" stroke="#5e4075" strokeWidth="1" strokeDasharray="5 9" />
-        </svg>
-        <div className="absolute top-24 left-[6%]" style={{ opacity: 0.08, transform: 'rotate(-14deg)' }}>
-          <TestTubeSVG width={120} height={120} color="#5e4075" />
-        </div>
-        <div className="absolute bottom-16 right-[5%]" style={{ opacity: 0.08, transform: 'rotate(12deg)' }}>
-          <MicroscopeSVG width={130} height={130} color="#8b6fa0" />
-        </div>
-        <div className="absolute top-[46%] right-[12%]" style={{ opacity: 0.07, transform: 'rotate(-7deg)' }}>
-          <AtomSVG width={95} height={95} color="#5e4075" />
-        </div>
-      </div>
-
-      <div className="relative z-10 max-w-3xl mx-auto">
-        {/* Eyebrow */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-accent1/60 border border-accent1 mb-8"
-        >
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-[14px] tracking-[0.25em] text-muted uppercase">Our Institute</span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.25 }}
-          className="text-5xl md:text-6xl text-primary leading-tight mb-6"
-        >
-          Built on Passion.<br />
-          <span className="text-muted italic">Driven by Purpose.</span>
-        </motion.h1>
-
-        {/* Description */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-base text-muted max-w-2xl mx-auto mb-12 leading-relaxed"
-        >
-          Chemistry@OCTET takes its name from the octet rule — the stability an atom gains by
-          completing its outer shell. We exist to give students that same completeness in chemistry.
-        </motion.p>
-
-        {/* Stat badges */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.55 }}
-          className="flex items-center justify-center gap-3 flex-wrap"
-        >
-          {[
-            { value: '30+',     label: 'Years of Teaching' },
-            { value: 'XI & XII', label: 'CBSE Chemistry'    },
-            { value: '100%',    label: 'English Medium'      },
-          ].map((s) => (
-            <div key={s.label} className="px-5 py-2.5 rounded-full bg-white border border-accent3/60 flex items-center gap-2.5">
-              <span className="text-xl font-mono text-primary">{s.value}</span>
-              <span className="text-[14px] text-muted">{s.label}</span>
-            </div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  )
-}
-
 function OurStory() {
   return (
-    <section id="story" className="py-24 px-6 bg-white">
+    <section id="story" className="pt-32 pb-24 px-6 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
@@ -1020,7 +931,6 @@ export default function AboutPage() {
   return (
     <main className="bg-bg min-h-screen">
       <Navbar />
-      <AboutHero />
       <OurStory />
       <Founder />
       <ToParents />
