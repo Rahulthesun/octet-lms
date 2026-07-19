@@ -176,22 +176,6 @@ function AnimatedLogoWatermark({
         {/* animated (throttled to ~20fps internally) — every other logo instance
             on this page stays static; this is the only live one */}
         <ChemistryOctetLogo size={LOGO_SIZE} />
-        {studentToken && (
-          <div
-            style={{
-              marginTop: 6,
-              textAlign: "center",
-              fontFamily: '"DM Sans", "Inter", sans-serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              color: "#4B2D8F",
-              textShadow: "0 1px 2px rgba(255,255,255,0.6)",
-            }}
-          >
-            Chemistry@OCTET · {studentToken}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -371,6 +355,48 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
           await page.render({ canvasContext: ctx, viewport }).promise;
           if (cancelled) return;
           drawWatermark(ctx, viewport.width, viewport.height, studentToken);
+          // Page number — bottom right
+// Page number — bottom right
+// Page number — bottom right
+ctx.save()
+ctx.font = `600 ${Math.max(10, viewport.width * 0.013)}px "Inter","Segoe UI",Arial,sans-serif`
+const label = `${pageNumber} / ${pdfDoc.numPages}`
+const fontSize = Math.max(10, viewport.width * 0.013)
+const textW = ctx.measureText(label).width
+const padX = 10
+const padY = 5
+const bgW = textW + padX * 2
+const bgH = fontSize + padY * 2
+const bgX = viewport.width - 16 - bgW
+const bgY = viewport.height - 14 - bgH
+
+// Background pill
+const r = bgH / 2
+ctx.globalAlpha = 0.12
+ctx.fillStyle = '#4B2D8F'
+ctx.beginPath()
+ctx.moveTo(bgX + r, bgY)
+ctx.arcTo(bgX + bgW, bgY,       bgX + bgW, bgY + bgH, r)
+ctx.arcTo(bgX + bgW, bgY + bgH, bgX,       bgY + bgH, r)
+ctx.arcTo(bgX,       bgY + bgH, bgX,       bgY,        r)
+ctx.arcTo(bgX,       bgY,       bgX + bgW, bgY,        r)
+ctx.closePath()
+ctx.fill()
+
+// Border
+ctx.globalAlpha = 0.18
+ctx.strokeStyle = '#4B2D8F'
+ctx.lineWidth = 0.8
+ctx.stroke()
+
+// Text — centered inside the pill
+ctx.globalAlpha = 0.55
+ctx.fillStyle = '#4B2D8F'
+ctx.textAlign = 'center'
+ctx.textBaseline = 'middle'
+ctx.fillText(label, bgX + bgW / 2, bgY + bgH / 2)
+
+ctx.restore()
         }
       } catch (e: any) {
         if (e?.name !== "RenderingCancelledException" && !cancelled) {
@@ -391,7 +417,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
       if (ctrl && ["s", "p", "c", "a", "u"].includes(e.key.toLowerCase())) {
         e.preventDefault();
         e.stopPropagation();
-      }
+      } 
     };
     document.addEventListener("keydown", block, true);
     return () => document.removeEventListener("keydown", block, true);
@@ -441,8 +467,8 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
   }, [url, loading]);
 
   const zoomIn  = () => setScale((s) => Math.min(+(s * 1.25).toFixed(3), 4.0));
-  const zoomOut = () =>
-  setScale((s) => Math.max(+(s / 1.25).toFixed(3), fitScale));  const zoomFit = () => setScale(fitScale);
+  const zoomOut = () => setScale((s) => Math.max(+(s / 1.25).toFixed(3), 0.3))
+  const zoomFit = () => setScale(fitScale);
   const scalePct = Math.round(scale * 100);
 
   // ── Gates — must be after all hooks ──────────────────────────────────────
@@ -501,7 +527,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
             <span className="text-xs text-gray-500 truncate">{filename ?? "Document"}</span>
           </div>
           <div className="flex items-center gap-0.5 shrink-0 border-l border-gray-100 pl-2">
-            <button onClick={zoomOut} disabled={scale <= fitScale || loading} className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+            <button onClick={zoomOut} disabled={scale <= 0.3 || loading} className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <svg className="w-3 h-3" viewBox="0 0 10 10" fill="none"><path d="M2 5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <span className="text-[11px] text-gray-500 tabular-nums w-10 text-center">

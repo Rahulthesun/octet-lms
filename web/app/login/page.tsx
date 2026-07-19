@@ -17,35 +17,59 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setError(null)
 
-    if (!email || !password) {
-      setError('Please enter both email and password.')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { user } = await signIn(email, password)
-
-      const role = user?.app_metadata?.role ?? 'student'
-
-      // Pure admins -> /admin, everyone else (student / both) -> /student
-      if (role === 'admin') {
-        router.push('/admin/content')
-      } else {
-        router.push('/student/notes')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+  if (!email || !password) {
+    setError('Please enter both email and password.')
+    return
   }
 
+  setLoading(true)
+
+  try {
+    const { user } = await signIn(email, password)
+    console.log('user.id:', user?.id)
+    console.log('app_metadata:', user?.app_metadata)
+    
+    const role = user?.app_metadata?.role // 'admin' | 'both' | undefined (students)
+
+    
+
+    if (role !== 'admin' && role !== 'both') {
+      const { data: student, error } = await supabase
+        .from('students')
+        .select('blocked')
+        .eq('auth_user_id', user.id)
+        .maybeSingle()
+
+      if (error) {
+        throw new Error('Unable to verify student account.')
+      }
+
+      if (!student) {
+        throw new Error('No student record found. Please contact the administrator.')
+      }
+
+      if (student.blocked) {
+        await supabase.auth.signOut()
+        setError('Your account has been blocked. Please contact the administrator.')
+        return
+      }
+    }
+
+    if (role === 'admin' || role === 'both') {
+      router.push('/admin/content')
+    } else {
+      router.push('/student/notes')
+    }
+  } catch (err: any) {
+    setError(err.message || 'Something went wrong. Please try again.')
+  } finally {
+    setLoading(false)
+  }
+}
   return (
     <div className="h-screen flex overflow-hidden bg-bg">
       {/* Left panel — auth form */}

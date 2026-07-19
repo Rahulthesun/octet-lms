@@ -229,7 +229,7 @@ export default function AdminSidebar({
             <ChemistryOctetLogo size={44} />
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="text-base text-primary whitespace-nowrap leading-tight">
+            <p className="text-[15px] text-primary whitespace-nowrap leading-tight">
               Chemistry<span className="text-muted">@OCTET</span>
             </p>
           </div>

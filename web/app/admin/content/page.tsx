@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/SvgIcons";
 import { useContentTree } from "../../../hooks/admin/useContentTree";
 import { PdfViewer } from "../../../components/admin/PDFViewer";
+import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer";
 import { getSession } from "@/lib/auth";
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
@@ -298,6 +299,7 @@ export default function ContentPage() {
   const [deletingFile, setDeletingFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
 
 
 
@@ -350,6 +352,47 @@ export default function ContentPage() {
         .then((data) => setPdfPreviewUrl(data.url))
         .catch(() => setPdfPreviewUrl(null));
     }, [selectedPath?.contentType, selectedFile]);
+
+  // ── Derived: Video preview URL ───────────────────────────────────────────
+  // Video streams are private, so obtain a short-lived signed R2 URL before
+  // assigning it to the native player.
+  useEffect(() => {
+    if (
+      selectedPath?.contentType !== "video" ||
+      !selectedFile?.id ||
+      selectedFile.id.startsWith("local-")
+    ) {
+      setVideoPreviewUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    setVideoPreviewUrl(null);
+
+    async function loadVideoPreview() {
+      try {
+        const session = await getSession();
+        const res = await fetch(
+          `${BASE_URL}/api/content/video/${selectedFile!.id}/stream`,
+          {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {},
+          },
+        );
+        if (!res.ok) throw new Error("Failed to load video preview");
+        const data = (await res.json()) as { url?: string };
+        if (!cancelled) setVideoPreviewUrl(data.url ?? null);
+      } catch {
+        if (!cancelled) setVideoPreviewUrl(null);
+      }
+    }
+
+    loadVideoPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPath?.contentType, selectedFile]);
 
   // ── Search visibility ──────────────────────────────────────────────────────
   const visibility = (() => {
@@ -1554,17 +1597,32 @@ export default function ContentPage() {
               </div>
 
               <div className="bg-white shadow-sm p-4 rounded-2xl space-y-5">
-                {/* Metadata card */}
-                <div className="border border-gray-200 rounded-md p-4 flex items-center gap-3">
-                  <IconPlay className="w-8 h-8 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base text-gray-800 truncate">
-                      {selectedFile.title}
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      {fmtSize(selectedFile.size_bytes)} · Video · uploaded{" "}
-                      {fmt(selectedFile.created_at)}
-                    </p>
+                {/* Video preview */}
+                <div className="overflow-hidden rounded-md border border-gray-200 bg-black">
+                  {videoPreviewUrl ? (
+                    <VideoPreviewPlayer
+                      key={selectedFile.id}
+                      src={videoPreviewUrl}
+                      title={selectedFile.title}
+                      mimeType={selectedFile.mime_type}
+                    />
+                  ) : (
+                    <div className="flex aspect-video flex-col items-center justify-center gap-2 text-gray-300">
+                      <IconPlay className="h-10 w-10" />
+                      <p className="text-sm">Loading video preview…</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 bg-white p-4">
+                    <IconPlay className="w-6 h-6 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base text-gray-800 truncate">
+                        {selectedFile.title}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {fmtSize(selectedFile.size_bytes)} · Video · uploaded{" "}
+                        {fmt(selectedFile.created_at)}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

@@ -1,13 +1,5 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "Contralto";
-  src: url("/fonts/contralto-small-regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
   --color-white: #ffffff;
   --color-bg: #f8f9ed;
@@ -20,7 +12,7 @@
   --color-border: #c8b8d8;
   --color-brand: #7A6B96;        /* dusty plum — student portal accent (admin/landing don't use) */
   --color-brand-dark: #635580;   /* plum-dark — hover / pressed */
-  --font-sans: "Contralto", system-ui, sans-serif;
+  --font-sans: "Geist", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
 }
 
@@ -60,8 +52,8 @@
   body {
     background-color: #f8f9ed;
     color: #5e4075;
-    font-family: "Contralto", system-ui, sans-serif;
-    font-weight: 400;
+    font-family: "Geist", system-ui, sans-serif;
+    font-weight: 500;
     font-size: 1rem;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
