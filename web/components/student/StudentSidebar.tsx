@@ -132,7 +132,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
             <ChemistryOctetLogo size={44} />
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="text-base text-[#7A6B96] whitespace-nowrap leading-tight">
+            <p className="text-base text-[15px] text-[#7A6B96] whitespace-nowrap leading-tight">
               Chemistry<span className="text-[#64748b]">@OCTET</span>
             </p>
           </div>

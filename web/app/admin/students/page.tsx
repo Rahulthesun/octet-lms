@@ -4,74 +4,32 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { IconCheckCircle, IconXCircle, IconDocument } from '@/components/ui/SvgIcons'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type AppStatus = 'pending' | 'approved' | 'rejected'
-type StudentStatus = 'active' | 'blocked'
-
-interface Application {
-  id: string; name: string; grade: string; batch: string
-  phone: string; email: string; appliedDate: string
-  status: AppStatus; board: string
-}
-
-interface Student {
-  id: string; name: string; roll: string; grade: string; batch: string
-  phone: string; email: string; joinedDate: string
-  onlineAtt: number | null; offlineAtt: number | null
-  status: StudentStatus; avgScore: number
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const initialApplications: Application[] = [
-  { id: 'APP001', name: 'Rohan Suresh',  grade: '12th', batch: 'Offline Batch A', phone: '9876540001', email: 'rohan@gmail.com',  appliedDate: '20 May 2026', status: 'pending', board: 'CBSE'     },
-  { id: 'APP002', name: 'Lakshmi Devi', grade: '11th', batch: 'Online Batch B',  phone: '9876540002', email: 'lakshmi@gmail.com', appliedDate: '21 May 2026', status: 'pending', board: 'TN Board' },
-  { id: 'APP003', name: 'Vishnu Rajan', grade: 'JEE',  batch: 'Online Batch A',  phone: '9876540003', email: 'vishnu@gmail.com',  appliedDate: '22 May 2026', status: 'pending', board: 'JEE'      },
-  { id: 'APP004', name: 'Pooja Nair',   grade: 'NEET', batch: 'Online Batch A',  phone: '9876540004', email: 'pooja@gmail.com',   appliedDate: '22 May 2026', status: 'pending', board: 'NEET'     },
-  { id: 'APP005', name: 'Ajay Krishnan',grade: '12th', batch: 'Offline Batch A', phone: '9876540005', email: 'ajay@gmail.com',    appliedDate: '23 May 2026', status: 'pending', board: 'CBSE'     },
-]
-
-const students: Student[] = [
-  { id: 'S01', name: 'Arjun Kumar',      roll: 'CO-001', grade: '12th', batch: 'Offline A', phone: '9876543210', email: 'arjun@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 82, offlineAtt: 78,   status: 'active',  avgScore: 84 },
-  { id: 'S02', name: 'Sneha Rajan',      roll: 'CO-002', grade: '12th', batch: 'Online A',  phone: '9876543211', email: 'sneha@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 94, offlineAtt: null, status: 'active',  avgScore: 92 },
-  { id: 'S03', name: 'Karthik S.',       roll: 'CO-003', grade: '11th', batch: 'Offline B', phone: '9876543212', email: 'karthik@gmail.com',  joinedDate: '15 Jun 2025', onlineAtt: 72, offlineAtt: 68,   status: 'blocked', avgScore: 58 },
-  { id: 'S04', name: 'Priya Thirumalai', roll: 'CO-004', grade: 'JEE',  batch: 'Online B',  phone: '9876543213', email: 'priya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 88, offlineAtt: null, status: 'active',  avgScore: 76 },
-  { id: 'S05', name: 'Meenakshi A.',     roll: 'CO-005', grade: '12th', batch: 'Offline A', phone: '9876543214', email: 'meenakshi@gmail.com',joinedDate: '01 Jun 2025', onlineAtt: 91, offlineAtt: 89,   status: 'active',  avgScore: 88 },
-  { id: 'S06', name: 'Rahul Venkat',     roll: 'CO-006', grade: 'NEET', batch: 'Online A',  phone: '9876543215', email: 'rahul@gmail.com',    joinedDate: '15 Jun 2025', onlineAtt: 73, offlineAtt: null, status: 'active',  avgScore: 69 },
-  { id: 'S07', name: 'Divya Krishnan',   roll: 'CO-007', grade: '11th', batch: 'Offline B', phone: '9876543216', email: 'divya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 65, offlineAtt: 60,   status: 'blocked', avgScore: 52 },
-  { id: 'S08', name: 'Ananya Lakshmi',   roll: 'CO-008', grade: 'NEET', batch: 'Online B',  phone: '9876543217', email: 'ananya@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 97, offlineAtt: null, status: 'active',  avgScore: 94 },
-  { id: 'S09', name: 'Siva Prakash',     roll: 'CO-009', grade: '12th', batch: 'Offline A', phone: '9876543218', email: 'siva@gmail.com',     joinedDate: '15 Jun 2025', onlineAtt: 85, offlineAtt: 83,   status: 'active',  avgScore: 78 },
-  { id: 'S10', name: 'Arun Shankar',     roll: 'CO-010', grade: 'JEE',  batch: 'Online A',  phone: '9876543219', email: 'arun@gmail.com',     joinedDate: '01 Jun 2025', onlineAtt: 79, offlineAtt: null, status: 'active',  avgScore: 71 },
-  { id: 'S11', name: 'Deepak Mohan',     roll: 'CO-011', grade: '11th', batch: 'Offline B', phone: '9876543220', email: 'deepak@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 88, offlineAtt: 85,   status: 'active',  avgScore: 80 },
-  { id: 'S12', name: 'Kaviya Raj',       roll: 'CO-012', grade: '12th', batch: 'Online B',  phone: '9876543221', email: 'kaviya@gmail.com',   joinedDate: '15 Jun 2025', onlineAtt: 92, offlineAtt: null, status: 'active',  avgScore: 86 },
-  { id: 'S13', name: 'Surya Kumar',      roll: 'CO-013', grade: 'NEET', batch: 'Offline A', phone: '9876543222', email: 'surya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 71, offlineAtt: 69,   status: 'active',  avgScore: 65 },
-  { id: 'S14', name: 'Nithya Saravanan', roll: 'CO-014', grade: '11th', batch: 'Online A',  phone: '9876543223', email: 'nithya@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 96, offlineAtt: null, status: 'active',  avgScore: 91 },
-  { id: 'S15', name: 'Praveen Raman',    roll: 'CO-015', grade: 'JEE',  batch: 'Offline B', phone: '9876543224', email: 'praveen@gmail.com',  joinedDate: '15 Jun 2025', onlineAtt: 76, offlineAtt: 74,   status: 'active',  avgScore: 73 },
-  { id: 'S16', name: 'Riya Sharma',      roll: 'CO-016', grade: '12th', batch: 'Online A',  phone: '9876543225', email: 'riya@gmail.com',     joinedDate: '01 Jun 2025', onlineAtt: 89, offlineAtt: null, status: 'active',  avgScore: 82 },
-  { id: 'S17', name: 'Venkat Suresh',    roll: 'CO-017', grade: '11th', batch: 'Offline A', phone: '9876543226', email: 'venkat@gmail.com',   joinedDate: '15 Jun 2025', onlineAtt: 63, offlineAtt: 58,   status: 'blocked', avgScore: 48 },
-  { id: 'S18', name: 'Pooja Nair',       roll: 'CO-018', grade: 'NEET', batch: 'Online B',  phone: '9876543227', email: 'pooja2@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 93, offlineAtt: null, status: 'active',  avgScore: 89 },
-  { id: 'S19', name: 'Manoj Pillai',     roll: 'CO-019', grade: '12th', batch: 'Offline B', phone: '9876543228', email: 'manoj@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 80, offlineAtt: 77,   status: 'active',  avgScore: 74 },
-  { id: 'S20', name: 'Lakshmi Devi',     roll: 'CO-020', grade: '11th', batch: 'Online A',  phone: '9876543229', email: 'lakshmi2@gmail.com', joinedDate: '01 Jun 2025', onlineAtt: 98, offlineAtt: null, status: 'active',  avgScore: 95 },
-]
+import { useStudents, type StudentRecord } from '@/hooks/admin/useStudents'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const GRADES   = ['All', '11th', '12th', 'JEE', 'NEET'] as const
-const STATUSES = ['All', 'active', 'blocked'] as const
 
 function initials(name: string) {
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('')
 }
 
+function formatDate(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 // ─── Application Card ─────────────────────────────────────────────────────────
 
-function ApplicationCard({ app, onApprove, onReject }: {
-  app: Application; onApprove: (id: string) => void; onReject: (id: string) => void
+function ApplicationCard({
+  app,
+  onApprove,
+  onReject,
+  busy,
+}: {
+  app: StudentRecord
+  onApprove: (id: string) => void
+  onReject: (id: string) => void
+  busy: boolean
 }) {
-  const isPending = app.status === 'pending'
-
   return (
     <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
       className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-4">
@@ -79,75 +37,135 @@ function ApplicationCard({ app, onApprove, onReject }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-lg text-primary">{app.name}</h3>
-            <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 rounded-full">{app.grade}</span>
-            {!isPending && (
-              <span className="text-sm px-2 py-0.5 border border-gray-200 text-gray-600 capitalize rounded-full">{app.status}</span>
+            {app.class_grade && (
+              <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 rounded-full">{app.class_grade}</span>
             )}
           </div>
-          <p className="text-base text-gray-600 mt-0.5">{app.batch} · {app.board} Board</p>
-          <p className="text-base text-gray-600">{app.email} · <span className="font-inter">{app.phone}</span></p>
-          <p className="text-base text-gray-600">Applied on <span className="font-inter">{app.appliedDate}</span></p>
+          <p className="text-base text-gray-600 mt-0.5">
+            {[app.learning_mode, app.preferred_batch].filter(Boolean).join(' · ') || 'Batch not set'}
+            {app.school_college ? ` · ${app.school_college}` : ''}
+          </p>
+          <p className="text-base text-gray-600">{app.email} · <span className="font-inter">{app.mobile_number || '—'}</span></p>
+          <p className="text-base text-gray-600">Applied on <span className="font-inter">{formatDate(app.created_at)}</span></p>
         </div>
         <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
           {initials(app.name)}
         </div>
       </div>
 
-      {/* Document placeholders */}
+      {/* Document links — pulled from marksheet_10th_url / school_id_card_url */}
       <div className="grid grid-cols-2 gap-3">
-        {[{ label: '10th ID Card', sub: 'Identity proof' }, { label: '10th Grade Paper', sub: 'Academic proof' }].map(({ label, sub }) => (
+        {[
+          { label: '10th ID Card', sub: 'Identity proof', url: app.school_id_card_url },
+          { label: '10th Grade Paper', sub: 'Academic proof', url: app.marksheet_10th_url },
+        ].map(({ label, sub, url }) => (
           <div key={label} className="border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1.5 py-3 bg-gray-50">
             <IconDocument className="w-4 h-4" />
             <div className="text-center">
               <p className="text-sm text-primary">{label}</p>
               <p className="text-sm text-gray-500">{sub}</p>
             </div>
-            <button className="text-sm text-primary hover:cursor-pointer hover:text-[#3d2652]">View Document</button>
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:cursor-pointer hover:text-[#3d2652]">
+                View Document
+              </a>
+            ) : (
+              <span className="text-sm text-gray-300 cursor-not-allowed">Not uploaded</span>
+            )}
           </div>
         ))}
       </div>
 
-      {isPending && (
-        <div className="flex gap-3">
-          <button onClick={() => onReject(app.id)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-300 text-gray-600 text-base hover:bg-gray-50 transition-colors">
-            <IconXCircle className="w-4 h-4" />Reject
-          </button>
-          <button onClick={() => onApprove(app.id)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors">
-            <IconCheckCircle className="w-4 h-4" />Approve
-          </button>
-        </div>
-      )}
+      <div className="flex gap-3">
+        <button disabled={busy} onClick={() => onReject(app.id)}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-300 text-gray-600 text-base hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <IconXCircle className="w-4 h-4" />Reject
+        </button>
+        <button disabled={busy} onClick={() => onApprove(app.id)}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors disabled:opacity-50">
+          <IconCheckCircle className="w-4 h-4" />Approve
+        </button>
+      </div>
     </motion.div>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const STATUSES = ['All', 'active', 'blocked'] as const
+
 export default function StudentsPage() {
+  const {
+    applications,
+    students,
+    loadingApplications,
+    loadingStudents,
+    error,
+    approveStudent,
+    rejectStudent,
+    setBlocked,
+  } = useStudents()
+
   const [activeTab, setActiveTab] = useState<'applications' | 'database'>('applications')
-  const [applications, setApplications] = useState<Application[]>(initialApplications)
   const [search, setSearch] = useState('')
-  const [gradeFilter, setGradeFilter] = useState<typeof GRADES[number]>('All')
+  const [gradeFilter, setGradeFilter] = useState<string>('All')
   const [statusFilter, setStatusFilter] = useState<typeof STATUSES[number]>('All')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null)
 
-  const pendingCount = applications.filter((a) => a.status === 'pending').length
+  // class_grade is free text in the DB (no enum constraint) — derive options
+  // from what's actually present rather than hardcoding a list.
+  const gradeOptions = useMemo(() => {
+    const set = new Set<string>()
+    students.forEach((s) => s.class_grade && set.add(s.class_grade))
+    return ['All', ...Array.from(set).sort()]
+  }, [students])
 
-  const approve = (id: string) => setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: 'approved' } : a))
-  const reject  = (id: string) => setApplications((prev) => prev.map((a) => a.id === id ? { ...a, status: 'rejected' } : a))
+  const approve = async (id: string) => {
+    setPendingActionId(id)
+    try {
+      await approveStudent(id)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  const reject = async (id: string) => {
+    setPendingActionId(id)
+    try {
+      await rejectStudent(id)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  const toggleBlock = async (id: string, currentlyBlocked: boolean) => {
+    try {
+      await setBlocked(id, !currentlyBlocked)
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const filteredStudents = useMemo(
-    () => students.filter((s) => {
-      const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.roll.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase())
-      const matchGrade  = gradeFilter === 'All' || s.grade === gradeFilter
-      const matchStatus = statusFilter === 'All' || s.status === statusFilter
-      return matchSearch && matchGrade && matchStatus
-    }),
-    [search, gradeFilter, statusFilter]
+    () =>
+      students.filter((s) => {
+        const q = search.toLowerCase()
+        const matchSearch =
+          s.name.toLowerCase().includes(q) ||
+          (s.admission_number ?? '').toLowerCase().includes(q) ||
+          s.email.toLowerCase().includes(q)
+        const matchGrade = gradeFilter === 'All' || s.class_grade === gradeFilter
+        const matchStatus =
+          statusFilter === 'All' ||
+          (statusFilter === 'blocked' ? s.blocked : !s.blocked)
+        return matchSearch && matchGrade && matchStatus
+      }),
+    [students, search, gradeFilter, statusFilter]
   )
 
   const activeFilterCount = (gradeFilter !== 'All' ? 1 : 0) + (statusFilter !== 'All' ? 1 : 0)
@@ -160,6 +178,12 @@ export default function StudentsPage() {
         <p className="text-base text-gray-600 mt-1">Verify applications and manage the student database.</p>
       </div>
 
+      {error && (
+        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-base rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-gray-200 mb-8">
         <button onClick={() => { setActiveTab('applications'); setSearch('') }}
@@ -167,8 +191,8 @@ export default function StudentsPage() {
             activeTab === 'applications' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-800'
           }`}>
           New Applications
-          {pendingCount > 0 && (
-            <span className="text-sm px-2 py-0.5 bg-primary text-white font-inter rounded-full">{pendingCount}</span>
+          {applications.length > 0 && (
+            <span className="text-sm px-2 py-0.5 bg-primary text-white font-inter rounded-full">{applications.length}</span>
           )}
         </button>
         <button onClick={() => { setActiveTab('database'); setSearch('') }}
@@ -184,28 +208,25 @@ export default function StudentsPage() {
         {/* Applications tab */}
         {activeTab === 'applications' && (
           <motion.div key="applications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }}>
-            {pendingCount === 0 && applications.every((a) => a.status !== 'pending') && (
+            {loadingApplications ? (
+              <div className="text-center py-16 text-gray-600 text-base">Loading applications…</div>
+            ) : applications.length === 0 ? (
               <div className="text-center py-16 text-gray-600 text-base">No pending applications.</div>
-            )}
-            {pendingCount > 0 && (
+            ) : (
               <div className="mb-8">
-                <h2 className="text-base text-gray-600 mb-4">Pending Review <span className="bg-primary text-white text-base font-inter px-2 py-0.5 rounded-full">{pendingCount}</span></h2>
+                <h2 className="text-base text-gray-600 mb-4">
+                  Pending Review <span className="bg-primary text-white text-base font-inter px-2 py-0.5 rounded-full">{applications.length}</span>
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   <AnimatePresence>
-                    {applications.filter((a) => a.status === 'pending').map((app) => (
-                      <ApplicationCard key={app.id} app={app} onApprove={approve} onReject={reject} />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-            )}
-            {applications.some((a) => a.status !== 'pending') && (
-              <div>
-                <h2 className="text-base text-gray-600 mb-4">Processed</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  <AnimatePresence>
-                    {applications.filter((a) => a.status !== 'pending').map((app) => (
-                      <ApplicationCard key={app.id} app={app} onApprove={approve} onReject={reject} />
+                    {applications.map((app) => (
+                      <ApplicationCard
+                        key={app.id}
+                        app={app}
+                        onApprove={approve}
+                        onReject={reject}
+                        busy={pendingActionId === app.id}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -230,7 +251,6 @@ export default function StudentsPage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full text-base text-gray-800 placeholder-gray-400 outline-none focus:border-gray-400 bg-transparent" />
                 </div>
 
-                {/* Filter toggle button — inline panel, no floating dropdown */}
                 <button
                   onClick={() => setFilterOpen((o) => !o)}
                   className={`flex items-center gap-2 px-4 py-2.5 border text-base rounded-full transition-colors shrink-0 ${
@@ -252,7 +272,6 @@ export default function StudentsPage() {
                 </button>
               </div>
 
-              {/* Inline filter panel — in normal flow, no absolute positioning */}
               <AnimatePresence>
                 {filterOpen && (
                   <motion.div
@@ -263,11 +282,10 @@ export default function StudentsPage() {
                     className="overflow-hidden"
                   >
                     <div className="bg-white border border-gray-200 shadow-sm p-4 space-y-4">
-                      {/* Grade filter */}
                       <div>
                         <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">Grade</p>
                         <div className="flex flex-wrap gap-2">
-                          {GRADES.map((g) => (
+                          {gradeOptions.map((g) => (
                             <button key={g} onClick={() => setGradeFilter(g)}
                               className={`px-3 py-1.5 text-base rounded-full transition-colors ${
                                 gradeFilter === g ? 'bg-primary text-white' : 'border border-gray-200 text-gray-600 hover:border-gray-400'
@@ -277,7 +295,6 @@ export default function StudentsPage() {
                           ))}
                         </div>
                       </div>
-                      {/* Status filter */}
                       <div>
                         <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">Status</p>
                         <div className="flex gap-2">
@@ -305,23 +322,27 @@ export default function StudentsPage() {
 
             {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_110px_80px_110px_110px_80px_44px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
+              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_80px_44px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
                 <span>ID</span>
                 <span>Student</span>
                 <span>Roll</span>
                 <span>Grade</span>
                 <span>Batch</span>
+                {/* TODO: attendance columns don't exist on `students` — needs a join
+                    against attendance_sessions/attendance_records once wired up. */}
                 <span className="text-right">Attendance</span>
                 <span className="text-right">Status</span>
                 <span />
               </div>
               <div className="divide-y divide-gray-100">
-                {filteredStudents.length === 0 ? (
+                {loadingStudents ? (
+                  <div className="py-12 text-center text-gray-600 text-base">Loading students…</div>
+                ) : filteredStudents.length === 0 ? (
                   <div className="py-12 text-center text-gray-600 text-base">No students match your filters.</div>
                 ) : (
                   filteredStudents.map((s, i) => (
                     <div key={s.id}
-                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_110px_80px_110px_110px_80px_44px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
+                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_80px_44px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
                       <span className="text-base text-gray-400 font-inter w-10">{i + 1}</span>
                       <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none">
                         <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
@@ -332,18 +353,20 @@ export default function StudentsPage() {
                           <p className="text-base text-gray-600 truncate">{s.email}</p>
                         </div>
                       </div>
-                      <span className="text-base font-inter text-gray-600 hidden lg:block">{s.roll}</span>
-                      <span className="text-base border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.grade}</span>
-                      <span className="text-base text-gray-600 hidden lg:block">{s.batch}</span>
-                      <div className="text-right hidden lg:block">
-                        <span className="text-base font-inter font-bold text-primary">{s.onlineAtt}%</span>
-                        {s.offlineAtt !== null && (
-                          <span className="text-base font-inter text-gray-400"> / {s.offlineAtt}%</span>
-                        )}
-                      </div>
-                      <span className={`text-base text-right hidden lg:block ${s.status === 'blocked' ? 'text-red-500' : 'text-green-600'}`}>
-                        {s.status === 'blocked' ? 'Blocked' : 'Active'}
+                      <span className="text-base font-inter text-gray-600 hidden lg:block">{s.admission_number || '—'}</span>
+                      <span className="text-base border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.class_grade || '—'}</span>
+                      <span className="text-base text-gray-600 hidden lg:block">
+                        {[s.learning_mode, s.preferred_batch].filter(Boolean).join(' · ') || '—'}
                       </span>
+                      <div className="text-right hidden lg:block">
+                        <span className="text-base font-inter text-gray-400">—</span>
+                      </div>
+                      <button
+                        onClick={() => toggleBlock(s.id, s.blocked)}
+                        className={`text-base text-right hidden lg:block hover:underline ${s.blocked ? 'text-red-500' : 'text-green-600'}`}
+                      >
+                        {s.blocked ? 'Blocked' : 'Active'}
+                      </button>
                       <Link href={`/admin/students/${s.id}`}
                         className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-primary transition-all shrink-0 ml-auto lg:ml-0">
                         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">

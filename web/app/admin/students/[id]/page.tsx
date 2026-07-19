@@ -1,23 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Student {
-  id: string; name: string; roll: string; grade: string; batch: string
-  phone: string; email: string; joinedDate: string
-  onlineAtt: number | null; offlineAtt: number | null
-  board: string; parent: string; parentPhone: string; avgScore: number
-}
-
-interface TestRecord {
-  id: string; name: string; date: string; maxMarks: number
-  marks: number | null; type: 'MCQ' | 'Descriptive'
-}
+import { useStudentDetail } from '@/hooks/admin/useStudents'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -46,69 +33,76 @@ function IconCheckCircle({ className }: { className?: string }) {
   )
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const students: Student[] = [
-  { id: 'S01', name: 'Arjun Kumar',      roll: 'CO-001', grade: '12th', batch: 'Offline A', phone: '9876543210', email: 'arjun@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 82, offlineAtt: 78,   board: 'CBSE',     parent: 'Suresh Kumar',     parentPhone: '9876543200', avgScore: 84 },
-  { id: 'S02', name: 'Sneha Rajan',      roll: 'CO-002', grade: '12th', batch: 'Online A',  phone: '9876543211', email: 'sneha@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 94, offlineAtt: null, board: 'CBSE',     parent: 'Rajan V.',         parentPhone: '9876543201', avgScore: 92 },
-  { id: 'S03', name: 'Karthik S.',       roll: 'CO-003', grade: '11th', batch: 'Offline B', phone: '9876543212', email: 'karthik@gmail.com',  joinedDate: '15 Jun 2025', onlineAtt: 72, offlineAtt: 68,   board: 'TN Board', parent: 'Senthil Kumar',    parentPhone: '9876543202', avgScore: 58 },
-  { id: 'S04', name: 'Priya Thirumalai', roll: 'CO-004', grade: 'JEE',  batch: 'Online B',  phone: '9876543213', email: 'priya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 88, offlineAtt: null, board: 'JEE',      parent: 'Thirumalai',       parentPhone: '9876543203', avgScore: 87 },
-  { id: 'S05', name: 'Meenakshi A.',     roll: 'CO-005', grade: '12th', batch: 'Offline A', phone: '9876543214', email: 'meenakshi@gmail.com',joinedDate: '01 Jun 2025', onlineAtt: 91, offlineAtt: 89,   board: 'CBSE',     parent: 'Anand M.',         parentPhone: '9876543204', avgScore: 88 },
-  { id: 'S06', name: 'Rahul Venkat',     roll: 'CO-006', grade: 'NEET', batch: 'Online A',  phone: '9876543215', email: 'rahul@gmail.com',    joinedDate: '15 Jun 2025', onlineAtt: 73, offlineAtt: null, board: 'NEET',     parent: 'Venkat R.',        parentPhone: '9876543205', avgScore: 69 },
-  { id: 'S07', name: 'Divya Krishnan',   roll: 'CO-007', grade: '11th', batch: 'Offline B', phone: '9876543216', email: 'divya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 65, offlineAtt: 60,   board: 'TN Board', parent: 'Krishnan P.',      parentPhone: '9876543206', avgScore: 52 },
-  { id: 'S08', name: 'Ananya Lakshmi',   roll: 'CO-008', grade: 'NEET', batch: 'Online B',  phone: '9876543217', email: 'ananya@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 97, offlineAtt: null, board: 'NEET',     parent: 'Lakshmi S.',       parentPhone: '9876543207', avgScore: 94 },
-  { id: 'S09', name: 'Siva Prakash',     roll: 'CO-009', grade: '12th', batch: 'Offline A', phone: '9876543218', email: 'siva@gmail.com',     joinedDate: '15 Jun 2025', onlineAtt: 85, offlineAtt: 83,   board: 'CBSE',     parent: 'Prakash S.',       parentPhone: '9876543208', avgScore: 78 },
-  { id: 'S10', name: 'Arun Shankar',     roll: 'CO-010', grade: 'JEE',  batch: 'Online A',  phone: '9876543219', email: 'arun@gmail.com',     joinedDate: '01 Jun 2025', onlineAtt: 79, offlineAtt: null, board: 'JEE',      parent: 'Shankar A.',       parentPhone: '9876543209', avgScore: 71 },
-  { id: 'S11', name: 'Deepak Mohan',     roll: 'CO-011', grade: '11th', batch: 'Offline B', phone: '9876543220', email: 'deepak@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 88, offlineAtt: 85,   board: 'TN Board', parent: 'Mohan D.',         parentPhone: '9876543210', avgScore: 80 },
-  { id: 'S12', name: 'Kaviya Raj',       roll: 'CO-012', grade: '12th', batch: 'Online B',  phone: '9876543221', email: 'kaviya@gmail.com',   joinedDate: '15 Jun 2025', onlineAtt: 92, offlineAtt: null, board: 'CBSE',     parent: 'Raj K.',           parentPhone: '9876543211', avgScore: 86 },
-  { id: 'S13', name: 'Surya Kumar',      roll: 'CO-013', grade: 'NEET', batch: 'Offline A', phone: '9876543222', email: 'surya@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 71, offlineAtt: 69,   board: 'NEET',     parent: 'Kumar S.',         parentPhone: '9876543212', avgScore: 65 },
-  { id: 'S14', name: 'Nithya Saravanan',roll: 'CO-014', grade: '11th', batch: 'Online A',  phone: '9876543223', email: 'nithya@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 96, offlineAtt: null, board: 'TN Board', parent: 'Saravanan N.',     parentPhone: '9876543213', avgScore: 91 },
-  { id: 'S15', name: 'Praveen Raman',    roll: 'CO-015', grade: 'JEE',  batch: 'Offline B', phone: '9876543224', email: 'praveen@gmail.com',  joinedDate: '15 Jun 2025', onlineAtt: 76, offlineAtt: 74,   board: 'JEE',      parent: 'Raman P.',         parentPhone: '9876543214', avgScore: 73 },
-  { id: 'S16', name: 'Riya Sharma',      roll: 'CO-016', grade: '12th', batch: 'Online A',  phone: '9876543225', email: 'riya@gmail.com',     joinedDate: '01 Jun 2025', onlineAtt: 89, offlineAtt: null, board: 'CBSE',     parent: 'Sharma R.',        parentPhone: '9876543215', avgScore: 82 },
-  { id: 'S17', name: 'Venkat Suresh',    roll: 'CO-017', grade: '11th', batch: 'Offline A', phone: '9876543226', email: 'venkat@gmail.com',   joinedDate: '15 Jun 2025', onlineAtt: 63, offlineAtt: 58,   board: 'TN Board', parent: 'Suresh V.',        parentPhone: '9876543216', avgScore: 48 },
-  { id: 'S18', name: 'Pooja Nair',       roll: 'CO-018', grade: 'NEET', batch: 'Online B',  phone: '9876543227', email: 'pooja2@gmail.com',   joinedDate: '01 Jun 2025', onlineAtt: 93, offlineAtt: null, board: 'NEET',     parent: 'Nair P.',          parentPhone: '9876543217', avgScore: 89 },
-  { id: 'S19', name: 'Manoj Pillai',     roll: 'CO-019', grade: '12th', batch: 'Offline B', phone: '9876543228', email: 'manoj@gmail.com',    joinedDate: '01 Jun 2025', onlineAtt: 80, offlineAtt: 77,   board: 'CBSE',     parent: 'Pillai M.',        parentPhone: '9876543218', avgScore: 74 },
-  { id: 'S20', name: 'Lakshmi Devi',     roll: 'CO-020', grade: '11th', batch: 'Online A',  phone: '9876543229', email: 'lakshmi2@gmail.com', joinedDate: '01 Jun 2025', onlineAtt: 98, offlineAtt: null, board: 'TN Board', parent: 'Devi L.',          parentPhone: '9876543219', avgScore: 95 },
-]
-
-const testHistory: Record<string, TestRecord[]> = {
-  S01: [
-    { id: 'T1', name: 'Unit Test 1 — Atomic Structure',  date: '10 May 2026', maxMarks: 50, marks: 44, type: 'MCQ' },
-    { id: 'T2', name: 'Unit Test 2 — Chemical Bonding',  date: '17 May 2026', maxMarks: 50, marks: 42, type: 'MCQ' },
-  ],
-  S02: [
-    { id: 'T1', name: 'Unit Test 1 — Atomic Structure', date: '10 May 2026', maxMarks: 50, marks: 47, type: 'MCQ' },
-    { id: 'T2', name: 'Unit Test 2 — Chemical Bonding', date: '17 May 2026', maxMarks: 50, marks: 46, type: 'MCQ' },
-  ],
-  S04: [
-    { id: 'T1', name: 'Unit Test 1 — Atomic Structure', date: '10 May 2026', maxMarks: 50, marks: 43, type: 'MCQ' },
-    { id: 'T2', name: 'Unit Test 2 — Chemical Bonding', date: '17 May 2026', maxMarks: 50, marks: 44, type: 'MCQ' },
-  ],
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StudentDetailPage() {
   const params = useParams()
-  const student = students.find((s) => s.id === params.id) ?? students[0]
+  const id = typeof params.id === 'string' ? params.id : undefined
+  const { student, loading, error, saving, updateStudent } = useStudentDetail(id)
 
-  const [blocked, setBlocked]   = useState(student.avgScore < 60)
-  const [editing, setEditing]   = useState(false)
-  const [saved, setSaved]       = useState(false)
-  const [form, setForm]         = useState({
-    phone:       student.phone,
-    email:       student.email,
-    parent:      student.parent,
-    parentPhone: student.parentPhone,
+  const [editing, setEditing] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [blockActionError, setBlockActionError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    mobile_number: '',
+    email: '',
+    father_name: '',
+    father_mobile: '',
   })
 
-  const handleSave = () => {
-    setEditing(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+  // Sync form when the real record arrives (or changes underneath us)
+  useEffect(() => {
+    if (student) {
+      setForm({
+        mobile_number: student.mobile_number ?? '',
+        email: student.email ?? '',
+        father_name: student.father_name ?? '',
+        father_mobile: student.father_mobile ?? '',
+      })
+    }
+  }, [student])
+
+  const handleSave = async () => {
+    try {
+      await updateStudent(form)
+      setEditing(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      // error state already surfaced via hook's `error`
+    }
   }
 
-  const tests = testHistory[student.id] ?? []
+  const toggleBlock = async () => {
+    if (!student) return
+    setBlockActionError(null)
+    try {
+      await updateStudent({ blocked: !student.blocked })
+    } catch (e) {
+      setBlockActionError(e instanceof Error ? e.message : 'Failed to update block status')
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8 text-base text-gray-600">Loading student…</div>
+  }
+
+  if (error && !student) {
+    return (
+      <div className="p-8">
+        <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-base rounded-lg">{error}</div>
+      </div>
+    )
+  }
+
+  if (!student) {
+    return <div className="p-8 text-base text-gray-600">Student not found.</div>
+  }
 
   return (
     <div className="p-8">
@@ -134,20 +128,26 @@ export default function StudentDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <h1 className="text-2xl text-primary">{student.name}</h1>
-              <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600">{student.grade}</span>
-              <span className={`text-sm border border-gray-200 px-2 py-0.5 ${blocked ? 'text-gray-500 line-through' : 'text-gray-600'}`}>
-                {blocked ? 'Blocked' : 'Active'}
+              {student.class_grade && (
+                <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600">{student.class_grade}</span>
+              )}
+              <span className={`text-sm border border-gray-200 px-2 py-0.5 ${student.blocked ? 'text-red-500' : 'text-green-600'}`}>
+                {student.blocked ? 'Blocked' : 'Active'}
               </span>
             </div>
-            <p className="text-lg text-gray-600">{student.roll} · {student.batch} · Joined {student.joinedDate}</p>
+            <p className="text-lg text-gray-600">
+              {student.admission_number || 'No admission number'} ·{' '}
+              {[student.learning_mode, student.preferred_batch].filter(Boolean).join(' · ') || 'Batch not set'} · Joined {formatDate(student.created_at)}
+            </p>
           </div>
 
           <div className="flex gap-2 shrink-0">
             <button
-              onClick={() => setBlocked(!blocked)}
-              className="px-5 py-2.5 text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              onClick={toggleBlock}
+              disabled={saving}
+              className="px-5 py-2.5 text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              {blocked ? 'Unblock Student' : 'Block Student'}
+              {student.blocked ? 'Unblock Student' : 'Block Student'}
             </button>
             <button
               onClick={() => setEditing(!editing)}
@@ -158,10 +158,13 @@ export default function StudentDetailPage() {
             </button>
           </div>
         </div>
+        {blockActionError && (
+          <p className="text-sm text-red-600 mt-3">{blockActionError}</p>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Personal info — 2 columns, no Batch */}
+        {/* Personal info */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
           className="bg-white shadow-sm p-5"
@@ -171,7 +174,7 @@ export default function StudentDetailPage() {
             {/* Left: Phone, Email */}
             <div className="space-y-4">
               {([
-                { label: 'Phone', key: 'phone' as const },
+                { label: 'Phone', key: 'mobile_number' as const },
                 { label: 'Email', key: 'email' as const },
               ] as { label: string; key: keyof typeof form }[]).map(({ label, key }) => (
                 <div key={key}>
@@ -185,11 +188,15 @@ export default function StudentDetailPage() {
                 </div>
               ))}
             </div>
-            {/* Right: Parent's Name, Parent's Phone */}
+            {/* Right: Father's Name, Father's Phone */}
+            {/* NOTE: schema has both father_* and mother_* contact fields —
+                showing father's here to match the original single-field
+                layout. Swap to mother_name/mother_mobile or show both if
+                that's not the right call. */}
             <div className="space-y-4">
               {([
-                { label: "Parent's Name",  key: 'parent'      as const },
-                { label: "Parent's Phone", key: 'parentPhone' as const },
+                { label: "Father's Name",  key: 'father_name'   as const },
+                { label: "Father's Phone", key: 'father_mobile' as const },
               ] as { label: string; key: keyof typeof form }[]).map(({ label, key }) => (
                 <div key={key}>
                   <label className="text-sm text-gray-400 block mb-1">{label}</label>
@@ -209,10 +216,10 @@ export default function StudentDetailPage() {
                 className="flex-1 py-2.5 border border-gray-200 text-gray-500 text-base hover:bg-gray-50">
                 Cancel
               </button>
-              <button onClick={handleSave}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors">
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors disabled:opacity-50">
                 <IconCheck className="w-4 h-4" />
-                Save Changes
+                {saving ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           )}
@@ -222,42 +229,28 @@ export default function StudentDetailPage() {
               Changes saved successfully.
             </div>
           )}
+          {error && (
+            <p className="text-sm text-red-600 mt-3">{error}</p>
+          )}
         </motion.div>
 
         {/* Attendance */}
+        {/* TODO: `students` has no attendance columns — real attendance lives
+            in attendance_sessions/attendance_records per the attendance
+            system. This section is a placeholder until that's joined in. */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
           className="bg-white shadow-sm p-6"
         >
           <h2 className="text-base text-primary mb-5">Attendance</h2>
-          <div className="space-y-5">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-base text-gray-600">Online Classes</span>
-                <span className="text-base font-inter text-primary">{student.onlineAtt}%</span>
-              </div>
-              <div className="h-2 bg-gray-100 overflow-hidden">
-                <div className="h-full bg-primary transition-all" style={{ width: `${student.onlineAtt}%` }} />
-              </div>
-            </div>
-            {student.offlineAtt !== null ? (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-base text-gray-600">Offline Classes</span>
-                  <span className="text-base font-inter text-primary">{student.offlineAtt}%</span>
-                </div>
-                <div className="h-2 bg-gray-100 overflow-hidden">
-                  <div className="h-full bg-primary transition-all" style={{ width: `${student.offlineAtt}%` }} />
-                </div>
-              </div>
-            ) : (
-              <p className="text-base text-gray-400 italic">Not enrolled in offline batch.</p>
-            )}
-          </div>
+          <p className="text-base text-gray-400 italic">Attendance data not connected yet.</p>
         </motion.div>
       </div>
 
       {/* Test history */}
+      {/* TODO: no tests/marks table exists in the schema or backend service —
+          this section has no data source yet. Left as an explicit "not
+          available" state rather than mock numbers. */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.16 }}
         className="bg-white shadow-sm overflow-hidden"
@@ -265,37 +258,9 @@ export default function StudentDetailPage() {
         <div className="px-5 py-4 border-b border-gray-200">
           <h2 className="text-base text-primary">Test History</h2>
         </div>
-        {tests.length === 0 ? (
-          <div className="px-5 py-8 text-base text-gray-400 text-center">No test records available.</div>
-        ) : (
-          <>
-            <div className="grid grid-cols-[1fr_100px_80px_80px_60px] px-5 py-3 text-xs uppercase tracking-widest text-gray-400 bg-gray-50 border-b border-gray-100">
-              <span>Test</span>
-              <span>Date</span>
-              <span className="text-right">Marks</span>
-              <span className="text-right">Max</span>
-              <span className="text-right">%</span>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {tests.map((t) => (
-                <div key={t.id} className="grid grid-cols-[1fr_100px_80px_80px_60px] px-5 py-3 hover:bg-gray-50">
-                  <div>
-                    <span className="text-base text-gray-800">{t.name}</span>
-                    <span className="ml-2 text-xs border border-gray-200 px-1.5 py-0.5 text-gray-500">{t.type}</span>
-                  </div>
-                  <span className="text-base text-gray-500 self-center">{t.date}</span>
-                  <span className="text-base font-inter text-gray-700 text-right self-center">
-                    {t.marks !== null ? t.marks : '—'}
-                  </span>
-                  <span className="text-base font-inter text-gray-500 text-right self-center">{t.maxMarks}</span>
-                  <span className="text-base font-inter font-bold text-primary text-right self-center">
-                    {t.marks !== null ? `${Math.round((t.marks / t.maxMarks) * 100)}%` : '—'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="px-5 py-8 text-base text-gray-400 text-center">
+          Test history isn't connected to a backend source yet.
+        </div>
       </motion.div>
     </div>
   )

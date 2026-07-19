@@ -12,7 +12,7 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
   '/student': 'testing',
   '/student/notes': 'production',
   '/student/feedback': 'production',
-  '/student/courses': 'testing',
+  '/student/courses': 'production',
   
 }
 

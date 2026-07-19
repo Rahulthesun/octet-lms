@@ -100,6 +100,8 @@ function AnimatedLogoWatermark({
         }}
       >
         <ChemistryOctetLogo size={LOGO_SIZE} />
+
+        {/* ------ STUDENT TOKEN WATERMARK---------
         {studentToken && (
           <div
             style={{
@@ -116,6 +118,8 @@ function AnimatedLogoWatermark({
             Chemistry@OCTET · {studentToken}
           </div>
         )}
+        */}
+        
       </div>
     </div>
   )
