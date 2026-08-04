@@ -251,6 +251,9 @@ async function setStudentOverride(studentId, batchId, unblocked) {
     .eq("id", studentId)
     .maybeSingle();
 
+  console.log("Student Lookup:", student);
+  console.log("Student Error :", stuErr);
+
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
@@ -354,6 +357,9 @@ async function getRoster(sessionId) {
     .eq("id", sessionId)
     .maybeSingle();
 
+  console.log("Session Lookup:", session);
+  console.log("Session Error :", sessErr);
+
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
@@ -377,6 +383,9 @@ async function manualMark(sessionId, studentId, present) {
     .eq("id", sessionId)
     .maybeSingle();
 
+  console.log("Session Lookup:", session);
+  console.log("Session Error :", sessErr);
+
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
@@ -386,6 +395,9 @@ async function manualMark(sessionId, studentId, present) {
     .select("id")
     .eq("id", studentId)
     .maybeSingle();
+
+  console.log("Student Lookup:", student);
+  console.log("Student Error :", stuErr);
 
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
@@ -408,6 +420,10 @@ async function manualMark(sessionId, studentId, present) {
  * We resolve: auth_user_id → students.id → batch_enrollment check → mark present.
  */
 async function scanQrToken(qrToken, authUserId) {
+
+  console.log("\n========== QR SCAN ==========");
+  console.log("QR Token:", qrToken);
+  console.log("Auth User ID:", authUserId);
   // 1. Resolve student from auth user
   const { data: student, error: stuErr } = await supabase
     .from("students")
@@ -415,23 +431,36 @@ async function scanQrToken(qrToken, authUserId) {
     .eq("auth_user_id", authUserId)
     .maybeSingle();
 
+  console.log("Student Lookup:", student);
+  console.log("Student Error :", stuErr);
+
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student profile not found"), { status: 404 });
 
   // 2. Find the active session for this token (not expired)
   const { data: session, error: sessErr } = await supabase
+
     .from("attendance_sessions")
     .select("id, batch_id, expires_at")
     .eq("qr_token", qrToken)
     .maybeSingle();
 
+  console.log("Session Lookup:", session);
+  console.log("Session Error :", sessErr);
+
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Invalid or expired QR token"), { status: 400 });
 
   // 3. Check token expiry
-  if (new Date(session.expires_at) < new Date()) {
+ console.log("Session expires at :", session.expires_at);
+ console.log("Current server time:", new Date().toISOString());
+
+if (new Date(session.expires_at) < new Date()) {
+    console.log("❌ TOKEN EXPIRED");
     throw Object.assign(new Error("QR token has expired"), { status: 400 });
-  }
+}
+
+console.log("✅ TOKEN STILL VALID");
 
   // 4. Check enrollment
   const { data: enrollment, error: enrErr } = await supabase
@@ -440,6 +469,9 @@ async function scanQrToken(qrToken, authUserId) {
     .eq("batch_id", session.batch_id)
     .eq("student_id", student.id)
     .maybeSingle();
+
+  console.log("Enrollment:", enrollment);
+  console.log("Enrollment Error:", enrErr);  
 
   if (enrErr) throw enrErr;
   if (!enrollment) {
@@ -455,6 +487,9 @@ async function scanQrToken(qrToken, authUserId) {
     );
 
   if (markErr) throw markErr;
+  
+  console.log("✅ Attendance successfully marked");
+
 }
 
 // ─── Trend ────────────────────────────────────────────────────────────────────
@@ -471,6 +506,10 @@ async function getStudentTrend(studentId, sessionCount = 5) {
     .eq("id", studentId)
     .maybeSingle();
 
+
+  console.log("Student Lookup:", student);
+  console.log("Student Error :", stuErr);
+
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
@@ -480,6 +519,9 @@ async function getStudentTrend(studentId, sessionCount = 5) {
     .select("batch_id")
     .eq("student_id", studentId)
     .maybeSingle();
+
+  console.log("Enrollment:", enrollment);
+  console.log("Enrollment Error:", enrErr);
 
   if (enrErr) throw enrErr;
   if (!enrollment) return []; // Not in any batch → no trend data

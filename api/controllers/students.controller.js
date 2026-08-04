@@ -21,6 +21,18 @@ exports.getPendingStudents = async (req, res) => {
   }
 };
 
+exports.getRejectedStudents = async (req, res) => {
+  try {
+    const result = await studentService.getRejectedStudents();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
 exports.getStudentById = async (req, res) => {
   try {
     const result = await studentService.getStudentById(req.params.id);
@@ -33,7 +45,10 @@ exports.getStudentById = async (req, res) => {
 
 exports.createStudent = async (req, res) => {
   try {
-    const result = await studentService.createStudent(req.body);
+    const result = await studentService.createStudent(
+    req.body,
+    req.files
+);
     res.status(201).json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -74,10 +89,69 @@ exports.bulkImport = async (req, res) => {
                 });
             });
             // Convert comma-separated subjects to array
-            studentsArray = studentsArray.map(s => ({
-                ...s,
-                subjects: s.subjects ? s.subjects.split(',').map(sub => sub.trim()) : []
-            }));
+            // Convert Google Form / Excel CSV headers into database column names
+studentsArray = studentsArray.map((row) => ({
+    name: row["Full Name *"]?.trim(),
+    email: row["Email Address *"]?.trim(),
+
+    mobile_number: row["Mobile Number"]?.trim(),
+    whatsapp_number: row["WhatsApp Number"]?.trim(),
+    telegram_number: row["Telegram Number"]?.trim(),
+
+    date_of_birth: row["Date of Birth"]?.trim(),
+
+    tenth_school: row["10th School Name"]?.trim(),
+    tenth_score: row["10th Total Score (Marks / Percentage)"]?.trim(),
+
+    class_grade: row["Current Class / Grade (e.g., 12th, NEET, JEE)"]?.trim(),
+    school_college: row["Current School / College"]?.trim(),
+
+    subjects: row["Subjects Opted (in School)"]
+        ? row["Subjects Opted (in School)"]
+            .split(",")
+            .map((s) => s.trim())
+        : [],
+
+    maths_tuition:
+        row["Maths Tuition (Teacher name, days, and timings)"]?.trim(),
+
+    physics_tuition:
+        row["Physics Tuition (Teacher name, days, and timings)"]?.trim(),
+
+    other_tuition:
+        row["Other Tuition Details (Subject, teacher, days, and timings)"]?.trim(),
+
+    neet_jee_details:
+        row["NEET/JEE Details (Institute name and timings)"]?.trim(),
+
+    future_plan:
+        row["Future Plan (Post-graduation career goals)"]?.trim(),
+
+    preferred_batch:
+        (row["Preferred Batch"] || row["Preferred Batch "])?.trim(),
+
+    learning_mode:
+        (row["Learning Mode"] || row["Learning Mode "])?.trim(),
+
+    father_name: row["Father's Full Name"]?.trim(),
+    father_mobile: row["Father's Mobile Number"]?.trim(),
+    father_whatsapp: row["Father's WhatsApp Number"]?.trim(),
+    father_telegram: row["Father's Telegram Number"]?.trim(),
+    father_email: row["Father's Email"]?.trim(),
+    father_profession: row["Father's Profession"]?.trim(),
+
+    mother_name: row["Mother's Full Name"]?.trim(),
+    mother_mobile: row["Mother's Mobile Number"]?.trim(),
+    mother_whatsapp: row["Mother's WhatsApp Number"]?.trim(),
+    mother_telegram: row["Mother's Telegram Number"]?.trim(),
+    mother_email: row["Mother's Email"]?.trim(),
+    mother_profession: row["Mother's Profession"]?.trim(),
+
+    address: row["Address (Street and Area)"]?.trim(),
+    landmark: row["Landmark"]?.trim(),
+    city: row["City"]?.trim(),
+    pincode: row["Pincode"]?.trim(),
+}));
         } 
         // CASE 2: JSON body (application/json)
         else if (req.body && req.body.students) {

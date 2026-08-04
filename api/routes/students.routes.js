@@ -26,6 +26,8 @@ router.get("/", studentController.getAllStudents);
 // GET    /api/students/pending  → list all students with status = 'PENDING'
 router.get("/pending", studentController.getPendingStudents);
 
+router.get("/rejected", studentController.getRejectedStudents);
+
 // GET /api/student/profile?studentId=:userId
 router.get("/profile", verifyToken , studentController.getProfilebyUserID);
 
@@ -36,7 +38,20 @@ router.get("/:id", studentController.getStudentById);
 //CREATE + UPDATE + DELETE OPERATIONS (admin only)
 
 // POST   /api/students          → create a new student application (direct, not via form)
-router.post("/", studentController.createStudent);
+router.post(
+    "/",
+    upload.fields([
+        {
+            name: "id_card",
+            maxCount: 1,
+        },
+        {
+            name: "marksheet",
+            maxCount: 1,
+        },
+    ]),
+    studentController.createStudent
+);
 
 // PUT    /api/students/:id      → update an existing student (admin only)
 router.put("/:id", studentController.updateStudent);

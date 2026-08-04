@@ -3,16 +3,46 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { student } from '@/lib/mockData'
+import { authedFetch } from '@/lib/apiClient'
+import { useEffect } from 'react'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
 export default function ProfilePage() {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({ ...student })
+  const [form, setForm] = useState({
+  name: '',
+  email: '',
+  mobile: '',
+  grade: '',
+  avatar: null,
+  joinedDate: '',
+  rollNumber: '',
+})
   const [saved, setSaved] = useState(false)
 
+
+   useEffect(() => {
+    async function loadProfile() {
+      try {
+        const profile = await authedFetch('/api/students/profile');
+
+        setForm((prev) => ({
+          ...prev,
+          name: profile.name || '',
+          email: profile.email || '',
+          avatar: profile.avatar || null,
+        }));
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  
   const handleSave = async () => {
     await new Promise((r) => setTimeout(r, 600))
     setSaved(true)
@@ -158,7 +188,7 @@ export default function ProfilePage() {
                 Save Changes
               </button>
               <button
-                onClick={() => { setForm({ ...student }); setEditing(false) }}
+                onClick={() => { setEditing(false) }}
                 className="px-6 py-2.5 bg-accent1/50 text-primary text-base rounded-md hover:bg-accent1/70 transition-all duration-200"
               >
                 Reset

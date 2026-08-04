@@ -107,6 +107,8 @@ export function useContentTree(autoLoadChapters = true) {
   const [session, setSession] = useState<Awaited<ReturnType<typeof getSession>> | null>(null);
   const BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8000";
 
+  console.log("BASE =", BASE);
+  console.log("window.origin =", window.location.origin);
   // Fetch subjects on mount
   useEffect(() => {
     let cancelled = false;

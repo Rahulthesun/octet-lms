@@ -17,7 +17,16 @@
 const express = require("express");
 const cors = require("cors");
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "http://192.168.1.70:3000",
+  ],
+  credentials: true,
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
+}));
 
 // ── Middleware ────────────────────────────────────────────────
 // express.json() parses incoming request bodies that have the
@@ -28,6 +37,8 @@ app.use(express.json());
 // express.urlencoded() handles form submissions (HTML <form> POST).
 // { extended: true } allows nested objects in the body.
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // ── Routers ───────────────────────────────────────────────────
 // Each router file defines a group of related routes.
@@ -95,6 +106,7 @@ app.use((err, req, res, next) => {
 
 // ── Start listening ───────────────────────────────────────────
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });

@@ -29,17 +29,25 @@ function ApplicationCard({
   onApprove: (id: string) => void
   onReject: (id: string) => void
   busy: boolean
-}) {
+})
+ {
+
   return (
     <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
       className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-4">
-      <div className="flex items-start gap-4">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-lg text-primary">{app.name}</h3>
             {app.class_grade && (
-              <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 rounded-full">{app.class_grade}</span>
-            )}
+  <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600 rounded-full">
+    {app.class_grade === "11"
+      ? "11th Std"
+      : app.class_grade === "12"
+      ? "12th Std"
+      : app.class_grade}
+  </span>
+)}
           </div>
           <p className="text-base text-gray-600 mt-0.5">
             {[app.learning_mode, app.preferred_batch].filter(Boolean).join(' · ') || 'Batch not set'}
@@ -48,16 +56,28 @@ function ApplicationCard({
           <p className="text-base text-gray-600">{app.email} · <span className="font-inter">{app.mobile_number || '—'}</span></p>
           <p className="text-base text-gray-600">Applied on <span className="font-inter">{formatDate(app.created_at)}</span></p>
         </div>
-        <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
-          {initials(app.name)}
-        </div>
+        <div className="flex items-start gap-2">
+
+  <Link
+  href={`/admin/students/${app.id}`}
+  title="View Full Details"
+  className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-primary hover:text-primary hover:bg-gray-50 transition-all"
+>
+  <span className="text-lg">👁️</span>
+</Link>
+
+  <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0 rounded-lg">
+    {initials(app.name)}
+  </div>
+
+</div>
       </div>
 
       {/* Document links — pulled from marksheet_10th_url / school_id_card_url */}
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: '10th ID Card', sub: 'Identity proof', url: app.school_id_card_url },
-          { label: '10th Grade Paper', sub: 'Academic proof', url: app.marksheet_10th_url },
+          { label: '10th Marksheet', sub: 'Academic proof', url: app.marksheet_10th_url },
         ].map(({ label, sub, url }) => (
           <div key={label} className="border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1.5 py-3 bg-gray-50">
             <IconDocument className="w-4 h-4" />
@@ -66,9 +86,16 @@ function ApplicationCard({
               <p className="text-sm text-gray-500">{sub}</p>
             </div>
             {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:cursor-pointer hover:text-[#3d2652]">
-                View Document
-              </a>
+              <div className="flex items-center gap-2 mt-1">
+                <a href={url} target="_blank" rel="noopener noreferrer"
+                  className="px-2.5 py-1 text-sm border border-primary text-primary hover:bg-primary hover:text-white transition-colors rounded-md">
+                  View
+                </a>
+                <a href={url} download target="_blank" rel="noopener noreferrer"
+                  className="px-2.5 py-1 text-sm border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors rounded-md">
+                  Download
+                </a>
+              </div>
             ) : (
               <span className="text-sm text-gray-300 cursor-not-allowed">Not uploaded</span>
             )}
@@ -78,11 +105,11 @@ function ApplicationCard({
 
       <div className="flex gap-3">
         <button disabled={busy} onClick={() => onReject(app.id)}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-300 text-gray-600 text-base hover:bg-gray-50 transition-colors disabled:opacity-50">
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-red-300 text-red-600 text-base hover:bg-red-50 transition-colors disabled:opacity-50 rounded-lg">
           <IconXCircle className="w-4 h-4" />Reject
         </button>
         <button disabled={busy} onClick={() => onApprove(app.id)}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-base hover:bg-[#3d2652] transition-colors disabled:opacity-50">
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white text-base hover:bg-green-700 transition-colors disabled:opacity-50 rounded-lg">
           <IconCheckCircle className="w-4 h-4" />Approve
         </button>
       </div>
@@ -98,6 +125,7 @@ export default function StudentsPage() {
   const {
     applications,
     students,
+    rejectedStudents,
     loadingApplications,
     loadingStudents,
     error,
@@ -106,7 +134,7 @@ export default function StudentsPage() {
     setBlocked,
   } = useStudents()
 
-  const [activeTab, setActiveTab] = useState<'applications' | 'database'>('applications')
+  const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected'>('applications')
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState<string>('All')
   const [statusFilter, setStatusFilter] = useState<typeof STATUSES[number]>('All')
@@ -202,6 +230,20 @@ export default function StudentsPage() {
           Student Database
           <span className="text-sm px-2 py-0.5 border border-gray-200 text-gray-500 font-inter rounded-full">{students.length}</span>
         </button>
+        <button
+  onClick={() => setActiveTab("rejected")}
+  className={`flex items-center gap-2 px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
+    activeTab === "rejected"
+      ? "border-primary text-primary"
+      : "border-transparent text-gray-600 hover:text-gray-800"
+  }`}
+>
+  Rejected Students
+
+  <span className="text-sm px-2 py-0.5 border border-gray-200 text-gray-500 rounded-full">
+    {rejectedStudents.length}
+  </span>
+</button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -228,6 +270,8 @@ export default function StudentsPage() {
                         busy={pendingActionId === app.id}
                       />
                     ))}
+                    {/* Rejected Students */}
+
                   </AnimatePresence>
                 </div>
               </div>
@@ -322,7 +366,7 @@ export default function StudentsPage() {
 
             {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_80px_44px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
+              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_100px_60px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
                 <span>ID</span>
                 <span>Student</span>
                 <span>Roll</span>
@@ -332,7 +376,7 @@ export default function StudentsPage() {
                     against attendance_sessions/attendance_records once wired up. */}
                 <span className="text-right">Attendance</span>
                 <span className="text-right">Status</span>
-                <span />
+                <span className="text-center">Actions</span>
               </div>
               <div className="divide-y divide-gray-100">
                 {loadingStudents ? (
@@ -342,7 +386,7 @@ export default function StudentsPage() {
                 ) : (
                   filteredStudents.map((s, i) => (
                     <div key={s.id}
-                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_80px_44px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
+                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_100px_60px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
                       <span className="text-base text-gray-400 font-inter w-10">{i + 1}</span>
                       <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none">
                         <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
@@ -351,27 +395,37 @@ export default function StudentsPage() {
                         <div className="min-w-0">
                           <p className="text-base text-primary truncate">{s.name}</p>
                           <p className="text-base text-gray-600 truncate">{s.email}</p>
+                          <p className="text-sm text-gray-500 truncate font-inter">{s.mobile_number || '—'}</p>
                         </div>
                       </div>
                       <span className="text-base font-inter text-gray-600 hidden lg:block">{s.admission_number || '—'}</span>
                       <span className="text-base border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.class_grade || '—'}</span>
-                      <span className="text-base text-gray-600 hidden lg:block">
-                        {[s.learning_mode, s.preferred_batch].filter(Boolean).join(' · ') || '—'}
-                      </span>
+                      <div className="text-base text-gray-600 hidden lg:flex lg:flex-col lg:gap-0.5">
+                        {s.preferred_batch && (
+                          <span className="flex items-center gap-1">🟣 {s.preferred_batch}</span>
+                        )}
+                        {s.learning_mode && (
+                          <span className="flex items-center gap-1">🏫 {s.learning_mode}</span>
+                        )}
+                        {!s.preferred_batch && !s.learning_mode && '—'}
+                      </div>
                       <div className="text-right hidden lg:block">
                         <span className="text-base font-inter text-gray-400">—</span>
                       </div>
-                      <button
-                        onClick={() => toggleBlock(s.id, s.blocked)}
-                        className={`text-base text-right hidden lg:block hover:underline ${s.blocked ? 'text-red-500' : 'text-green-600'}`}
-                      >
-                        {s.blocked ? 'Blocked' : 'Active'}
-                      </button>
+                      <div className="text-right hidden lg:block">
+                        <button
+                          onClick={() => toggleBlock(s.id, s.blocked)}
+                          className={`inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity ${
+                            s.blocked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'
+                          }`}
+                        >
+                          {s.blocked ? '🔴 Blocked' : '🟢 Active'}
+                        </button>
+                      </div>
                       <Link href={`/admin/students/${s.id}`}
+                        title="Show Details"
                         className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-primary transition-all shrink-0 ml-auto lg:ml-0">
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                          <path d="M 6,4 L 10,8 L 6,12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <span className="text-xl leading-none">⋮</span>
                       </Link>
                     </div>
                   ))
@@ -384,6 +438,83 @@ export default function StudentsPage() {
             </p>
           </motion.div>
         )}
+
+        {activeTab === "rejected" && (
+  <motion.div
+    key="rejected"
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -10 }}
+    transition={{ duration: 0.22 }}
+  >
+
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+
+      <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_100px_60px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
+        <span>ID</span>
+        <span>Student</span>
+        <span>Roll</span>
+        <span>Grade</span>
+        <span>Batch</span>
+        <span>Status</span>
+        <span className="text-center">View</span>
+      </div>
+
+      <div className="divide-y divide-gray-100">
+
+        {rejectedStudents.length === 0 ? (
+
+          <div className="py-12 text-center text-gray-500">
+            No rejected students.
+          </div>
+
+        ) : (
+
+          rejectedStudents.map((s, i) => (
+
+            <div
+              key={s.id}
+              className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_100px_60px] gap-3 px-5 py-4 items-center hover:bg-gray-50"
+            >
+
+              <span>{i + 1}</span>
+
+              <div>
+                <p className="text-primary">{s.name}</p>
+                <p>{s.email}</p>
+                <p>{s.mobile_number}</p>
+              </div>
+
+              <span>{s.admission_number || "-"}</span>
+
+              <span>{s.class_grade || "-"}</span>
+
+              <span>{s.preferred_batch || "-"}</span>
+
+              <span className="text-red-600">
+                Rejected
+              </span>
+
+            <div className="flex justify-center">
+              <Link
+                href={`/admin/students/${s.id}`}
+                className="text-center text-xl"
+              >
+                👁️
+              </Link>
+            </div>
+            </div>
+
+          ))
+
+        )}
+
+      </div>
+
+    </div>
+
+  </motion.div>
+)}
       </AnimatePresence>
     </div>
   )
