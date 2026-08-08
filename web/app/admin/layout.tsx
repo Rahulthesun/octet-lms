@@ -1,15 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { AtomSVG, FlaskSVG, TestTubeSVG, MicroscopeSVG, CompoundSVG, BeakerSVG } from '@/components/ui/PencilSVGs'
 // app/admin/layout.tsx
 import AdminGuard from '@/components/admin/AdminGuard'
 import TestingGuard from '@/components/TestingGuard'
+import { clearGuestMode } from '@/hooks/useGuestMode'
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
+
+  // Self-heal: guest mode should only ever be "on" while inside /student/*.
+  // Landing on any admin page — however that happened — clears it, so a
+  // stale flag can never leak into a later session on a shared browser.
+  useEffect(() => {
+    clearGuestMode()
+  }, [])
 
   return (
     <AdminGuard>

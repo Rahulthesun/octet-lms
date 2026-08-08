@@ -8,6 +8,7 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
   '/admin/students': 'production',
   '/admin/attendance': 'production',
   '/admin/tests': 'testing',
+  '/admin/online-classes': 'production',
 
   '/student': 'testing',
   '/student/notes': 'production',
@@ -15,7 +16,8 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
   '/student/courses': 'production',
   '/student/attendance': 'production',
   '/student/profile': 'production',
-  
+  '/student/classes': 'production',
+
 }
 
 // Exact match only - unlisted paths default to 'testing'

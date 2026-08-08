@@ -11,6 +11,7 @@ import {
   useAttendanceSession,
   useRoster,
   useStudentTrend,
+  useBatchSummary,
 } from '../../../hooks/useAttendanceData'
 import type { Student } from '../../../hooks/useAttendanceData'
 
@@ -286,6 +287,8 @@ export default function AttendancePage() {
   const [addingBatch, setAddingBatch] = useState(false)
   const [newBatchName, setNewBatchName] = useState('')
   const [newBatchMode, setNewBatchMode] = useState<'online' | 'offline'>('offline')
+  const [newBatchMeetLink, setNewBatchMeetLink] = useState('')
+  const [newBatchLocation, setNewBatchLocation] = useState('')
   const [showAddStudents, setShowAddStudents] = useState(false)
   const [graphStudent, setGraphStudent] = useState<Student | null>(null)
   const [selectedStudentIdForScan, setSelectedStudentIdForScan] = useState('')
@@ -294,21 +297,30 @@ export default function AttendancePage() {
   const selectedBatch = batches.find(b => b.id === selectedBatchId) ?? null
 
   const { students, refetch: refetchStudents } = useBatchStudents(selectedBatchId, date)
+  const { summary } = useBatchSummary(selectedBatchId)
 
   const hasContext = !!(selectedGrade && selectedBatchId)
   const qrActive = activeSection === 'qr' && hasContext
+  const isToday = date === new Date().toISOString().slice(0, 10)
 
-  const { sessionId, qrToken, countdown, refreshSeconds, error: sessionError } =
-    useAttendanceSession(selectedBatchId, date, qrActive)
+  const {
+    sessionId, qrToken, countdown, refreshSeconds, error: sessionError,
+    started, startSession, stopSession,
+  } = useAttendanceSession(selectedBatchId, date, qrActive)
   const { entries, refetch: refetchRoster } = useRoster(sessionId)
 
   async function handleAddBatch() {
     const name = newBatchName.trim()
     if (!name) return
-    const batch = await addBatch(name, newBatchMode)
+    const batch = await addBatch(name, newBatchMode, {
+      meet_link: newBatchMode === 'online' ? (newBatchMeetLink.trim() || undefined) : undefined,
+      location:  newBatchMode === 'offline' ? (newBatchLocation.trim() || undefined) : undefined,
+    })
     if (batch) setSelectedBatchId(batch.id)
     setAddingBatch(false)
     setNewBatchName('')
+    setNewBatchMeetLink('')
+    setNewBatchLocation('')
   }
 
   function handleGradeSelect(g: string) {
@@ -415,13 +427,20 @@ export default function AttendancePage() {
                   <button
                     key={b.id}
                     onClick={() => setSelectedBatchId(b.id)}
-                    className={`px-3 py-1.5 rounded-md text-sm transition-colors border ${
+                    className={`px-3 py-1.5 rounded-md text-sm transition-colors border flex items-center gap-1.5 ${
                       selectedBatchId === b.id
                         ? 'bg-zinc-900 text-white border-zinc-900 font-medium'
                         : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-300'
                     }`}
                   >
                     {b.name}
+                    {b.mode && (
+                      <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                        selectedBatchId === b.id ? 'bg-white/15 text-white' : 'bg-zinc-100 text-zinc-500'
+                      }`}>
+                        {b.mode}
+                      </span>
+                    )}
                   </button>
                 ))}
                 {!addingBatch ? (
@@ -455,12 +474,29 @@ export default function AttendancePage() {
                         </button>
                       ))}
                     </div>
+                    {newBatchMode === 'online' ? (
+                      <input
+                        type="url"
+                        value={newBatchMeetLink}
+                        onChange={e => setNewBatchMeetLink(e.target.value)}
+                        placeholder="Meet/Zoom link"
+                        className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 bg-white"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={newBatchLocation}
+                        onChange={e => setNewBatchLocation(e.target.value)}
+                        placeholder="Room / location"
+                        className="border border-zinc-300 rounded-md px-3 py-1.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 bg-white"
+                      />
+                    )}
                     <button onClick={handleAddBatch}
                       className="px-3 py-1.5 text-white text-sm rounded-md transition-colors"
                       style={{ backgroundColor: ACCENT }}>
                       Save
                     </button>
-                    <button onClick={() => { setAddingBatch(false); setNewBatchName('') }}
+                    <button onClick={() => { setAddingBatch(false); setNewBatchName(''); setNewBatchMeetLink(''); setNewBatchLocation('') }}
                       className="text-zinc-400 hover:text-zinc-700 px-1 text-lg leading-none">&times;</button>
                   </div>
                 )}
@@ -537,63 +573,109 @@ export default function AttendancePage() {
                   <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-zinc-400 mb-2">Live Session</p>
                   <p className="text-zinc-900 text-lg font-semibold">
                     {selectedGrade} · {selectedBatch?.name}
+                    {selectedBatch?.mode && (
+                      <span className="ml-2 align-middle text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500">
+                        {selectedBatch.mode}
+                      </span>
+                    )}
                   </p>
                   <p className="text-zinc-500 text-xs mt-1">{dateLabel}</p>
+                  {selectedBatch?.mode === 'online' && selectedBatch?.meet_link && (
+                    <a
+                      href={selectedBatch.meet_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 text-xs text-violet-700 underline"
+                    >
+                      Open meet link
+                    </a>
+                  )}
                 </div>
 
-                {/* QR + ring */}
-                <div className="relative" style={{ width: 220, height: 220 }}>
-                  <CountdownRing countdown={countdown} total={refreshSeconds} size={220} />
-                  <div className="absolute inset-3 bg-white rounded-md flex items-center justify-center border border-zinc-200 shadow-sm">
-                    {qrToken ? (
-                      <QRCodeSVG value={qrToken} size={172} bgColor="#ffffff" fgColor="#18181B" level="H" />
-                    ) : (
-                      <div className="w-40 h-40 bg-zinc-100 animate-pulse rounded" />
-                    )}
+                {/* QR + ring, or explicit start-session CTA */}
+                {started ? (
+                  <div className="relative" style={{ width: 220, height: 220 }}>
+                    <CountdownRing countdown={countdown} total={refreshSeconds} size={220} />
+                    <div className="absolute inset-3 bg-white rounded-md flex items-center justify-center border border-zinc-200 shadow-sm">
+                      {qrToken ? (
+                        <QRCodeSVG value={qrToken} size={172} bgColor="#ffffff" fgColor="#18181B" level="H" />
+                      ) : (
+                        <div className="w-40 h-40 bg-zinc-100 animate-pulse rounded" />
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {sessionError ? (
-                  <p className="text-xs text-red-600 text-center">{sessionError}</p>
                 ) : (
-                  <p className="text-zinc-500 text-xs text-center">
-                    Refreshes in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
-                  </p>
+                  <div
+                    style={{ width: 220, height: 220 }}
+                    className="flex flex-col items-center justify-center gap-4 border border-dashed border-zinc-300 rounded-xl"
+                  >
+                    <p className="text-xs text-zinc-400 text-center px-6">No live session yet for this date</p>
+                    <button
+                      onClick={startSession}
+                      className="px-4 py-2 text-white text-sm rounded-md transition-colors"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Start Live Session
+                    </button>
+                  </div>
+                )}
+
+                {started && (
+                  sessionError ? (
+                    <p className="text-xs text-red-600 text-center">{sessionError}</p>
+                  ) : (
+                    <p className="text-zinc-500 text-xs text-center">
+                      Refreshes in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
+                    </p>
+                  )
+                )}
+
+                {started && (
+                  <button
+                    onClick={stopSession}
+                    className="text-xs text-zinc-400 hover:text-zinc-700 underline"
+                  >
+                    End session view
+                  </button>
                 )}
 
                 {/* Demo simulator */}
-                <div className="w-full pt-5 border-t border-zinc-200 space-y-2">
-                  <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400">
-                    Demo — simulate scan
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <select
-                      value={selectedStudentIdForScan}
-                      onChange={e => setSelectedStudentIdForScan(e.target.value)}
-                      className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-                    >
-                      <option value="">Select student…</option>
-                      {students.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleSimulateScan}
-                      disabled={!selectedStudentIdForScan}
-                      className="px-4 py-2 text-white text-sm rounded-md disabled:opacity-40 transition-colors whitespace-nowrap"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      Mark present
-                    </button>
+                {started && (
+                  <div className="w-full pt-5 border-t border-zinc-200 space-y-2">
+                    <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400">
+                      Demo — simulate scan
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={selectedStudentIdForScan}
+                        onChange={e => setSelectedStudentIdForScan(e.target.value)}
+                        className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                      >
+                        <option value="">Select student…</option>
+                        {students.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleSimulateScan}
+                        disabled={!selectedStudentIdForScan}
+                        className="px-4 py-2 text-white text-sm rounded-md disabled:opacity-40 transition-colors whitespace-nowrap"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        Mark present
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Attendance roster */}
               <div className="border border-zinc-200 rounded-lg overflow-hidden flex flex-col bg-white">
                 <div className="px-5 py-4 border-b border-zinc-200 flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-zinc-900">Today's roster</p>
+                    <p className="text-sm font-semibold text-zinc-900">
+                      {isToday ? "Today's roster" : `Roster for ${dateLabel}`}
+                    </p>
                     <p className="text-xs text-zinc-500 mt-1">
                       {presentCount} of {students.length} present
                     </p>
@@ -646,7 +728,25 @@ export default function AttendancePage() {
               key="summary"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
+              className="space-y-4"
             >
+              {/* Batch-level aggregate stats — from GET /batches/:id/summary */}
+              {summary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Total students', value: summary.totalStudents },
+                    { label: 'Total sessions', value: summary.totalSessions },
+                    { label: 'Avg attendance', value: summary.avgAttendancePct !== null ? `${summary.avgAttendancePct}%` : '—' },
+                    { label: 'Present today', value: summary.todaySessionActive ? `${summary.presentToday}/${summary.totalStudents}` : '—' },
+                  ].map(tile => (
+                    <div key={tile.label} className="bg-white rounded-lg border border-zinc-200 px-4 py-3">
+                      <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mb-1">{tile.label}</p>
+                      <p className="text-lg font-semibold text-zinc-900 tabular-nums">{tile.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
                 {/* Header row — hidden on mobile, cards carry their own labels */}
                 <div className="hidden sm:grid grid-cols-[1fr_140px_180px] px-5 py-3 border-b border-zinc-200 bg-zinc-50">

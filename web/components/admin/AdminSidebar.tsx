@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "../../lib/auth"; // adjust path to wherever your signOut lives
 import { canAccessPage } from "@/lib/pageStatus";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useGuestMode } from "@/hooks/useGuestMode";
+import GuestModeSwitch from "@/components/shared/GuestModeSwitch";
 
 import ChemistryOctetLogo from "@/components/ui/ChemistryOctetLogo";
 
@@ -115,6 +117,18 @@ const navItems = [
     ),
   },
   {
+    href: "/admin/online-classes",
+    label: "Online Classes",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M 2,8 L 18,8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M 8,11.5 L 8,15 L 12,13.25 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/tests",
     label: "Test Results",
     status: "testing",
@@ -194,6 +208,7 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { role } = useUserRole()
+  const { guestMode, setGuestMode } = useGuestMode()
 
 
   const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
@@ -204,8 +219,13 @@ export default function AdminSidebar({
     return pathname.startsWith(href);
   };
   const handleSignOut = async () => {
+    setGuestMode(false);
     await signOut();
     router.replace("/login");
+  };
+  const handleEnterGuestMode = () => {
+    setGuestMode(true);
+    router.push("/student/notes");
   };
 
   
@@ -294,6 +314,47 @@ export default function AdminSidebar({
 
       {/* My Profile + Sign out */}
       <div className={`${collapsed ? "flex flex-col items-center gap-1" : ""}`}>
+        {/* Guest mode — admin-only. Lets the admin preview the exact UI a
+            student would see, purely as a client-side view toggle. */}
+        {(role === "admin" || role === "both") && (
+          collapsed ? (
+            <button
+              onClick={handleEnterGuestMode}
+              className="relative group w-full h-12 flex items-center justify-center border-l-2 border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+              title="Guest mode"
+            >
+              <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+              <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-gray-900 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                Guest Mode
+              </span>
+            </button>
+          ) : (
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-l-2 border-transparent">
+              <div className="flex items-center gap-3 min-w-0">
+                <svg className="w-5.5 h-5.5 shrink-0 text-gray-500" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+                <span className="text-lg text-gray-700 whitespace-nowrap">Guest Mode</span>
+              </div>
+              <GuestModeSwitch checked={guestMode} onChange={handleEnterGuestMode} />
+            </div>
+          )
+        )}
+
         {/* My Profile */}
         {collapsed ? (
           <Link

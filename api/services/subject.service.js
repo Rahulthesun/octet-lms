@@ -20,7 +20,7 @@ const  supabase  = require("../config/supabase");
 
 // ─── Create ───────────────────────────────────────────────────
 
-const createSubject = async ({ name, description, orderIndex, isVisible }) => {
+const createSubject = async ({ name, description, orderIndex, isVisible, standard }) => {
   const { data, error } = await supabase
     .from("subjects")
     .insert({
@@ -28,6 +28,9 @@ const createSubject = async ({ name, description, orderIndex, isVisible }) => {
       description,
       order_index: orderIndex ?? 0,
       is_visible:  isVisible  ?? true,
+      // Optional class/grade tag ('11' | '12'). Left null for every existing
+      // subject — this never touches subjects created before this feature.
+      standard: standard ?? null,
     })
     .select()
     .single();
@@ -72,6 +75,7 @@ const updateSubject = async (id, updates) => {
   if (updates.description !== undefined) allowed.description = updates.description;
   if (updates.orderIndex  !== undefined) allowed.order_index = updates.orderIndex;
   if (updates.isVisible   !== undefined) allowed.is_visible  = updates.isVisible;
+  if (updates.standard    !== undefined) allowed.standard    = updates.standard;
   allowed.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase

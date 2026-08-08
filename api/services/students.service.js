@@ -18,9 +18,23 @@ console.log('Checking environment:');
 console.log('BREVO_FROM_EMAIL:', process.env.BREVO_FROM_EMAIL);
 console.log('BREVO_SMTP_HOST:', process.env.BREVO_SMTP_HOST);
 
-
-
-
+// ─── Attendance bridge ────────────────────────────────────────────────────
+// The attendance system (calendar, roster, summary) reads enrollment from
+// `batch_enrollments`, not from `students.preferred_batch`. Every place that
+// creates/approves an APPROVED student must also mirror them into
+// batch_enrollments, or their attendance calendar stays permanently blank.
+async function enrollInPreferredBatch(studentId, preferredBatch) {
+    if (!preferredBatch) return;
+    const { error } = await supabase
+        .from("batch_enrollments")
+        .upsert(
+            { batch_id: preferredBatch, student_id: studentId },
+            { onConflict: "batch_id,student_id", ignoreDuplicates: true }
+        );
+    if (error) {
+        console.error(`[batch_enrollments] upsert failed for student ${studentId} / batch ${preferredBatch}:`, error.message);
+    }
+}
 
 // ========================= GET /students =========================
 async function getAllStudents({ batch, mode, status, search, limit = 100, offset = 0 }) {
@@ -312,6 +326,8 @@ async function bulkImportStudents(studentsArray) {
             const { authUserId, tempPassword, username } = await createStudentAuthUser(student, admissionNumber);
             console.log(`[${student.email}] Auth user created: ${authUserId}`);
 
+            const preferredBatch = student.preferred_batch || "EVENING";
+
             // 4. Insert into students table – do NOT store temp_password
             const { data: newStudent, error: dbError } = await supabase
                 .from("students")
@@ -323,7 +339,7 @@ async function bulkImportStudents(studentsArray) {
                     admission_number: admissionNumber,
                     name: student.name,
                     email: student.email,
-                    preferred_batch: student.preferred_batch || "EVENING",
+                    preferred_batch: preferredBatch,
                     learning_mode: student.learning_mode || "OFFLINE",
                     status: "APPROVED",
                     username,
@@ -335,6 +351,10 @@ async function bulkImportStudents(studentsArray) {
 
             if (dbError) throw dbError;
             console.log(`[${student.email}] Insert successful.`);
+
+            // 4b. Mirror into batch_enrollments so the attendance system
+            // (calendar / roster / summary) actually sees this student.
+            await enrollInPreferredBatch(authUserId, preferredBatch);
 
             // 5. Send welcome email (non‑blocking)
             try {
@@ -382,6 +402,11 @@ async function approveStudent(id) {
         .select()
         .single();
     if (updateError) throw updateError;
+
+    // Mirror preferred_batch into batch_enrollments so the attendance system
+    // (calendar / roster / summary) actually sees this student.
+    await enrollInPreferredBatch(authUserId, student.preferred_batch);
+
     await sendWelcomeEmail(student.email, student.name, tempPassword, admissionNumber);
     return {
         success: true,

@@ -16,10 +16,13 @@ const subjectService = require("../services/subject.service");
 /** POST /api/subjects  →  create a subject */
 const createSubject = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, standard } = req.body;
     if (!name) return res.status(400).json({ error: "Subject name is required" });
+    if (standard !== undefined && standard !== null && !["11", "12"].includes(String(standard))) {
+      return res.status(400).json({ error: "Standard must be '11' or '12'" });
+    }
 
-    const subject = await subjectService.createSubject({ name, description });
+    const subject = await subjectService.createSubject({ name, description, standard: standard ?? null });
     res.status(201).json(subject);
   } catch (err) {
     res.status(500).json({ error: err.message });

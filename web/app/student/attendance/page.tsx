@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import jsQR from 'jsqr'
 import { supabase } from '@/lib/supabase/client'
-import { attendance } from '@/lib/mockData'
 import { CalendarCheck2, CalendarX2, Wifi, MapPin } from 'lucide-react'
 import {formatDate}  from '../../../lib/helpers'
 
@@ -24,7 +23,7 @@ async function authedFetch(path: string, init?: RequestInit) {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    throw new Error(body?.error || body?.message || `Scan failed: ${res.status}`)
+    throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
   }
   return res.status === 204 ? null : res.json()
 }
@@ -33,6 +32,38 @@ const submitScan = (token: string) =>
 
 // ─── Scan states ────────────────────────────────────────────────────────────
 type ScanState = 'idle' | 'requesting' | 'scanning' | 'success' | 'error'
+
+// ─── Attendance data types (mirrors backend responses) ──────────────────────
+type MonthDay = { date: string; day: number; status: 'present' | 'absent' }
+type MonthResponse = {
+  days: MonthDay[]
+  totalSessions: number
+  presentCount: number
+  attendancePct: number | null
+}
+type HistoryRecord = {
+  id: string
+  date: string
+  time: string | null
+  status: 'present' | 'absent'
+  type: string
+  batchName: string | null
+  source?: 'OFFLINE' | 'GOOGLE_MEET'
+  classTitle?: string | null
+  attendanceStatus?: 'present' | 'partial' | 'absent'
+  attendancePct?: number | null
+  durationMinutes?: number | null
+}
+type TodayClass = {
+  batchId: string
+  batchName: string
+  startTime: string | null
+  endTime: string | null
+  deliveryType: 'online' | 'offline' | 'hybrid'
+  meetLink: string | null
+  location: string | null
+  sessionLive: boolean
+}
 
 // ─── QR Scanner ─────────────────────────────────────────────────────────────
 
@@ -196,6 +227,64 @@ function QRScanner({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ─── Today's scheduled class(es) — collaborates with the calendar below ─────
+
+function TodayClassCard() {
+  const [classes, setClasses] = useState<TodayClass[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    authedFetch('/api/attendance/me/schedule/today')
+      .then((res: { classes: TodayClass[] }) => {
+        if (!cancelled) setClasses(res?.classes ?? [])
+      })
+      .catch(() => { if (!cancelled) setClasses([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading || classes.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      {classes.map(c => (
+        <div
+          key={c.batchId}
+          className="bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)] px-5 py-4 flex items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              c.deliveryType === 'online' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'
+            }`}>
+              {c.deliveryType === 'online'
+                ? <Wifi className="w-5 h-5" strokeWidth={1.75} />
+                : <MapPin className="w-5 h-5" strokeWidth={1.75} />}
+            </div>
+            <div className="min-w-0">
+              <p className="text-primary text-[15px] truncate">{c.batchName} · Today</p>
+              <p className="text-muted text-[13px]">
+                {c.startTime ? c.startTime.slice(0, 5) : '—'}
+                {c.endTime ? `–${c.endTime.slice(0, 5)}` : ''}
+                {c.location && c.deliveryType !== 'online' ? ` · ${c.location}` : ''}
+              </p>
+            </div>
+          </div>
+          {c.deliveryType !== 'offline' && c.meetLink && (
+            <a
+              href={c.meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 px-4 py-2 rounded-full bg-brand text-white text-sm font-medium hover:bg-brand-dark transition-colors"
+            >
+              Join Class
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ─── Month arrow timeline ───────────────────────────────────────────────────
 
@@ -239,7 +328,7 @@ function DayDot({
       >
         {day}
       </span>
-      
+
     </div>
   )
 }
@@ -247,30 +336,47 @@ function DayDot({
 function MonthTimeline() {
   const now = new Date()
   const [monthOffset, setMonthOffset] = useState(0)
+  const [monthData, setMonthData] = useState<MonthResponse | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
   const monthLabel = viewDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
   const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate()
   const isCurrentMonth = monthOffset === 0
 
-  // Roll up attendance.history into per-day status. Swap for a real
-  // `/api/attendance/students/me/month?month=...` fetch once that endpoint exists —
-  // shape stays the same: Record<dayNumber, 'present' | 'absent'>.
+  // Real attendance for the visible month, fetched from Supabase via the backend.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+    const year = target.getFullYear()
+    const month = target.getMonth() + 1
+
+    authedFetch(`/api/attendance/me/month?year=${year}&month=${month}`)
+      .then((res: MonthResponse) => {
+        if (!cancelled) setMonthData(res)
+      })
+      .catch(() => {
+        if (!cancelled) setMonthData({ days: [], totalSessions: 0, presentCount: 0, attendancePct: null })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthOffset])
+
   const dayStatus = useMemo(() => {
     const map: Record<number, 'present' | 'absent'> = {}
-    attendance.history.forEach(r => {
-      const d = new Date(r.date)
-      if (d.getFullYear() === viewDate.getFullYear() && d.getMonth() === viewDate.getMonth()) {
-        const day = d.getDate()
-        if (map[day] !== 'present') map[day] = r.status as 'present' | 'absent'
-      }
+    ;(monthData?.days ?? []).forEach(d => {
+      map[d.day] = d.status
     })
     return map
-  }, [viewDate])
+  }, [monthData])
 
-  const presentCount = Object.values(dayStatus).filter(s => s === 'present').length
-  const totalMarked = Object.keys(dayStatus).length
-  const pct = totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : null
+  const pct = monthData?.attendancePct ?? null
 
   // Leading blanks so day 1 lands on its correct weekday column (Sun-start)
   const leadingBlanks = viewDate.getDay()
@@ -302,7 +408,7 @@ function MonthTimeline() {
             </svg>
           </button>
         </div>
-        {pct !== null && (
+        {!loading && pct !== null && (
           <span className="text-sm font-data text-primary">{pct}%</span>
         )}
       </div>
@@ -318,7 +424,7 @@ function MonthTimeline() {
         </div>
 
         {/* Calendar grid — full width, wraps naturally by week */}
-        <div className="grid grid-cols-7">
+        <div className={`grid grid-cols-7 transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}>
           {cells.map((day, i) =>
             day === null ? (
               <div key={`blank-${i}`} />
@@ -356,6 +462,33 @@ function MonthTimeline() {
 
 function HistoryList() {
   const [open, setOpen] = useState(false)
+  const [history, setHistory] = useState<HistoryRecord[]>([])
+  const [loading, setLoading] = useState(false)
+  const [fetched, setFetched] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!open || fetched) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+
+    authedFetch('/api/attendance/me/history?limit=50')
+      .then((res: { history: HistoryRecord[] }) => {
+        if (!cancelled) setHistory(res?.history ?? [])
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load history')
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+          setFetched(true)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [open, fetched])
 
   return (
     <div className="bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)] overflow-hidden">
@@ -379,47 +512,72 @@ function HistoryList() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden border-t border-[#e2e5ec]"
           >
-            <div className="divide-y divide-[#F4F1F8]">
-              {attendance.history.map(record => {
-                const isPresent = record.status === 'present'
-                const isOnline = record.type === 'online'
+            {loading && (
+              <div className="px-5 py-6 text-center text-sm text-muted">Loading history…</div>
+            )}
 
-                return (
-                  <div
-                    key={record.id}
-                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors"
-                  >
+            {!loading && error && (
+              <div className="px-5 py-6 text-center text-sm text-rose-600">{error}</div>
+            )}
+
+            {!loading && !error && history.length === 0 && (
+              <div className="px-5 py-6 text-center text-sm text-muted">No attendance records yet.</div>
+            )}
+
+            {!loading && !error && history.length > 0 && (
+              <div className="divide-y divide-[#F4F1F8]">
+                {history.map(record => {
+                  const triStatus = record.attendanceStatus || record.status
+                  const isPresent = triStatus === 'present'
+                  const isPartial = triStatus === 'partial'
+                  const isMeet = record.source === 'GOOGLE_MEET'
+
+                  return (
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ${
-                        isPresent
-                          ? 'bg-emerald-50 text-emerald-600 ring-emerald-100'
-                          : 'bg-rose-50 text-rose-600 ring-rose-100'
-                      }`}
+                      key={record.id}
+                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors"
                     >
-                      {isPresent ? (
-                        <CalendarCheck2 className="w-5 h-5" strokeWidth={1.75} />
-                      ) : (
-                        <CalendarX2 className="w-5 h-5" strokeWidth={1.75} />
-                      )}
-                    </div>
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ring-1 ${
+                          isPresent
+                            ? 'bg-emerald-50 text-emerald-600 ring-emerald-100'
+                            : isPartial
+                              ? 'bg-amber-50 text-amber-600 ring-amber-100'
+                              : 'bg-rose-50 text-rose-600 ring-rose-100'
+                        }`}
+                      >
+                        {isPresent ? (
+                          <CalendarCheck2 className="w-5 h-5" strokeWidth={1.75} />
+                        ) : (
+                          <CalendarX2 className="w-5 h-5" strokeWidth={1.75} />
+                        )}
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <p className="text-primary text-[15px]">
-                        Marked{' '}
-                        <span className={isPresent ? 'text-emerald-600' : 'text-rose-600'}>
-                          {record.status}
-                        </span>{' '}
-                        for <span className="text-muted">{record.type}</span> class
-                      </p>
-                      <p className="text-border text-[13px] text-gray-500 font-data mt-0.5">
-                        {formatDate(record.date)} at {record.time}
-                      </p>
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-primary text-[15px]">
+                          Marked{' '}
+                          <span className={isPresent ? 'text-emerald-600' : isPartial ? 'text-amber-600' : 'text-rose-600'}>
+                            {triStatus}
+                          </span>{' '}
+                          for <span className="text-muted">{isMeet ? 'online' : record.type}</span> class
+                          {record.batchName ? <span className="text-muted"> · {record.batchName}</span> : null}
+                          {isMeet && <span className="text-muted"> · Google Meet</span>}
+                        </p>
+                        {record.classTitle && (
+                          <p className="text-primary text-[13px] mt-0.5">{record.classTitle}</p>
+                        )}
+                        <p className="text-border text-[13px] text-gray-500 font-data mt-0.5">
+                          {formatDate(record.date)}{record.time ? ` at ${record.time}` : ''}
+                          {isMeet && record.durationMinutes != null && ` · ${record.durationMinutes} min attended`}
+                          {isMeet && record.attendancePct != null && ` · ${record.attendancePct}%`}
+                        </p>
+                      </div>
 
-                  </div>
-                )
-              })}
-            </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -458,6 +616,10 @@ export default function AttendancePage() {
           <p className="text-white/70 text-sm mt-0.5">Tap to open camera</p>
         </div>
       </motion.button>
+
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.13 }}>
+        <TodayClassCard />
+      </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
         <MonthTimeline />

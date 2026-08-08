@@ -8,6 +8,9 @@ import { signOut } from '@/lib/auth'
 import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 import { useStudentName } from '@/hooks/useStudentName'
 import { toTitleCase } from '@/lib/helpers'
+import { useGuestMode } from '@/hooks/useGuestMode'
+import GuestModeSwitch from '@/components/shared/GuestModeSwitch'
+import NotificationBell from '@/components/student/NotificationBell'
 
 // inside component, with other hooks:
 
@@ -56,6 +59,17 @@ const navItems = [
     ),
   },
   {
+    href: '/student/classes',
+    label: 'Online Classes',
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M 2,8 L 18,8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M 8,11.5 L 8,15 L 12,13.25 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/student/tests',
     label: 'Tests',
     icon: (
@@ -100,7 +114,18 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
   const router = useRouter()
   const { role } = useUserRole()
   const studentName = useStudentName()
+  const { guestMode, setGuestMode } = useGuestMode()
 
+  // Only an admin (or an admin+student 'both' account) who explicitly
+  // turned Guest Mode on ever sees this — a real student's role is never
+  // 'admin' or 'both', so this stays hidden for them even if the flag were
+  // somehow still set from a previous session.
+  const isAdminGuest = guestMode && (role === 'admin' || role === 'both')
+
+  const exitGuestMode = () => {
+    setGuestMode(false)
+    router.replace('/admin')
+  }
 
   const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
 
@@ -136,6 +161,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
               Chemistry<span className="text-[#64748b]">@OCTET</span>
             </p>
           </div>
+          <NotificationBell />
           <button
             onClick={onToggle}
             className="shrink-0 w-7 h-7 flex items-center justify-center text-[#64748b] hover:bg-[#F4F1F8] rounded-md transition-colors"
@@ -186,8 +212,40 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
         })}
       </nav>
 
-{/* Bottom — Sign Out + Profile */}
+{/* Bottom — Guest mode + Sign Out + Profile */}
 <div className="shrink-0">
+
+  {/* Guest mode — only shown to an admin (or 'both' role) previewing the
+      student experience. Same control, same place as the toggle that
+      turned it on in the admin sidebar; clicking it here turns it off. */}
+  {isAdminGuest && (
+    collapsed ? (
+      <button
+        onClick={exitGuestMode}
+        className="relative group w-full h-12 flex items-center justify-center border-l-2 border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96] transition-colors"
+        title="Switch back to admin"
+      >
+        <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+          <path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#3d3354] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+          Switch back to admin
+        </span>
+      </button>
+    ) : (
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-l-2 border-transparent">
+        <div className="flex items-center gap-3 min-w-0">
+          <svg className="w-5.5 h-5.5 shrink-0 text-[#64748b]" viewBox="0 0 20 20" fill="none">
+            <path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          <span className="text-lg text-[#3d3354] whitespace-nowrap">Guest Mode</span>
+        </div>
+        <GuestModeSwitch checked={guestMode} onChange={exitGuestMode} />
+      </div>
+    )
+  )}
 
   {/* Sign Out */}
   <button

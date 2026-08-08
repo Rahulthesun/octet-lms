@@ -5,6 +5,10 @@ import { useState, useEffect, useCallback } from "react";
 interface Subject {
   id: string;
   name: string;
+  // Optional class/grade tag ('11' | '12'). Null/undefined for every subject
+  // that existed before the "Add" (11th/12th) feature — those stay exactly
+  // as they were, view-only groupings, unaffected by this field.
+  standard?: string | null;
 }
 
 interface Chapter {
@@ -265,6 +269,30 @@ export function useContentTree(autoLoadChapters = true) {
     }
   }, [BASE]);
 
+  // Create a subject, optionally tagged with a class/grade ('11' | '12').
+  // Existing (untagged) subjects are never touched by this — it only ever
+  // appends a brand-new row.
+  const createSubject = useCallback(
+    async (name: string, standard?: "11" | "12" | null) => {
+      const res = await fetch(`${BASE}/api/subjects/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, standard: standard ?? null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(getResponseMessage(data, "Failed to create subject"));
+      }
+      const subject = (data?.subject ?? data) as Subject;
+      setSubjects((prev) => [...prev, subject]);
+      // Seed an empty chapters list so the accordion opens straight into the
+      // "Add Chapter" prompt instead of a perpetual loading state.
+      setChaptersMap((prev) => ({ ...prev, [subject.id]: [] }));
+      return subject;
+    },
+    [BASE],
+  );
+
   // Add a chapter optimistically
   function addChapter(subjectId: string, chapter: Chapter) {
     setChaptersMap((prev) => ({
@@ -345,6 +373,7 @@ export function useContentTree(autoLoadChapters = true) {
     error,
     loadChapters,
     loadChapterContent,
+    createSubject,
     addChapter,
     deleteChapter,
     updatePdfs,

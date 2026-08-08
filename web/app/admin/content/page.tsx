@@ -20,7 +20,12 @@ interface BackendSubject {
   id: string;
   name: string;
   unit_prefix : number;
+  // Optional class/grade tag ('11' | '12'). Null/undefined for every
+  // pre-existing subject — those render exactly as they always have.
+  standard?: string | null;
 }
+
+type Standard = "11" | "12";
 interface BackendChapter {
   id: string;
   name: string;
@@ -235,6 +240,7 @@ export default function ContentPage() {
     deleteChapter, // ← Add this line
     loadChapterContent,
     addChapter,
+    createSubject,
     updatePdfs,
     updateVideos,
     getStorage,
@@ -262,6 +268,13 @@ export default function ContentPage() {
   >(null);
   const [newChapterName, setNewChapterName] = useState("");
   const [addingChapter, setAddingChapter] = useState(false);
+
+  // ── Add subject (11th / 12th) modal ───────────────────────────────────────
+  const [addSubjectOpen, setAddSubjectOpen] = useState(false);
+  const [addSubjectStandard, setAddSubjectStandard] = useState<Standard | null>(null);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [addingSubject, setAddingSubject] = useState(false);
+  const [addSubjectError, setAddSubjectError] = useState<string | null>(null);
 
   // ── Delete confirmation ────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -525,6 +538,44 @@ export default function ContentPage() {
   function cancelAddChapter() {
     setAddingChapterToSubject(null);
     setNewChapterName("");
+  }
+
+  // ── Add subject (11th / 12th) ──────────────────────────────────────────────
+  function openAddSubject() {
+    setAddSubjectOpen(true);
+    setAddSubjectStandard(null);
+    setNewSubjectName("");
+    setAddSubjectError(null);
+  }
+
+  function closeAddSubject() {
+    if (addingSubject) return;
+    setAddSubjectOpen(false);
+    setAddSubjectStandard(null);
+    setNewSubjectName("");
+    setAddSubjectError(null);
+  }
+
+  async function submitAddSubject() {
+    const name = newSubjectName.trim();
+    if (!addSubjectStandard || !name || addingSubject) return;
+    setAddingSubject(true);
+    setAddSubjectError(null);
+    try {
+      const subject = await createSubject(name, addSubjectStandard);
+      closeAddSubject();
+      // Open it straight away so the admin can immediately add topics
+      // (chapters) and content under this standard.
+      setOpenSubjectId(subject.id);
+      setOpenChapterId(null);
+      setSelectedItemId(null);
+    } catch (e) {
+      setAddSubjectError(
+        e instanceof Error ? e.message : "Failed to create subject",
+      );
+    } finally {
+      setAddingSubject(false);
+    }
   }
 
   // ── Upload ─────────────────────────────────────────────────────────────────
@@ -879,6 +930,18 @@ export default function ContentPage() {
       )
     : (subjects as BackendSubject[]);
 
+  // ── Group by class/standard ────────────────────────────────────────────────
+  // Untagged (pre-existing) subjects render first, exactly as before — then
+  // any 11th/12th subjects created via "Add" appear under their own headers.
+  function subjectGroup(s: BackendSubject): Standard | null {
+    return s.standard === "11" || s.standard === "12" ? s.standard : null;
+  }
+  const orderedVisibleSubjects = [
+    ...visibleSubjects.filter((s) => !subjectGroup(s)),
+    ...visibleSubjects.filter((s) => subjectGroup(s) === "11"),
+    ...visibleSubjects.filter((s) => subjectGroup(s) === "12"),
+  ];
+
   // ──────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full p-3">
@@ -890,11 +953,20 @@ export default function ContentPage() {
               Content Manager
             </h1>
             <p className="text-base text-gray-600 mt-1">
-              Select a subject and chapter — then upload PDF or Video content.            
+              
             </p>
           </div>
-          <div className="lg:w-100 shrink-0">
-            <StorageBar totalBytes={storage.totalBytes} />
+          <div className="flex-1 flex items-center justify-end gap-4">
+            <button
+              onClick={openAddSubject}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary/90 cursor-pointer shrink-0"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Add
+            </button>
+            <div className="lg:w-100 shrink-0">
+              <StorageBar totalBytes={storage.totalBytes} />
+            </div>
           </div>
         </div>
         {actionNotice && (
@@ -955,14 +1027,28 @@ export default function ContentPage() {
                 No matches for &quot;{searchQuery}&quot;
               </div>
             ) : (
-              visibleSubjects.map((subject) => {
+              orderedVisibleSubjects.map((subject, subjectIdx) => {
                 const subjectOpen = openSubjectId === subject.id;
                 const chapters = (chaptersMap[subject.id] ??
                   []) as BackendChapter[];
+                const group = subjectGroup(subject);
+                const prevGroup =
+                  subjectIdx > 0
+                    ? subjectGroup(orderedVisibleSubjects[subjectIdx - 1])
+                    : null;
+                const showGroupHeader = group !== null && group !== prevGroup;
 
                 return (
+                  <div key={subject.id}>
+                  {showGroupHeader && (
+                    <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        Class {group}
+                      </span>
+                      <span className="flex-1 h-px bg-gray-100" />
+                    </div>
+                  )}
                   <div
-                    key={subject.id}
                     className="border-b border-gray-100 last:border-0"
                   >
                     {/* Subject row */}
@@ -1361,6 +1447,7 @@ export default function ContentPage() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                  </div>
                   </div>
                 );
               })
@@ -1946,6 +2033,130 @@ export default function ContentPage() {
           )}
         </div>
       </div>
+
+      {/* ── Add Subject (11th / 12th) modal ── */}
+      <AnimatePresence>
+        {addSubjectOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeAddSubject}
+          >
+            <motion.div
+              className="bg-white shadow-xl p-6 max-w-md w-full mx-4 rounded-2xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {!addSubjectStandard ? (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Add subject
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Choose which class this new subject belongs to.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 mt-5">
+                    {(["11", "12"] as Standard[]).map((std) => (
+                      <button
+                        key={std}
+                        onClick={() => setAddSubjectStandard(std)}
+                        className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-gray-200 py-6 text-gray-700 transition hover:border-primary hover:bg-primary/5 hover:text-primary cursor-pointer"
+                      >
+                        <span className="text-2xl font-semibold">
+                          {std}th
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          Standard {std}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-end mt-5">
+                    <button
+                      onClick={closeAddSubject}
+                      className="px-4 py-2 text-base text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAddSubjectStandard(null)}
+                      disabled={addingSubject}
+                      className="text-gray-400 hover:text-gray-600 disabled:opacity-50 cursor-pointer"
+                      title="Back"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
+                        <path
+                          d="M 7,2 L 3,6 L 7,10"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      New subject — Class {addSubjectStandard}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1 ml-6">
+                    This is added alongside the existing subjects — nothing
+                    else changes.
+                  </p>
+                  <div className="mt-4">
+                    <label className="text-sm text-gray-500 block mb-1">
+                      Subject name <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newSubjectName}
+                      onChange={(e) => setNewSubjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitAddSubject();
+                      }}
+                      placeholder="e.g. Physical Chemistry"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-base text-gray-800 placeholder-gray-300 outline-none focus:border-primary"
+                    />
+                  </div>
+                  {addSubjectError && (
+                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {addSubjectError}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2 mt-5">
+                    <button
+                      onClick={closeAddSubject}
+                      disabled={addingSubject}
+                      className="px-4 py-2 text-base text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitAddSubject}
+                      disabled={addingSubject || !newSubjectName.trim()}
+                      className="px-4 py-2 text-base bg-primary text-white hover:bg-primary/90 rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {addingSubject && (
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      )}
+                      {addingSubject ? "Creating…" : "Create subject"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Delete modal ── */}
       <AnimatePresence>

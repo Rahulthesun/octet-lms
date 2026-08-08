@@ -1,15 +1,77 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { authedFetch } from '@/lib/apiClient'
 import { useEffect } from 'react'
+import { useGoogleIdentity } from '@/hooks/useOnlineClasses'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
+// ─── Google account link (used to match Google Meet attendance to this student) ─
+
+function GoogleIdentityCard() {
+  const { status, loading, link, unlink } = useGoogleIdentity()
+  const [busy, setBusy] = useState(false)
+
+  async function handleLink() {
+    setBusy(true)
+    try {
+      await link()
+    } catch (e) {
+      console.error(e)
+      setBusy(false)
+    }
+  }
+
+  async function handleUnlink() {
+    if (!confirm('Unlink your Google account? Your online-class attendance will no longer be matched automatically until you link it again.')) return
+    setBusy(true)
+    try {
+      await unlink()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className={`${card} p-5`}>
+      <h3 className="text-primary text-base mb-1">Google Account</h3>
+      <p className="text-muted text-sm mb-3">
+        Link the Google account you use to join online classes, so your Google Meet attendance is matched to you automatically.
+      </p>
+      {loading ? (
+        <p className="text-muted text-sm">Checking…</p>
+      ) : status?.linked ? (
+        <>
+          <p className="text-emerald-600 text-sm mb-3">Linked{status.email ? ` · ${status.email}` : ''}</p>
+          <button
+            onClick={handleUnlink}
+            disabled={busy}
+            className="w-full py-2.5 rounded-md text-[15px] border border-[#e2e5ec] text-primary hover:bg-accent1/40 transition-colors disabled:opacity-50"
+          >
+            {busy ? 'Working…' : 'Unlink Google Account'}
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={handleLink}
+          disabled={busy}
+          className="w-full py-2.5 rounded-md text-[15px] bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50"
+        >
+          {busy ? 'Working…' : 'Link Google Account'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
   name: '',
@@ -21,6 +83,7 @@ export default function ProfilePage() {
   rollNumber: '',
 })
   const [saved, setSaved] = useState(false)
+  const [googleBanner, setGoogleBanner] = useState<string | null>(null)
 
 
    useEffect(() => {
@@ -41,6 +104,17 @@ export default function ProfilePage() {
 
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    const googleIdentity = searchParams.get('google_identity')
+    if (googleIdentity === 'linked') {
+      setGoogleBanner('Google account linked successfully.')
+      router.replace('/student/profile')
+    } else if (googleIdentity === 'error') {
+      setGoogleBanner('Could not link the Google account. Please try again.')
+      router.replace('/student/profile')
+    }
+  }, [searchParams, router])
 
   
   const handleSave = async () => {
@@ -70,6 +144,13 @@ export default function ProfilePage() {
           </svg>
           Profile updated successfully
         </motion.div>
+      )}
+
+      {googleBanner && (
+        <div className="mb-5 flex items-center justify-between gap-2 px-4 py-3 bg-violet-50 border border-violet-200 rounded-lg text-violet-700 text-base">
+          {googleBanner}
+          <button onClick={() => setGoogleBanner(null)} className="text-violet-400 hover:text-violet-700 text-xl leading-none">&times;</button>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -142,6 +223,14 @@ export default function ProfilePage() {
                 Sign Out
               </button>
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+          >
+            <GoogleIdentityCard />
           </motion.div>
         </div>
 

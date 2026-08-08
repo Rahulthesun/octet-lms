@@ -4,10 +4,12 @@
 import { usePathname } from 'next/navigation'
 import { useUserRole } from '@/hooks/useUserRole'
 import { canAccessPage } from '@/lib/pageStatus'
+import { useGuestMode } from '@/hooks/useGuestMode'
 
 export default function TestingGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { role, loading } = useUserRole()
+  const { guestMode } = useGuestMode()
 
   if (loading) {
     return (
@@ -17,7 +19,12 @@ export default function TestingGuard({ children }: { children: React.ReactNode }
     )
   }
 
-  if (!canAccessPage(role, pathname)) {
+  // An admin previewing Guest Mode should see every student page exactly as
+  // a student would — including ones still marked "testing" — so treat them
+  // as role 'both' (which already always passes) for this check only.
+  const effectiveRole = role === 'admin' && guestMode ? 'both' : role
+
+  if (!canAccessPage(effectiveRole, pathname)) {
     return (
       <div className="h-screen flex items-center justify-center px-6">
         <div className="w-full max-w-md bg-white rounded-2xl border border-accent3/60 shadow-[0_8px_40px_rgba(94,64,117,0.08)] p-8 text-center">
