@@ -6,6 +6,13 @@ import jsQR from 'jsqr'
 import { supabase } from '@/lib/supabase/client'
 import { CalendarCheck2, CalendarX2, Wifi, MapPin } from 'lucide-react'
 import {formatDate}  from '../../../lib/helpers'
+import AttendanceChart, {
+  type AttendanceChartType,
+  type ChartDatum,
+  buildAttendanceCategoryData,
+  buildAttendanceTrend,
+} from '@/components/shared/AttendanceChart'
+import { downloadAttendanceFile } from '@/hooks/useAttendanceData'
 
 
 // ─── Auth fetch helper ─────────────────────────────────────────────────────
@@ -63,6 +70,18 @@ type TodayClass = {
   meetLink: string | null
   location: string | null
   sessionLive: boolean
+}
+type MyReportRecord = {
+  date: string
+  status: 'present' | 'absent'
+  attendanceStatus?: 'present' | 'partial' | 'absent'
+}
+type MyReport = {
+  totalSessions: number
+  presentCount: number
+  absentCount: number
+  attendancePct: number | null
+  records: MyReportRecord[]
 }
 
 // ─── QR Scanner ─────────────────────────────────────────────────────────────
@@ -229,19 +248,31 @@ function QRScanner({ onClose }: { onClose: () => void }) {
 
 // ─── Today's scheduled class(es) — collaborates with the calendar below ─────
 
+// How often the "live" views below re-check the server. Admin-initiated
+// events (starting a live session, syncing Meet attendance) happen outside
+// this tab, so we poll rather than push — kept short enough that a student
+// sees the change without needing to reload the page.
+const LIVE_POLL_MS = 30000
+
 function TodayClassCard() {
   const [classes, setClasses] = useState<TodayClass[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    authedFetch('/api/attendance/me/schedule/today')
-      .then((res: { classes: TodayClass[] }) => {
-        if (!cancelled) setClasses(res?.classes ?? [])
-      })
-      .catch(() => { if (!cancelled) setClasses([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+
+    function load() {
+      authedFetch('/api/attendance/me/schedule/today')
+        .then((res: { classes: TodayClass[] }) => {
+          if (!cancelled) setClasses(res?.classes ?? [])
+        })
+        .catch(() => { if (!cancelled) setClasses([]) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }
+
+    load()
+    const interval = setInterval(load, LIVE_POLL_MS)
+    return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
   if (loading || classes.length === 0) return null
@@ -345,26 +376,36 @@ function MonthTimeline() {
   const isCurrentMonth = monthOffset === 0
 
   // Real attendance for the visible month, fetched from Supabase via the backend.
+  // While viewing the CURRENT month, this also polls — an admin starting a
+  // live session (or a Google Meet sync landing) elsewhere shouldn't require
+  // a manual page reload before it shows up as Present/Absent here instead
+  // of "No class".
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    let firstLoad = true
 
     const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
     const year = target.getFullYear()
     const month = target.getMonth() + 1
 
-    authedFetch(`/api/attendance/me/month?year=${year}&month=${month}`)
-      .then((res: MonthResponse) => {
-        if (!cancelled) setMonthData(res)
-      })
-      .catch(() => {
-        if (!cancelled) setMonthData({ days: [], totalSessions: 0, presentCount: 0, attendancePct: null })
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    function load() {
+      if (firstLoad) setLoading(true)
+      authedFetch(`/api/attendance/me/month?year=${year}&month=${month}`)
+        .then((res: MonthResponse) => {
+          if (!cancelled) setMonthData(res)
+        })
+        .catch(() => {
+          if (!cancelled && firstLoad) setMonthData({ days: [], totalSessions: 0, presentCount: 0, attendancePct: null })
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+          firstLoad = false
+        })
+    }
 
-    return () => { cancelled = true }
+    load()
+    const interval = monthOffset === 0 ? setInterval(load, LIVE_POLL_MS) : null
+    return () => { cancelled = true; if (interval) clearInterval(interval) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthOffset])
 
@@ -457,6 +498,99 @@ function MonthTimeline() {
     </div>
   )
 }
+
+// ─── Attendance statistics graph + downloadable PDF report ──────────────────
+
+function AttendanceStatisticsCard() {
+  const [report, setReport] = useState<MyReport | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [chartType, setChartType] = useState<AttendanceChartType>('bar')
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    authedFetch('/api/attendance/me/report')
+      .then((res: MyReport) => {
+        if (!cancelled) setReport(res)
+      })
+      .catch(() => {
+        if (!cancelled) setReport(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const categoryData: ChartDatum[] = report ? buildAttendanceCategoryData(report.records) : []
+  const trendData: ChartDatum[] = report
+    ? buildAttendanceTrend([...report.records].reverse().map((r) => ({ present: r.status === 'present' })))
+    : []
+
+  async function handleDownload() {
+    setDownloading(true)
+    setDownloadError('')
+    try {
+      await downloadAttendanceFile(`/api/attendance/me/report/pdf?chartType=${chartType}`, 'my_attendance_report.pdf')
+    } catch (e) {
+      setDownloadError(e instanceof Error ? e.message : 'Could not download report')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-primary text-base">Attendance Statistics</h2>
+        {report && report.attendancePct !== null && (
+          <span className="text-sm font-data text-primary">{report.attendancePct}% overall</span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-muted text-sm">Loading statistics…</div>
+      ) : !report || report.totalSessions === 0 ? (
+        <div className="py-10 text-center text-muted text-sm">No attendance recorded yet.</div>
+      ) : (
+        <>
+          <AttendanceChart
+            type={chartType}
+            onTypeChange={setChartType}
+            barData={categoryData}
+            pieData={categoryData}
+            lineData={trendData}
+            lineColor="#7A6B96"
+            valueSuffix={chartType === 'line' ? '%' : ''}
+            barAxisLabels={{ x: 'Attendance status', y: 'Number of sessions' }}
+            lineAxisLabels={{ x: 'Session number', y: 'Attendance % so far' }}
+            description={
+              chartType === 'bar'
+                ? 'How many of your sessions fall into each attendance status.'
+                : chartType === 'pie'
+                ? 'Share of your sessions in each attendance status.'
+                : 'Your running attendance percentage after each session, oldest to most recent.'
+            }
+          />
+          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e2e5ec]">
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-dark rounded-md transition-colors disabled:opacity-50"
+            >
+              {downloading ? 'Preparing…' : 'Download PDF Report'}
+            </button>
+            {downloadError && <p className="text-sm text-rose-600">{downloadError}</p>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Detailed history list (toggleable) ─────────────────────────────────────
 
 
@@ -623,6 +757,10 @@ export default function AttendancePage() {
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
         <MonthTimeline />
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.18 }}>
+        <AttendanceStatisticsCard />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>

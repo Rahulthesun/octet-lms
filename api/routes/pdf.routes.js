@@ -23,6 +23,9 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 const pdfController = require("../controllers/pdf.controller");
+const { verifyToken, requireRole } = require("../middleware/auth");
+
+const adminOnly = requireRole(["admin", "developer"]);
 
 const allowedContentTypes = new Set([
   "application/pdf",
@@ -54,32 +57,34 @@ const handleUploadError = (err, req, res, next) => {
   return res.status(400).json({ error: err.message || "Invalid upload" });
 };
 
-// POST   /api/content/pdf/upload   → upload a new PDF/PPTX content file
+// POST   /api/content/pdf/upload   → upload a new PDF/PPTX content file (admin only)
 router.post(
   "/upload",
+  verifyToken,
+  adminOnly,
   upload.single("file"),
   handleUploadError,
   pdfController.uploadPdf,
 );
 
-// GET    /api/content/pdf/:id/stream   → Stream a PDF file by ID (for inline viewing)
-router.get("/:id/stream", pdfController.streamPdfbyId);
+// GET    /api/content/pdf/:id/stream   → Stream a PDF file by ID (any authenticated user)
+router.get("/:id/stream", verifyToken, pdfController.streamPdfbyId);
 
-// GET    /api/content/pdf          → list all PDFs
-router.get("/", pdfController.getAllPdfs);
+// GET    /api/content/pdf          → list all PDFs across every chapter (admin only)
+router.get("/", verifyToken, adminOnly, pdfController.getAllPdfs);
 
-// GET    /api/content/pdf/:id      → get a single PDF by ID
+// GET    /api/content/pdf/:id      → get a single PDF by ID (any authenticated user)
 // :id is a URL parameter – accessible via req.params.id
-router.get("/:id", pdfController.getPdfById);
+router.get("/:id", verifyToken, pdfController.getPdfById);
 
-// GET    /api/content/pdf/chapter/:chapterId     → get PDFs by chapter ID
+// GET    /api/content/pdf/chapter/:chapterId     → get PDFs by chapter ID (any authenticated user)
 // :chapterId is a URL parameter – accessible via req.params.chapterId
-router.get("/chapter/:chapterId", pdfController.getPdfsByChapterId);
+router.get("/chapter/:chapterId", verifyToken, pdfController.getPdfsByChapterId);
 
-// PUT    /api/content/pdf/:id      → update metadata of a PDF
-router.patch("/:id", pdfController.updatePdf);
+// PUT    /api/content/pdf/:id      → update metadata of a PDF (admin only)
+router.patch("/:id", verifyToken, adminOnly, pdfController.updatePdf);
 
-// DELETE /api/content/pdf/:id      → delete a PDF
-router.delete("/:id", pdfController.deletePdf);
+// DELETE /api/content/pdf/:id      → delete a PDF (admin only)
+router.delete("/:id", verifyToken, adminOnly, pdfController.deletePdf);
 
 module.exports = router;

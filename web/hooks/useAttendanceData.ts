@@ -83,6 +83,12 @@ export interface StudentReportRecord {
   deliveryType: string | null
   status: 'present' | 'absent'
   time: string | null
+  source?: 'OFFLINE' | 'GOOGLE_MEET'
+  classTitle?: string | null
+  attendanceStatus?: AttendanceTriState
+  attendancePct?: number | null
+  durationMinutes?: number | null
+  wasOverridden?: boolean
 }
 
 export interface StudentReport {

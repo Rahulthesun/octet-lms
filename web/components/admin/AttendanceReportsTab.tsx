@@ -11,6 +11,13 @@ import {
   type Batch,
 } from '@/hooks/useAttendanceData'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
+import AttendanceChart, {
+  ATTENDANCE_STATUS_COLORS,
+  buildAttendanceTrend,
+  buildAttendanceCategoryData,
+  type AttendanceChartType,
+  type ChartDatum,
+} from '@/components/shared/AttendanceChart'
 
 const ACCENT = '#5B21B6'
 
@@ -26,12 +33,20 @@ function pctColor(pct: number | null) {
 function StudentReportModal({ studentId, onClose }: { studentId: string; onClose: () => void }) {
   const { report, loading, error } = useStudentReport(studentId)
   const [downloading, setDownloading] = useState<'pdf' | 'csv' | null>(null)
+  const [chartType, setChartType] = useState<AttendanceChartType>('bar')
+
+  const categoryChartData: ChartDatum[] = report ? buildAttendanceCategoryData(report.records) : []
+
+  const trendChartData: ChartDatum[] = report
+    ? buildAttendanceTrend([...report.records].reverse().map((r) => ({ present: r.status === 'present' })))
+    : []
 
   async function download(kind: 'pdf' | 'csv') {
     setDownloading(kind)
     try {
       const name = report ? `attendance_${report.student.roll || report.student.id}.${kind}` : `attendance.${kind}`
-      await downloadAttendanceFile(`/api/attendance/students/${studentId}/report/${kind}`, name)
+      const suffix = kind === 'pdf' ? `?chartType=${chartType}` : ''
+      await downloadAttendanceFile(`/api/attendance/students/${studentId}/report/${kind}${suffix}`, name)
     } catch (e) {
       console.error(e)
     } finally {
@@ -81,6 +96,27 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
                   </p>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-400 mt-0.5">Attendance</p>
                 </div>
+              </div>
+
+              <div className="px-6 pb-4">
+                <AttendanceChart
+                  type={chartType}
+                  onTypeChange={setChartType}
+                  barData={categoryChartData}
+                  pieData={categoryChartData}
+                  lineData={trendChartData}
+                  lineColor={ACCENT}
+                  valueSuffix={chartType === 'line' ? '%' : ''}
+                  barAxisLabels={{ x: 'Attendance status', y: 'Number of sessions' }}
+                  lineAxisLabels={{ x: 'Session number', y: 'Attendance % so far' }}
+                  description={
+                    chartType === 'bar'
+                      ? "How many of this student's sessions fall into each attendance status."
+                      : chartType === 'pie'
+                      ? "Share of this student's sessions in each attendance status."
+                      : 'Running attendance percentage after each session, oldest to most recent.'
+                  }
+                />
               </div>
 
               <div className="px-6 pb-4">
@@ -137,12 +173,49 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
   const { report, loading, error } = useBatchReport(batchId)
   const [downloading, setDownloading] = useState<'pdf' | 'csv' | null>(null)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
+  const [chartType, setChartType] = useState<AttendanceChartType>('bar')
+
+  // Bar: per-student attendance %, ranked — the most useful "batch-wise" view.
+  const barChartData: ChartDatum[] = report
+    ? [...report.studentStats]
+        .sort((a, b) => (b.attendancePct ?? -1) - (a.attendancePct ?? -1))
+        .map((s) => ({ label: s.name, value: s.attendancePct ?? 0, color: pctColor(s.attendancePct) }))
+    : []
+
+  // Pie: aggregate Present/Partial/Absent across every session held.
+  const pieChartData: ChartDatum[] = report
+    ? (() => {
+        const totals = report.dailyBreakdown.reduce(
+          (acc, d) => {
+            acc.present += d.presentCount
+            acc.partial += d.partialCount
+            acc.absent += d.absentCount
+            return acc
+          },
+          { present: 0, partial: 0, absent: 0 },
+        )
+        return [
+          { label: 'Present', value: totals.present, color: ATTENDANCE_STATUS_COLORS.present },
+          { label: 'Partial', value: totals.partial, color: ATTENDANCE_STATUS_COLORS.partial },
+          { label: 'Absent', value: totals.absent, color: ATTENDANCE_STATUS_COLORS.absent },
+        ]
+      })()
+    : []
+
+  // Line: day-by-day attendance % trend across the batch's session history.
+  const lineChartData: ChartDatum[] = report
+    ? report.dailyBreakdown.map((d) => ({
+        label: new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        value: d.attendancePct ?? 0,
+      }))
+    : []
 
   async function download(kind: 'pdf' | 'csv') {
     setDownloading(kind)
     try {
       const name = report ? `batch_${report.batch.name.replace(/\s+/g, '_')}.${kind}` : `batch_report.${kind}`
-      await downloadAttendanceFile(`/api/attendance/batches/${batchId}/report/${kind}`, name)
+      const suffix = kind === 'pdf' ? `?chartType=${chartType}` : ''
+      await downloadAttendanceFile(`/api/attendance/batches/${batchId}/report/${kind}${suffix}`, name)
     } catch (e) {
       console.error(e)
     } finally {
@@ -186,6 +259,29 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
                   <p className="text-lg font-semibold text-zinc-900 tabular-nums">{report.totalSessions}</p>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-400 mt-0.5">Sessions held</p>
                 </div>
+              </div>
+
+              <div className="px-6 pb-4">
+                <AttendanceChart
+                  type={chartType}
+                  onTypeChange={setChartType}
+                  barData={barChartData}
+                  pieData={pieChartData}
+                  lineData={lineChartData}
+                  horizontalBars
+                  lineColor={ACCENT}
+                  valueSuffix="%"
+                  height={barChartData.length > 6 ? 320 : 260}
+                  barAxisLabels={{ x: 'Attendance %', y: 'Student' }}
+                  lineAxisLabels={{ x: 'Session date', y: 'Batch attendance %' }}
+                  description={
+                    chartType === 'bar'
+                      ? "Each enrolled student's overall attendance percentage, ranked highest to lowest."
+                      : chartType === 'pie'
+                      ? 'Total Present / Partial / Absent count added up across every session this batch has held.'
+                      : "The batch's average attendance percentage on each day a session was held, in order."
+                  }
+                />
               </div>
 
               <div className="px-6 pb-3">

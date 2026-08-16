@@ -14,8 +14,8 @@ const transporter = nodemailer.createTransport({
 
 // Verify on startup (just log, don't crash)
 transporter.verify((err) => {
-    if (err) console.error('❌ Email transporter error:', err.message);
-    else console.log('✅ Email transporter ready');
+    if (err) console.error('Email transporter error:', err.message);
+    else console.log('Email transporter ready');
 });
 
 /**
@@ -28,7 +28,7 @@ async function sendWelcomeEmail(to, name, tempPassword, admissionNumber, loginUr
 
     // Guard against missing fromEmail
     if (!fromEmail) {
-        console.error('❌ BREVO_FROM_EMAIL not set – cannot send email');
+        console.error('BREVO_FROM_EMAIL not set - cannot send email');
         return;
     }
 
@@ -60,9 +60,9 @@ Let's crush the chemistry boards.
             subject: subject,
             text: text,
         });
-        console.log(`✅ Welcome email sent to ${to} (${info.messageId})`);
+        console.log(`Welcome email sent to ${to} (${info.messageId})`);
     } catch (err) {
-        console.error(`❌ Failed to send email to ${to}:`, err.message);
+        console.error(`Failed to send email to ${to}:`, err.message);
         // Do NOT throw – let the import continue
     }
 }
@@ -75,7 +75,7 @@ async function sendPasswordResetEmail(to, resetLink) {
     const fromName = process.env.BREVO_FROM_NAME || 'OCTET LMS';
 
     if (!fromEmail) {
-        console.error('❌ BREVO_FROM_EMAIL not set – cannot send reset email');
+        console.error('BREVO_FROM_EMAIL not set - cannot send reset email');
         return;
     }
 
@@ -99,9 +99,9 @@ If you didn't request this, ignore this email.
             subject: subject,
             text: text,
         });
-        console.log(`✅ Reset email sent to ${to} (${info.messageId})`);
+        console.log(`Reset email sent to ${to} (${info.messageId})`);
     } catch (err) {
-        console.error(`❌ Failed to send reset email to ${to}:`, err.message);
+        console.error(`Failed to send reset email to ${to}:`, err.message);
     }
 }
 

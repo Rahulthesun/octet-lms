@@ -83,6 +83,12 @@ export interface StudentRecord {
   updated_at: string | null
 
   blocked: boolean
+
+  // Computed server-side from real attendance_sessions/attendance_records
+  // rows (see attendanceService.getAttendancePercentagesForStudents) — not
+  // a students-table column. Null until the student has at least one
+  // scheduled session in an enrolled batch.
+  attendance_pct?: number | null
 }
 
 interface ListFilters {
@@ -153,8 +159,6 @@ useState<StudentRecord[]>([])
   try {
     const json = await authedFetch("/api/students/rejected");
 
-    alert(JSON.stringify(json));
-
     setRejectedStudents(
       Array.isArray(json)
         ? json
@@ -187,7 +191,7 @@ useState<StudentRecord[]>([])
 
     setApplications((prev) => prev.filter((a) => a.id !== id));
 
-    // 👇 Refresh rejected students
+    // Refresh rejected students
     await fetchRejectedStudents();
 
     return json;

@@ -3,8 +3,11 @@ const express = require("express");
 const router = express.Router();
 
 const { searchDocuments } = require("../services/search.service");
+const { verifyToken } = require("../middleware/auth");
 
-router.get("/documents", async (req, res) => {
+// Any authenticated user — searches within content they're already allowed
+// to browse (same trust level as GET /api/subjects, /api/chapters, etc.)
+router.get("/documents", verifyToken, async (req, res) => {
 
     try {
 

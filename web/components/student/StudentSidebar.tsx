@@ -122,12 +122,20 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
   // somehow still set from a previous session.
   const isAdminGuest = guestMode && (role === 'admin' || role === 'both')
 
+  // While previewing Guest Mode, an admin (plain 'admin' or the internal
+  // 'both' preview role) must see EXACTLY what a real student sees —
+  // production pages only, same as TestingGuard enforces for the page body.
+  // Without this, 'both' in particular always passes canAccessPage's own
+  // "sees everything" rule, which would leak testing-only nav items (e.g.
+  // Tests) into what's supposed to be a faithful student-facing preview.
+  const effectiveRole = isAdminGuest ? 'student' : role
+
   const exitGuestMode = () => {
     setGuestMode(false)
     router.replace('/admin')
   }
 
-  const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
+  const visibleNavItems = navItems.filter((item) => canAccessPage(effectiveRole, item.href))
 
   const isActive = (href: string) => {
     if (href === '/student') return pathname === '/student'

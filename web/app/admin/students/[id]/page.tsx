@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useStudentDetail } from '@/hooks/admin/useStudents'
+import { IconDocument, IconClipboard } from '@/components/ui/SvgIcons'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,46 @@ function IconDownload({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 16 16" fill="none">
       <path d="M 8,2 L 8,10 M 4.5,7 L 8,10.5 L 11.5,7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M 2.5,12.5 L 2.5,13.5 C 2.5,14 3,14.5 3.5,14.5 L 12.5,14.5 C 13,14.5 13.5,14 13.5,13.5 L 13.5,12.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconUser({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="5.2" r="2.8" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M 2.2,14 C 2.8,10.8 5,9.2 8,9.2 C 11,9.2 13.2,10.8 13.8,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconAcademic({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M 8,2 L 14.5,5.2 L 8,8.4 L 1.5,5.2 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M 4.2,6.8 L 4.2,10.2 C 4.2,11.4 5.9,12.4 8,12.4 C 10.1,12.4 11.8,11.4 11.8,10.2 L 11.8,6.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 14.2,5.6 L 14.2,10.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconFamily({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none">
+      <circle cx="5.6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="10.6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M 1.4,14 C 1.9,11.2 3.5,9.9 5.6,9.9 C 7.7,9.9 9.3,11.2 9.8,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M 7,14 C 7.5,11.2 9,9.9 10.6,9.9 C 12.5,9.9 13.9,11.1 14.5,13.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconHome({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M 1.5,8 L 8,2 L 14.5,8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 3.3,6.5 L 3.3,13.5 L 12.7,13.5 L 12.7,6.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M 6.4,13.5 L 6.4,9.5 L 9.6,9.5 L 9.6,13.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -112,7 +153,7 @@ function SectionCard({
   children,
   delay = 0,
 }: {
-  icon: string
+  icon: React.ReactNode
   title: string
   children: React.ReactNode
   delay?: number
@@ -125,7 +166,7 @@ function SectionCard({
       className="bg-white shadow-sm p-5"
     >
       <h2 className="text-base text-primary mb-4 flex items-center gap-2">
-        <span>{icon}</span>
+        <span className="text-gray-400">{icon}</span>
         {title}
       </h2>
       {children}
@@ -305,7 +346,7 @@ export default function StudentDetailPage() {
       <div className="flex flex-col gap-6">
 
         {/* Personal Information */}
-        <SectionCard icon="👤" title="Personal Information" delay={0.06}>
+        <SectionCard icon={<IconUser className="w-4 h-4" />} title="Personal Information" delay={0.06}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <ReadField label="Full Name" value={student.name} />
             {editing ? (
@@ -333,7 +374,7 @@ export default function StudentDetailPage() {
         </SectionCard>
 
         {/* Academic Information */}
-        <SectionCard icon="🎓" title="Academic Information" delay={0.1}>
+        <SectionCard icon={<IconAcademic className="w-4 h-4" />} title="Academic Information" delay={0.1}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <ReadField label="10th School" value={student.tenth_school} />
             <ReadField label="10th Score" value={student.tenth_score} />
@@ -351,7 +392,7 @@ export default function StudentDetailPage() {
         </SectionCard>
 
         {/* Father Details */}
-        <SectionCard icon="👨" title="Father Details" delay={0.14}>
+        <SectionCard icon={<IconFamily className="w-4 h-4" />} title="Father Details" delay={0.14}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <ReadField label="Father Name" value={student.father_name} />
             <ReadField label="Mobile" value={student.father_mobile} />
@@ -363,7 +404,7 @@ export default function StudentDetailPage() {
         </SectionCard>
 
         {/* Mother Details */}
-        <SectionCard icon="👩" title="Mother Details" delay={0.18}>
+        <SectionCard icon={<IconFamily className="w-4 h-4" />} title="Mother Details" delay={0.18}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <ReadField label="Mother Name" value={student.mother_name} />
             <ReadField label="Mobile" value={student.mother_mobile} />
@@ -375,7 +416,7 @@ export default function StudentDetailPage() {
         </SectionCard>
 
         {/* Address */}
-        <SectionCard icon="🏠" title="Address" delay={0.22}>
+        <SectionCard icon={<IconHome className="w-4 h-4" />} title="Address" delay={0.22}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             {editing ? (
               <>
@@ -430,7 +471,7 @@ export default function StudentDetailPage() {
         >
           <div className="px-5 py-4 border-b border-gray-200">
             <h2 className="text-base text-primary flex items-center gap-2">
-              <span>📄</span>
+              <span className="text-gray-400"><IconDocument className="w-4 h-4" /></span>
               Documents
             </h2>
           </div>
@@ -442,7 +483,7 @@ export default function StudentDetailPage() {
         </motion.div>
 
         {/* Application Information */}
-        <SectionCard icon="📋" title="Application Information" delay={0.3}>
+        <SectionCard icon={<IconClipboard className="w-4 h-4" />} title="Application Information" delay={0.3}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <ReadField label="Application ID" value={student.admission_number || student.id} />
             <ReadField label="Admission Number" value={student.admission_number} />

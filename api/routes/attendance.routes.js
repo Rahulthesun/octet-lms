@@ -109,6 +109,17 @@ router.get("/me/history",        verifyToken, ctrl.getMyAttendanceHistory);
 router.get("/me/month",          verifyToken, ctrl.getMyMonthAttendance);
 router.get("/me/schedule/today", verifyToken, ctrl.getMyTodaySchedule);
 
+// ─── Logged-in student's own downloadable report (self-service, own data only) ─
+// GET /api/attendance/me/report          → JSON: summary + full history
+// GET /api/attendance/me/report/csv      → CSV download
+// GET /api/attendance/me/report/pdf      → PDF download (?chartType=bar|pie|line)
+// studentId is always resolved server-side from the verified JWT — there is
+// no route param here, so a student can never request another student's data.
+
+router.get("/me/report",     verifyToken, ctrl.getMyReport);
+router.get("/me/report/csv", verifyToken, ctrl.downloadMyReportCsv);
+router.get("/me/report/pdf", verifyToken, ctrl.downloadMyReportPdf);
+
 // ─── Trend ────────────────────────────────────────────────────────────────────
 // GET /api/attendance/students/:studentId/trend?sessions=5
 

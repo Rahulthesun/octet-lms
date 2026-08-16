@@ -12,11 +12,61 @@ import {
   type OnlineClassStatus,
   type SyncStatus,
 } from '@/hooks/useOnlineClasses'
-import { useBatches, useBatchStudents } from '@/hooks/useAttendanceData'
+import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 
 const ACCENT = '#5B21B6'
+
+// ─── Icons ──────────────────────────────────────────────────────────────────
+
+function ClockIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 7.2V12l3.3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="0.9" fill="currentColor" />
+    </svg>
+  )
+}
+
+function CalendarIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <rect x="3.5" y="5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function SearchIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function UsersIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <circle cx="7" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2 16c.6-3 2.4-4.5 5-4.5s4.4 1.5 5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="14.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M12.5 11.3c2 .1 3.3 1.4 3.8 3.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function LinkIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <path d="M8.5 11.5a3 3 0 0 0 4.2.3l2-2a3 3 0 0 0-4.2-4.2l-1.1 1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11.5 8.5a3 3 0 0 0-4.2-.3l-2 2a3 3 0 0 0 4.2 4.2l1.1-1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 const STATUS_STYLE: Record<OnlineClassStatus, { label: string; fg: string; bg: string }> = {
   scheduled: { label: 'Scheduled', fg: '#15803D', bg: '#F0FDF4' },
@@ -52,11 +102,21 @@ function SyncBadge({ status }: { status: SyncStatus | null }) {
   )
 }
 
-// ─── Online attendance settings panel ──────────────────────────────────────
+// ─── Online attendance settings modal ──────────────────────────────────────
+// Reached via the ⚙️ button next to "Schedule Online Class" — kept out of
+// the main flow since it's configured once and rarely touched day to day.
 
-function AttendanceSettingsPanel() {
+function SettingField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-zinc-800 mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
   const { settings, loading, update } = useAttendanceSettings()
-  const [open, setOpen] = useState(false)
   const [presentThreshold, setPresentThreshold] = useState(75)
   const [partialThreshold, setPartialThreshold] = useState(40)
   const [autoCalculate, setAutoCalculate] = useState(true)
@@ -65,6 +125,7 @@ function AttendanceSettingsPanel() {
   const [syncDelayMinutes, setSyncDelayMinutes] = useState(5)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!settings) return
@@ -78,80 +139,102 @@ function AttendanceSettingsPanel() {
 
   async function handleSave() {
     setSaving(true)
+    setError(null)
     try {
       await update({ presentThreshold, partialThreshold, autoCalculate, autoSync, allowOverride, syncDelayMinutes })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
-      console.error(e)
+      setError(e instanceof Error ? e.message : 'Failed to save settings')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="border border-zinc-200 rounded-lg bg-white overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50 transition-colors"
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white w-full sm:max-w-xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[88vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
-        Online Attendance Settings
-        <svg className={`w-4 h-4 text-zinc-400 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none">
-          <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open && (
-        <div className="px-5 py-4 border-t border-zinc-200 space-y-4">
+        <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-xl leading-none" aria-hidden="true">⚙️</span>
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Online Attendance Settings</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">How Google Meet attendance is calculated and synced</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           {loading ? (
-            <p className="text-xs text-zinc-400">Loading settings…</p>
+            <p className="text-sm text-zinc-400">Loading settings…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 max-w-sm">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Present threshold (%)</label>
-                  <input type="number" min={0} max={100} value={presentThreshold}
-                    onChange={(e) => setPresentThreshold(Number(e.target.value))}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Partial threshold (%)</label>
-                  <input type="number" min={0} max={100} value={partialThreshold}
-                    onChange={(e) => setPartialThreshold(Number(e.target.value))}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300" />
+              <div>
+                <p className="text-xs text-zinc-500 mb-2">Minimum % of class time to count as Present or Partial</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <SettingField label="Present threshold (%)">
+                    <input type="number" min={0} max={100} value={presentThreshold}
+                      onChange={(e) => setPresentThreshold(Number(e.target.value))}
+                      className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  </SettingField>
+                  <SettingField label="Partial threshold (%)">
+                    <input type="number" min={0} max={100} value={partialThreshold}
+                      onChange={(e) => setPartialThreshold(Number(e.target.value))}
+                      className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  </SettingField>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-500 mb-1.5">Sync delay after class ends (minutes)</label>
+
+              <SettingField label="Sync delay after class ends (minutes)">
                 <input type="number" min={0} max={60} value={syncDelayMinutes}
                   onChange={(e) => setSyncDelayMinutes(Number(e.target.value))}
-                  className="w-32 text-sm rounded-md px-3 py-2 border border-zinc-300" />
+                  className="w-32 text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+              </SettingField>
+
+              <div className="pt-1 border-t border-zinc-100">
+                <p className="text-xs text-zinc-500 pt-3 mb-1">What happens automatically after each class</p>
+                <div className="space-y-2.5">
+                  <label className="flex items-center gap-2.5 text-sm text-zinc-700">
+                    <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} />
+                    Automatically calculate attendance
+                  </label>
+                  <label className="flex items-center gap-2.5 text-sm text-zinc-700">
+                    <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+                    Automatically sync attendance
+                  </label>
+                  <label className="flex items-center gap-2.5 text-sm text-zinc-700">
+                    <input type="checkbox" checked={allowOverride} onChange={(e) => setAllowOverride(e.target.checked)} />
+                    Allow admin override
+                  </label>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm text-zinc-700">
-                  <input type="checkbox" checked={autoCalculate} onChange={(e) => setAutoCalculate(e.target.checked)} />
-                  Automatically calculate attendance
-                </label>
-                <label className="flex items-center gap-2 text-sm text-zinc-700">
-                  <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
-                  Automatically sync attendance
-                </label>
-                <label className="flex items-center gap-2 text-sm text-zinc-700">
-                  <input type="checkbox" checked={allowOverride} onChange={(e) => setAllowOverride(e.target.checked)} />
-                  Allow admin override
-                </label>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={handleSave} disabled={saving}
-                  className="text-sm px-4 py-2 text-white rounded-md disabled:opacity-40 transition-colors" style={{ backgroundColor: ACCENT }}>
-                  {saving ? 'Saving…' : 'Save Settings'}
-                </button>
-                {saved && <span className="text-xs text-emerald-600">Saved</span>}
-              </div>
+
+              {error && (
+                <div className="text-sm px-3 py-2.5 rounded-md bg-rose-50 text-rose-700 border border-rose-100">{error}</div>
+              )}
             </>
           )}
         </div>
-      )}
-    </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0 flex items-center gap-3">
+          <button onClick={handleSave} disabled={saving || loading}
+            className="text-sm px-5 py-2.5 text-white rounded-md disabled:opacity-40 transition-colors" style={{ backgroundColor: ACCENT }}>
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+          {saved && <span className="text-xs text-emerald-600">Saved</span>}
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -238,8 +321,36 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
   const [sendNotification, setSendNotification] = useState(true)
   const [extraStudentIds, setExtraStudentIds] = useState<string[]>([])
   const [showExtraStudents, setShowExtraStudents] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
 
-  const { students: batchStudents } = useBatchStudents(batchId || null, date || new Date().toISOString().slice(0, 10))
+  // Students genuinely OUTSIDE this batch (never already-enrolled ones) —
+  // scoped to the selected batch's grade so the candidate list stays
+  // relevant, fetched live from the database, not derived from mock data.
+  // useEligibleStudents(grade, batchId) only gates its fetch on `grade` being
+  // truthy — the backend (getEligibleStudents) never actually filters by it,
+  // it only needs `batchId`. The batches list here (useBatches('all')) never
+  // carries a real `grade` field, so deriving one from the selected batch is
+  // always empty and silently keeps the list from ever loading. Pass a fixed
+  // truthy placeholder instead so the fetch fires as soon as a batch is picked.
+  const { students: eligibleStudents, loading: loadingEligible } = useEligibleStudents(
+    batchId ? 'all' : null,
+    batchId || null
+  )
+
+  // Dropdown only ever offers students not already added, narrowed live by
+  // whatever's typed into the search bar above it.
+  const studentDropdownOptions = eligibleStudents
+    .filter((s) => !extraStudentIds.includes(s.id))
+    .filter((s) => s.name.toLowerCase().includes(studentSearch.trim().toLowerCase()))
+
+  function addExtraStudent(id: string) {
+    setExtraStudentIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    setStudentSearch('')
+  }
+
+  function removeExtraStudent(id: string) {
+    setExtraStudentIds((prev) => prev.filter((x) => x !== id))
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -281,84 +392,96 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-lg shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[90vh] flex flex-col"
+        className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
-          <h3 className="text-sm font-semibold text-zinc-900">Schedule Online Class</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
+        <div className="px-8 py-5 border-b border-zinc-200 flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="text-lg font-semibold text-zinc-900">Schedule Online Class</h3>
+            <p className="text-sm text-zinc-500 mt-0.5">Creates a Google Meet and notifies the batch automatically</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-2xl leading-none">&times;</button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+        <div className="overflow-y-auto flex-1 px-8 py-6 space-y-6">
           {!googleConnected && (
-            <div className="text-xs px-3 py-2.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100">
+            <div className="text-sm px-4 py-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-100">
               No Google account is connected. Connect one above before scheduling — otherwise no Google Meet can be created.
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-500 mb-1.5">Course / Subject</label>
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-            >
-              <option value="">Select subject (optional)…</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Course / Subject</label>
+              <select
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+              >
+                <option value="">Select subject (optional)…</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Topic</label>
+              <input
+                type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Introduction to TCP/IP"
+                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-500 mb-1.5">Topic</label>
-            <input
-              type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Introduction to TCP/IP"
-              className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-500 mb-1.5">Description</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-2">Description</label>
             <textarea
               value={description} onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Optional notes for students"
-              className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 resize-none"
+              className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1.5">Date</label>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Date</label>
               <input
                 type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1.5">Start time</label>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Start time</label>
               <input
                 type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1.5">End time</label>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">End time</label>
               <input
                 type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-500 mb-1.5">Students (batch)</label>
+          <div className="pt-2 border-t border-zinc-100">
+            <label className="block text-sm font-medium text-zinc-700 mb-2 flex items-center gap-2">
+              <UsersIcon className="w-4 h-4 text-zinc-400" />
+              Students (batch)
+            </label>
             <select
               value={batchId}
-              onChange={(e) => { setBatchId(e.target.value); setExtraStudentIds([]) }}
-              className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+              onChange={(e) => {
+                setBatchId(e.target.value)
+                setExtraStudentIds([])
+                setStudentSearch('')
+                setShowExtraStudents(false)
+              }}
+              className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
             >
               <option value="">Select a batch…</option>
               {batches.map((b) => (
@@ -372,58 +495,98 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
               <button
                 type="button"
                 onClick={() => setShowExtraStudents((v) => !v)}
-                className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
+                className="text-sm font-medium hover:underline underline-offset-2"
+                style={{ color: ACCENT }}
               >
-                {showExtraStudents ? 'Hide' : 'Add individual students outside this batch'}
+                {showExtraStudents ? 'Hide' : '+ Add individual students outside this batch'}
+                {extraStudentIds.length > 0 ? ` (${extraStudentIds.length} added)` : ''}
               </button>
+
               {showExtraStudents && (
-                <div className="mt-2 border border-zinc-200 rounded-md max-h-40 overflow-y-auto divide-y divide-zinc-100">
-                  {batchStudents.length === 0 ? (
-                    <p className="text-xs text-zinc-400 px-3 py-2">No students enrolled in this batch.</p>
-                  ) : (
-                    batchStudents.map((s) => (
-                      <label key={s.id} className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600">
-                        <input
-                          type="checkbox"
-                          checked={extraStudentIds.includes(s.id)}
-                          onChange={() =>
-                            setExtraStudentIds((prev) =>
-                              prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
-                            )
-                          }
-                        />
-                        {s.name} <span className="text-zinc-400">({s.roll})</span>
-                      </label>
-                    ))
+                <div className="mt-3 space-y-3">
+                  {extraStudentIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {extraStudentIds.map((id) => {
+                        const s = eligibleStudents.find((x) => x.id === id)
+                        return (
+                          <span key={id} className="inline-flex items-center gap-1.5 text-sm bg-violet-50 text-violet-700 border border-violet-100 rounded-full pl-3 pr-2 py-1">
+                            {s?.name ?? 'Student'}
+                            <button type="button" onClick={() => removeExtraStudent(id)}
+                              className="text-violet-400 hover:text-violet-700 text-base leading-none">&times;</button>
+                          </span>
+                        )
+                      })}
+                    </div>
                   )}
+
+                  <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                    <div className="relative p-2.5 bg-zinc-50 border-b border-zinc-200">
+                      <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        placeholder="Search students by name…"
+                        className="w-full text-sm rounded-md pl-9 pr-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                      />
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto divide-y divide-zinc-100">
+                      {loadingEligible ? (
+                        <p className="text-xs text-zinc-400 px-4 py-3">Loading students…</p>
+                      ) : studentDropdownOptions.length === 0 ? (
+                        <p className="text-xs text-zinc-400 px-4 py-3">
+                          {studentSearch
+                            ? `No students found matching "${studentSearch}".`
+                            : 'No more students available outside this batch.'}
+                        </p>
+                      ) : (
+                        studentDropdownOptions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => addExtraStudent(s.id)}
+                            className="w-full flex items-center justify-between gap-2 px-4 py-2 text-sm text-left text-zinc-700 hover:bg-violet-50 transition-colors"
+                          >
+                            <span className="truncate">
+                              {s.name} <span className="text-zinc-400">({s.roll})</span>
+                            </span>
+                            {s.currentBatchName && (
+                              <span className="text-[11px] text-zinc-400 shrink-0">also in {s.currentBatchName}</span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          <div className="space-y-2 pt-2 border-t border-zinc-100">
-            <label className="flex items-center gap-2 text-sm text-zinc-700">
+          <div className="space-y-3 pt-3 border-t border-zinc-100">
+            <label className="flex items-center gap-2.5 text-sm text-zinc-700">
               <input type="checkbox" checked={createGoogleMeet} onChange={(e) => setCreateGoogleMeet(e.target.checked)} />
               Create Google Meet
             </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <label className="flex items-center gap-2.5 text-sm text-zinc-700">
               <input type="checkbox" checked={sendNotification} onChange={(e) => setSendNotification(e.target.checked)} />
               Send student notification (Google Calendar invite + email)
             </label>
           </div>
 
           {error && (
-            <div className="text-sm px-3 py-2.5 rounded-md bg-rose-50 text-rose-700 border border-rose-100">
+            <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
+        <div className="px-8 py-5 border-t border-zinc-200 bg-zinc-50 shrink-0">
           <button
             onClick={handleSubmit}
             disabled={!canSubmit || submitting}
-            className="w-full py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+            className="w-full py-3.5 text-[15px] font-medium text-white rounded-lg disabled:opacity-40 transition-colors"
             style={{ backgroundColor: ACCENT }}
           >
             {submitting ? 'Scheduling…' : 'Schedule Online Class'}
@@ -606,6 +769,17 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
+type ViewFilter = 'all' | 'past' | 'today'
+
+/** Which calendar day (in the CLASS's own timezone) a class falls on, relative to today. */
+function classDayBucket(cls: OnlineClass): 'today' | 'past' | 'future' {
+  const todayStr = isoToZonedParts(new Date().toISOString(), cls.timezone).date
+  const clsStr = isoToZonedParts(cls.scheduledStart, cls.timezone).date
+  if (clsStr === todayStr) return 'today'
+  if (clsStr < todayStr) return 'past'
+  return 'future'
+}
+
 export default function OnlineClassesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -613,11 +787,13 @@ export default function OnlineClassesPage() {
   const { status: googleStatus } = useGoogleAccountStatus()
 
   const [showSchedule, setShowSchedule] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [selectedClass, setSelectedClass] = useState<OnlineClass | null>(null)
   const [attendanceSessionId, setAttendanceSessionId] = useState<string | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('today')
 
   useEffect(() => {
     const google = searchParams.get('google')
@@ -634,6 +810,12 @@ export default function OnlineClassesPage() {
     () => [...classes].sort((a, b) => new Date(b.scheduledStart).getTime() - new Date(a.scheduledStart).getTime()),
     [classes]
   )
+
+  const filtered = useMemo(() => {
+    if (viewFilter === 'all') return sorted
+    if (viewFilter === 'today') return sorted.filter((c) => classDayBucket(c) === 'today')
+    return sorted.filter((c) => classDayBucket(c) === 'past')
+  }, [sorted, viewFilter])
 
   async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string }) {
     const updated = await reschedule(id, input)
@@ -672,6 +854,13 @@ export default function OnlineClassesPage() {
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Schedule &amp; Manage Online Classes</h1>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button
+            onClick={() => setShowSettings(true)}
+            title="Online Attendance Settings"
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-md border border-zinc-300 hover:bg-zinc-100 transition-colors text-xl leading-none"
+          >
+            <span aria-hidden="true">⚙️</span>
+          </button>
           <GoogleAccountPanel />
           <button
             onClick={() => setShowSchedule(true)}
@@ -690,75 +879,108 @@ export default function OnlineClassesPage() {
         </div>
       )}
 
-      <AttendanceSettingsPanel />
-
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
-        <div className="hidden md:grid md:grid-cols-[1fr_120px_130px_100px_110px_210px] px-5 py-3 border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium tracking-widest uppercase text-zinc-400">
-          <span>Subject / Topic</span>
-          <span>Date</span>
-          <span>Time</span>
-          <span>Status</span>
-          <span>Attendance</span>
-          <span className="text-right">Actions</span>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 rounded-lg" role="group" aria-label="Filter classes">
+          {(['all', 'past', 'today'] as ViewFilter[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => setViewFilter(v)}
+              aria-pressed={viewFilter === v}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                viewFilter === v ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              }`}
+            >
+              {v === 'all' ? 'All' : v === 'past' ? 'Past' : 'Today'}
+            </button>
+          ))}
         </div>
+        <p className="text-xs text-zinc-400">
+          {filtered.length} class{filtered.length === 1 ? '' : 'es'}
+        </p>
+      </div>
 
-        <div className="divide-y divide-zinc-100">
-          {loading ? (
-            <div className="py-12 text-center text-sm text-zinc-400">Loading classes…</div>
-          ) : error ? (
-            <div className="py-12 text-center text-sm text-red-600">{error}</div>
-          ) : sorted.length === 0 ? (
-            <div className="py-12 text-center text-sm text-zinc-400">No online classes scheduled yet.</div>
-          ) : (
-            sorted.map((cls) => (
-              <div key={cls.id} className="flex flex-col md:grid md:grid-cols-[1fr_120px_130px_100px_110px_210px] gap-2 md:gap-0 px-5 py-3.5 md:items-center hover:bg-zinc-50 transition-colors">
+      <div className="space-y-3">
+        {loading ? (
+          <div className="py-12 text-center text-sm text-zinc-400 bg-white border border-zinc-200 rounded-xl">Loading classes…</div>
+        ) : error ? (
+          <div className="py-12 text-center text-sm text-red-600 bg-white border border-zinc-200 rounded-xl">{error}</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center text-sm text-zinc-400 bg-white border border-zinc-200 rounded-xl">
+            {viewFilter === 'today'
+              ? 'No online classes scheduled for today.'
+              : viewFilter === 'past'
+              ? 'No past online classes.'
+              : 'No online classes scheduled yet.'}
+          </div>
+        ) : (
+          filtered.map((cls) => (
+            <div
+              key={cls.id}
+              className="bg-white rounded-xl border border-zinc-200 hover:border-violet-200 hover:shadow-sm transition-all p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-zinc-900 truncate">{cls.title}</p>
-                  <p className="text-xs text-zinc-500 truncate">
+                  <h3 className="text-[15px] font-semibold text-zinc-900 truncate">{cls.title}</h3>
+                  <p className="text-sm text-zinc-500 truncate mt-0.5">
                     {cls.batchName}{cls.subjectName ? ` · ${cls.subjectName}` : ''}
                   </p>
                 </div>
-                <span className="text-sm text-zinc-600">{formatDateInZone(cls.scheduledStart, cls.timezone)}</span>
-                <span className="text-sm text-zinc-600">
-                  {formatTimeInZone(cls.scheduledStart, cls.timezone)} – {formatTimeInZone(cls.scheduledEnd, cls.timezone)}
-                </span>
-                <span><StatusBadge status={cls.status} /></span>
-                <span><SyncBadge status={cls.attendance?.syncStatus ?? null} /></span>
-                <div className="flex items-center gap-1.5 md:justify-end flex-wrap">
-                  <button onClick={() => setSelectedClass(cls)}
-                    className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
-                    View
-                  </button>
-                  {cls.attendance && (
-                    <button onClick={() => setAttendanceSessionId(cls.attendance!.sessionId)}
-                      className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
-                      Attendance
-                    </button>
-                  )}
-                  {cls.status !== 'cancelled' && cls.meetUrl && (
-                    <button onClick={() => handleSync(cls.id)} disabled={syncingId === cls.id}
-                      className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-40">
-                      {syncingId === cls.id ? 'Syncing…' : cls.attendance?.syncStatus === 'SYNC_FAILED' ? 'Retry Sync' : 'Sync Attendance'}
-                    </button>
-                  )}
-                  {cls.meetUrl && cls.status !== 'cancelled' && (
-                    <>
-                      <button onClick={() => copyLink(cls)}
-                        className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
-                        {copiedId === cls.id ? 'Copied' : 'Copy link'}
-                      </button>
-                      <a href={cls.meetUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2.5 py-1 rounded-md text-white transition-colors"
-                        style={{ backgroundColor: ACCENT }}>
-                        Join
-                      </a>
-                    </>
-                  )}
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={cls.status} />
+                  <SyncBadge status={cls.attendance?.syncStatus ?? null} />
                 </div>
               </div>
-            ))
-          )}
-        </div>
+
+              <div className="flex items-center gap-3 py-3 my-3 border-y border-zinc-100">
+                <div className="w-10 h-10 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                  <ClockIcon className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-0.5">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-800">
+                    <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
+                    {formatDateInZone(cls.scheduledStart, cls.timezone)}
+                  </span>
+                  <span className="text-sm text-zinc-500">
+                    {formatTimeInZone(cls.scheduledStart, cls.timezone)} – {formatTimeInZone(cls.scheduledEnd, cls.timezone)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => setSelectedClass(cls)}
+                  className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
+                  View
+                </button>
+                {cls.attendance && (
+                  <button onClick={() => setAttendanceSessionId(cls.attendance!.sessionId)}
+                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
+                    Attendance
+                  </button>
+                )}
+                {cls.status !== 'cancelled' && cls.meetUrl && (
+                  <button onClick={() => handleSync(cls.id)} disabled={syncingId === cls.id}
+                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-40">
+                    {syncingId === cls.id ? 'Syncing…' : cls.attendance?.syncStatus === 'SYNC_FAILED' ? 'Retry Sync' : 'Sync Attendance'}
+                  </button>
+                )}
+                {cls.meetUrl && cls.status !== 'cancelled' && (
+                  <>
+                    <button onClick={() => copyLink(cls)}
+                      className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      {copiedId === cls.id ? 'Copied' : 'Copy link'}
+                    </button>
+                    <a href={cls.meetUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-sm px-3.5 py-1.5 rounded-md text-white transition-colors ml-auto"
+                      style={{ backgroundColor: ACCENT }}>
+                      Join
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <AnimatePresence>
@@ -768,6 +990,9 @@ export default function OnlineClassesPage() {
             onScheduled={refetch}
             googleConnected={!!googleStatus?.connected}
           />
+        )}
+        {showSettings && (
+          <AttendanceSettingsModal onClose={() => setShowSettings(false)} />
         )}
         {selectedClass && (
           <ClassDetailsModal

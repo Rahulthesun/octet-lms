@@ -343,7 +343,7 @@ async function bulkImportStudents(studentsArray) {
                     learning_mode: student.learning_mode || "OFFLINE",
                     status: "APPROVED",
                     username,
-                    // ✅ temp_password is NOT stored here
+                    // temp_password is NOT stored here
                                        // all other CSV fields
                 })
                 .select()
@@ -367,7 +367,7 @@ async function bulkImportStudents(studentsArray) {
 
             results.push(newStudent);
         } catch (err) {
-            console.error(`[${student.email}] ❌ FAILED:`, err.message);
+            console.error(`[${student.email}] FAILED:`, err.message);
             console.error(err.stack);
             errors.push({ email: student.email, error: err.message });
         }

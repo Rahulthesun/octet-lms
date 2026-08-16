@@ -13,6 +13,7 @@ const {
   buildBatchReportCsv,
   buildStudentReportPdf,
   buildBatchReportPdf,
+  normalizeChartType,
 } = require("../utils/attendanceReportFormat");
 
 // ─── Shared error handler ─────────────────────────────────────────────────────
@@ -352,6 +353,71 @@ async function getMyTodaySchedule(req, res) {
   }
 }
 
+/**
+ * GET /api/attendance/me/report
+ * The logged-in student's OWN full attendance report — studentId is always
+ * resolved server-side from the verified JWT, never accepted from the
+ * client, so a student can never request another student's report this way.
+ */
+async function getMyReport(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    res.json(report);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/report/csv
+ */
+async function downloadMyReportCsv(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    const csv = buildStudentReportCsv(report);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/report/pdf
+ * Query: chartType = bar | pie | line (default bar) — the chart the
+ * student had selected on screen, redrawn identically into the PDF.
+ */
+async function downloadMyReportPdf(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    const chartType = normalizeChartType(req.query.chartType);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+    buildStudentReportPdf(doc, report, chartType);
+    doc.end();
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
 // ─── Admin: per-student & per-batch attendance reports ────────────────────────
 
 /**
@@ -392,13 +458,14 @@ async function downloadStudentReportPdf(req, res) {
   const { studentId } = req.params;
   try {
     const report = await svc.getStudentAttendanceReport(studentId);
+    const chartType = normalizeChartType(req.query.chartType);
     const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
     const doc = new PDFDocument({ margin: 40, size: "A4" });
     doc.pipe(res);
-    buildStudentReportPdf(doc, report);
+    buildStudentReportPdf(doc, report, chartType);
     doc.end();
   } catch (err) {
     handleError(res, err);
@@ -443,13 +510,14 @@ async function downloadBatchReportPdf(req, res) {
   const { batchId } = req.params;
   try {
     const report = await svc.getBatchAttendanceReport(batchId);
+    const chartType = normalizeChartType(req.query.chartType);
     const filename = `batch_${report.batch.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
     const doc = new PDFDocument({ margin: 40, size: "A4" });
     doc.pipe(res);
-    buildBatchReportPdf(doc, report);
+    buildBatchReportPdf(doc, report, chartType);
     doc.end();
   } catch (err) {
     handleError(res, err);
@@ -572,6 +640,9 @@ module.exports = {
   getMyAttendanceHistory,
   getMyMonthAttendance,
   getMyTodaySchedule,
+  getMyReport,
+  downloadMyReportCsv,
+  downloadMyReportPdf,
   getStudentReport,
   downloadStudentReportCsv,
   downloadStudentReportPdf,

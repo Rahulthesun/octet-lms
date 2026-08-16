@@ -246,10 +246,12 @@ async function getEligibleStudents(batchId) {
 
   const enrolledIds = (enrolled || []).map((e) => e.student_id);
 
-  // All students
+  // All approved students not already in this batch — pending/rejected
+  // applicants are never real candidates for a live class roster.
   let query = supabase
     .from("students")
-    .select("id, name, admission_number");
+    .select("id, name, admission_number")
+    .eq("status", "APPROVED");
 
   if (enrolledIds.length > 0) {
     query = query.not("id", "in", `(${enrolledIds.join(",")})`);
@@ -1263,6 +1265,73 @@ async function getMyTodaySchedule(authUserId) {
   return { classes };
 }
 
+/**
+ * Bulk attendance-% lookup for a list of student ids, in a fixed small
+ * number of queries (no N+1) — used by the admin Students list so its
+ * "Attendance" column shows a real, database-backed percentage instead of
+ * a placeholder. Returns { [studentId]: number | null }; null means the
+ * student isn't enrolled in any batch with sessions yet.
+ */
+async function getAttendancePercentagesForStudents(studentIds) {
+  const result = {};
+  if (!studentIds || studentIds.length === 0) return result;
+  studentIds.forEach((id) => { result[id] = null; });
+
+  const { data: enrollments, error: enrollErr } = await supabase
+    .from("batch_enrollments")
+    .select("student_id, batch_id")
+    .in("student_id", studentIds);
+  if (enrollErr) throw enrollErr;
+  if (!enrollments || enrollments.length === 0) return result;
+
+  const batchIdsByStudent = {};
+  const allBatchIds = new Set();
+  enrollments.forEach((e) => {
+    if (!batchIdsByStudent[e.student_id]) batchIdsByStudent[e.student_id] = [];
+    batchIdsByStudent[e.student_id].push(e.batch_id);
+    allBatchIds.add(e.batch_id);
+  });
+
+  const { data: sessions, error: sessErr } = await supabase
+    .from("attendance_sessions")
+    .select("id, batch_id")
+    .in("batch_id", Array.from(allBatchIds));
+  if (sessErr) throw sessErr;
+
+  const sessionIdsByBatch = {};
+  const allSessionIds = [];
+  (sessions || []).forEach((s) => {
+    if (!sessionIdsByBatch[s.batch_id]) sessionIdsByBatch[s.batch_id] = [];
+    sessionIdsByBatch[s.batch_id].push(s.id);
+    allSessionIds.push(s.id);
+  });
+  if (allSessionIds.length === 0) return result;
+
+  const { data: records, error: recErr } = await supabase
+    .from("attendance_records")
+    .select("student_id, session_id, present")
+    .in("student_id", studentIds)
+    .in("session_id", allSessionIds)
+    .eq("present", true);
+  if (recErr) throw recErr;
+
+  const presentCountByStudent = {};
+  (records || []).forEach((r) => {
+    presentCountByStudent[r.student_id] = (presentCountByStudent[r.student_id] || 0) + 1;
+  });
+
+  studentIds.forEach((id) => {
+    const batchIds = batchIdsByStudent[id] || [];
+    const totalSessions = batchIds.reduce((sum, bId) => sum + (sessionIdsByBatch[bId]?.length || 0), 0);
+    if (totalSessions > 0) {
+      const presentCount = presentCountByStudent[id] || 0;
+      result[id] = Math.round((presentCount / totalSessions) * 100);
+    }
+  });
+
+  return result;
+}
+
 // ─── Admin: per-student & per-batch attendance reports ────────────────────────
 
 /**
@@ -1353,6 +1422,19 @@ async function getStudentAttendanceReport(studentId) {
     attendancePct: totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : null,
     records,
   };
+}
+
+/**
+ * GET /me/report — a student's OWN full attendance report (self-service
+ * download, no PDF/CSV route previously existed for students). The student
+ * id is resolved server-side from the verified JWT (authUserId), never from
+ * client input, so this can only ever return the caller's own data — it
+ * intentionally reuses getStudentAttendanceReport() rather than trusting a
+ * studentId supplied by the request.
+ */
+async function getMyAttendanceReport(authUserId) {
+  const student = await getStudentByAuthUserId(authUserId);
+  return getStudentAttendanceReport(student.id);
 }
 
 /**
@@ -1559,6 +1641,8 @@ module.exports = {
   getMyMonthAttendance,
   getMyTodaySchedule,
   getStudentAttendanceReport,
+  getMyAttendanceReport,
+  getAttendancePercentagesForStudents,
   getBatchAttendanceReport,
   getStudentTrend,
 };

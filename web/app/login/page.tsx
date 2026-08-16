@@ -30,9 +30,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
   try {
     const { user } = await signIn(email, password)
-    console.log('user.id:', user?.id)
-    console.log('app_metadata:', user?.app_metadata)
-    
+
     const role = user?.app_metadata?.role // 'admin' | 'both' | undefined (students)
 
     

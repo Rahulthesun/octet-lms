@@ -1,11 +1,29 @@
 // controllers/student.controller.js
 const studentService = require("../services/students.service");
+const attendanceService = require("../services/attendance.service");
 
 
 exports.getAllStudents = async (req, res) => {
   try {
     const { batch, mode, status, search, limit, offset } = req.query;
     const result = await studentService.getAllStudents({ batch, mode, status, search, limit, offset });
+
+    // Real, database-backed attendance % per student (no mock/placeholder
+    // data) — best-effort: if this lookup fails for any reason, the list
+    // still returns with attendance_pct left null rather than failing the
+    // whole request over a non-critical column.
+    if (result?.data?.length) {
+      try {
+        const pctByStudent = await attendanceService.getAttendancePercentagesForStudents(
+          result.data.map((s) => s.id)
+        );
+        result.data = result.data.map((s) => ({ ...s, attendance_pct: pctByStudent[s.id] ?? null }));
+      } catch (attendanceErr) {
+        console.error("[students] attendance % lookup failed:", attendanceErr.message);
+        result.data = result.data.map((s) => ({ ...s, attendance_pct: null }));
+      }
+    }
+
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

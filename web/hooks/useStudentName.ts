@@ -31,7 +31,6 @@ export function useStudentName(): string | null {
           },
 
         );
-        console.log(response);
         if (!response.ok) {
           throw new Error('Failed to fetch student profile');
         }

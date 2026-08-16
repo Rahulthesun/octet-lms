@@ -18,6 +18,15 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+// Same present/partial/absent threshold convention used across the admin
+// attendance views (AttendanceReportsTab's pctColor).
+function attendancePctColor(pct: number | null) {
+  if (pct === null) return '#9CA3AF'
+  if (pct < 75) return '#DC2626'
+  if (pct < 90) return '#D97706'
+  return '#16A34A'
+}
+
 // ─── Application Card ─────────────────────────────────────────────────────────
 
 function ApplicationCard({
@@ -64,7 +73,7 @@ function ApplicationCard({
   title="View Full Details"
   className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-primary hover:text-primary hover:bg-gray-50 transition-all"
 >
-  <span className="text-lg">👁️</span>
+  <span className="text-xl leading-none">⋮</span>
 </Link>
 
   <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0 rounded-lg">
@@ -381,8 +390,6 @@ export default function StudentsPage() {
                 <span>Roll</span>
                 <span>Grade</span>
                 <span>Batch</span>
-                {/* TODO: attendance columns don't exist on `students` — needs a join
-                    against attendance_sessions/attendance_records once wired up. */}
                 <span className="text-right">Attendance</span>
                 <span className="text-right">Status</span>
                 <span className="text-center">Actions</span>
@@ -411,15 +418,26 @@ export default function StudentsPage() {
                       <span className="text-base border border-gray-200 px-2 py-0.5 text-gray-600 w-fit hidden lg:block rounded-full">{s.class_grade || '—'}</span>
                       <div className="text-base text-gray-600 hidden lg:flex lg:flex-col lg:gap-0.5">
                         {s.preferred_batch && (
-                          <span className="flex items-center gap-1">🟣 {s.preferred_batch}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                            {s.preferred_batch}
+                          </span>
                         )}
                         {s.learning_mode && (
-                          <span className="flex items-center gap-1">🏫 {s.learning_mode}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                            {s.learning_mode}
+                          </span>
                         )}
                         {!s.preferred_batch && !s.learning_mode && '—'}
                       </div>
                       <div className="text-right hidden lg:block">
-                        <span className="text-base font-inter text-gray-400">—</span>
+                        <span
+                          className="text-base font-inter"
+                          style={{ color: attendancePctColor(s.attendance_pct ?? null) }}
+                        >
+                          {s.attendance_pct !== null && s.attendance_pct !== undefined ? `${s.attendance_pct}%` : '—'}
+                        </span>
                       </div>
                       <div className="text-right hidden lg:block">
                         <button
@@ -428,7 +446,8 @@ export default function StudentsPage() {
                             s.blocked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'
                           }`}
                         >
-                          {s.blocked ? '🔴 Blocked' : '🟢 Active'}
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.blocked ? 'bg-red-500' : 'bg-green-500'}`} />
+                          {s.blocked ? 'Blocked' : 'Active'}
                         </button>
                       </div>
                       <Link href={`/admin/students/${s.id}`}
@@ -507,9 +526,10 @@ export default function StudentsPage() {
             <div className="flex justify-center">
               <Link
                 href={`/admin/students/${s.id}`}
-                className="text-center text-xl"
+                title="Show Details"
+                className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-primary transition-all rounded-lg"
               >
-                👁️
+                <span className="text-xl leading-none">⋮</span>
               </Link>
             </div>
             </div>

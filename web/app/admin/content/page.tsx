@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckIcon, XMarkIcon, TrashIcon } from "@heroicons/react/16/solid";
+import { CheckIcon, XMarkIcon, TrashIcon, PencilIcon } from "@heroicons/react/16/solid";
 import {
   IconPlay,
   IconDocument,
   IconClose,
   IconCheckCircle,
 } from "@/components/ui/SvgIcons";
-import { useContentTree } from "../../../hooks/admin/useContentTree";
+import { useContentTree, authHeaders } from "../../../hooks/admin/useContentTree";
 import { PdfViewer } from "../../../components/admin/PDFViewer";
 import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer";
 import { getSession } from "@/lib/auth";
@@ -20,12 +20,11 @@ interface BackendSubject {
   id: string;
   name: string;
   unit_prefix : number;
-  // Optional class/grade tag ('11' | '12'). Null/undefined for every
-  // pre-existing subject — those render exactly as they always have.
-  standard?: string | null;
+  // Which class this subject belongs to — required on every subject.
+  grade: number;
 }
 
-type Standard = "11" | "12";
+type Grade = 11 | 12;
 interface BackendChapter {
   id: string;
   name: string;
@@ -241,6 +240,8 @@ export default function ContentPage() {
     loadChapterContent,
     addChapter,
     createSubject,
+    renameSubject,
+    deleteSubject,
     updatePdfs,
     updateVideos,
     getStorage,
@@ -257,6 +258,9 @@ export default function ContentPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // ── Grade tab (11th / 12th) ────────────────────────────────────────────────
+  const [activeGrade, setActiveGrade] = useState<Grade>(12);
+
   // ── Per-chapter PDF / Video toggle ────────────────────────────────────────
   const [chapterContentType, setChapterContentType] = useState<
     Record<string, ContentType>
@@ -269,12 +273,25 @@ export default function ContentPage() {
   const [newChapterName, setNewChapterName] = useState("");
   const [addingChapter, setAddingChapter] = useState(false);
 
-  // ── Add subject (11th / 12th) modal ───────────────────────────────────────
+  // ── Add subject modal (grade comes from the active tab) ────────────────────
   const [addSubjectOpen, setAddSubjectOpen] = useState(false);
-  const [addSubjectStandard, setAddSubjectStandard] = useState<Standard | null>(null);
   const [newSubjectName, setNewSubjectName] = useState("");
   const [addingSubject, setAddingSubject] = useState(false);
   const [addSubjectError, setAddSubjectError] = useState<string | null>(null);
+
+  // ── Rename subject (inline) ─────────────────────────────────────────────────
+  const [renamingSubjectId, setRenamingSubjectId] = useState<string | null>(null);
+  const [renameSubjectValue, setRenameSubjectValue] = useState("");
+  const [renamingSubjectBusy, setRenamingSubjectBusy] = useState(false);
+  const [renameSubjectError, setRenameSubjectError] = useState<string | null>(null);
+
+  // ── Delete subject confirmation ─────────────────────────────────────────────
+  const [deletingSubject, setDeletingSubject] = useState<{
+    id: string;
+    name: string;
+    chapterCount: number;
+  } | null>(null);
+  const [confirmingDeleteSubject, setConfirmingDeleteSubject] = useState(false);
 
   // ── Delete confirmation ────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -360,10 +377,12 @@ export default function ContentPage() {
 
       setPdfPreviewUrl(null);
 
-      fetch(`${BASE_URL}/api/content/pdf/${selectedFile.id}/stream`)
-        .then((res) => res.json())
-        .then((data) => setPdfPreviewUrl(data.url))
-        .catch(() => setPdfPreviewUrl(null));
+      authHeaders().then((headers) =>
+        fetch(`${BASE_URL}/api/content/pdf/${selectedFile.id}/stream`, { headers })
+          .then((res) => res.json())
+          .then((data) => setPdfPreviewUrl(data.url))
+          .catch(() => setPdfPreviewUrl(null)),
+      );
     }, [selectedPath?.contentType, selectedFile]);
 
   // ── Derived: Video preview URL ───────────────────────────────────────────
@@ -507,9 +526,10 @@ export default function ContentPage() {
     subjectId: string,
     name: string,
   ): Promise<{ id: string; name: string } | null> {
+    const authed = await authHeaders();
     const res = await fetch(`${BASE_URL}/api/chapters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authed },
       body: JSON.stringify({ subjectId: subjectId, name: name }),
     });
     if (!res.ok) throw new Error("Failed to create chapter");
@@ -540,10 +560,9 @@ export default function ContentPage() {
     setNewChapterName("");
   }
 
-  // ── Add subject (11th / 12th) ──────────────────────────────────────────────
+  // ── Add subject (grade comes from the active tab) ──────────────────────────
   function openAddSubject() {
     setAddSubjectOpen(true);
-    setAddSubjectStandard(null);
     setNewSubjectName("");
     setAddSubjectError(null);
   }
@@ -551,21 +570,20 @@ export default function ContentPage() {
   function closeAddSubject() {
     if (addingSubject) return;
     setAddSubjectOpen(false);
-    setAddSubjectStandard(null);
     setNewSubjectName("");
     setAddSubjectError(null);
   }
 
   async function submitAddSubject() {
     const name = newSubjectName.trim();
-    if (!addSubjectStandard || !name || addingSubject) return;
+    if (!name || addingSubject) return;
     setAddingSubject(true);
     setAddSubjectError(null);
     try {
-      const subject = await createSubject(name, addSubjectStandard);
+      const subject = await createSubject(name, activeGrade);
       closeAddSubject();
       // Open it straight away so the admin can immediately add topics
-      // (chapters) and content under this standard.
+      // (chapters) and content under this grade.
       setOpenSubjectId(subject.id);
       setOpenChapterId(null);
       setSelectedItemId(null);
@@ -575,6 +593,66 @@ export default function ContentPage() {
       );
     } finally {
       setAddingSubject(false);
+    }
+  }
+
+  // ── Rename subject ──────────────────────────────────────────────────────────
+  function startRenameSubject(subject: BackendSubject) {
+    setRenamingSubjectId(subject.id);
+    setRenameSubjectValue(subject.name);
+    setRenameSubjectError(null);
+  }
+
+  function cancelRenameSubject() {
+    setRenamingSubjectId(null);
+    setRenameSubjectValue("");
+    setRenameSubjectError(null);
+  }
+
+  async function submitRenameSubject(subjectId: string) {
+    const name = renameSubjectValue.trim();
+    if (!name || renamingSubjectBusy) return;
+    setRenamingSubjectBusy(true);
+    setRenameSubjectError(null);
+    try {
+      await renameSubject(subjectId, name);
+      cancelRenameSubject();
+    } catch (e) {
+      setRenameSubjectError(
+        e instanceof Error ? e.message : "Failed to rename subject",
+      );
+    } finally {
+      setRenamingSubjectBusy(false);
+    }
+  }
+
+  // ── Delete subject ──────────────────────────────────────────────────────────
+  function handleDeleteSubject(subject: BackendSubject) {
+    setDeletingSubject({
+      id: subject.id,
+      name: subject.name,
+      chapterCount: (chaptersMap[subject.id] ?? []).length,
+    });
+  }
+
+  async function confirmDeleteSubject() {
+    if (!deletingSubject) return;
+    setConfirmingDeleteSubject(true);
+    try {
+      await deleteSubject(deletingSubject.id);
+      if (openSubjectId === deletingSubject.id) {
+        setOpenSubjectId(null);
+        setOpenChapterId(null);
+        setSelectedItemId(null);
+      }
+      setDeletingSubject(null);
+    } catch (e) {
+      showNotice(
+        "error",
+        e instanceof Error ? e.message : "Failed to delete subject",
+      );
+    } finally {
+      setConfirmingDeleteSubject(false);
     }
   }
 
@@ -648,8 +726,10 @@ export default function ContentPage() {
     if (uploadDesc.trim()) formData.append("description", uploadDesc.trim());
 
     try {
+      const authed = await authHeaders();
       const res = await fetch(`${BASE_URL}/api/content/pdf/upload`, {
         method: "POST",
+        headers: authed,
         body: formData,
       });
 
@@ -733,6 +813,7 @@ export default function ContentPage() {
     setSavingEdit(true);
 
     try {
+      const authed = await authHeaders();
       if (replaceFile) {
         const formData = new FormData();
         formData.append("title", editTitle.trim());
@@ -742,6 +823,7 @@ export default function ContentPage() {
 
         const uploadRes = await fetch(`${BASE_URL}/api/content/pdf/upload`, {
           method: "POST",
+          headers: authed,
           body: formData,
         });
 
@@ -762,6 +844,7 @@ export default function ContentPage() {
           `${BASE_URL}/api/content/pdf/${selectedFile.id}`,
           {
             method: "DELETE",
+            headers: authed,
           },
         );
 
@@ -785,7 +868,7 @@ export default function ContentPage() {
           `${BASE_URL}/api/content/pdf/${selectedFile.id}`,
           {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authed },
             body: JSON.stringify({ title: editTitle.trim() }),
           },
         );
@@ -823,11 +906,13 @@ export default function ContentPage() {
     setDeletingFile(true);
 
     try {
+      const authed = await authHeaders();
       const endpoint = deleteTarget.type === "pdf" ? "pdf" : "video";
       const res = await fetch(
         `${BASE_URL}/api/content/${endpoint}/${deleteTarget.itemId}`,
         {
           method: "DELETE",
+          headers: authed,
         },
       );
 
@@ -918,29 +1003,24 @@ export default function ContentPage() {
     ? "MP4, WebM, MKV, MOV or AVI — max 4 GB"
     : "PDF or PPTX — max 50 MB";
 
+  const allSubjects = subjects as BackendSubject[];
+
+  const gradeSubjects = allSubjects.filter((s) => s.grade === activeGrade);
+
   const noMatches =
     visibility &&
-    (subjects as BackendSubject[]).every(
-      (s) => !visibility.visibleSubjects.has(s.id),
-    );
+    gradeSubjects.every((s) => !visibility.visibleSubjects.has(s.id));
 
+  // Subjects shown in the left rail: scoped to the active 11th/12th tab,
+  // then narrowed further by the search box if it's in use.
   const visibleSubjects = visibility
-    ? (subjects as BackendSubject[]).filter((s) =>
-        visibility.visibleSubjects.has(s.id),
-      )
-    : (subjects as BackendSubject[]);
+    ? gradeSubjects.filter((s) => visibility.visibleSubjects.has(s.id))
+    : gradeSubjects;
 
-  // ── Group by class/standard ────────────────────────────────────────────────
-  // Untagged (pre-existing) subjects render first, exactly as before — then
-  // any 11th/12th subjects created via "Add" appear under their own headers.
-  function subjectGroup(s: BackendSubject): Standard | null {
-    return s.standard === "11" || s.standard === "12" ? s.standard : null;
-  }
-  const orderedVisibleSubjects = [
-    ...visibleSubjects.filter((s) => !subjectGroup(s)),
-    ...visibleSubjects.filter((s) => subjectGroup(s) === "11"),
-    ...visibleSubjects.filter((s) => subjectGroup(s) === "12"),
-  ];
+  const gradeCounts: Record<Grade, number> = {
+    11: allSubjects.filter((s) => s.grade === 11).length,
+    12: allSubjects.filter((s) => s.grade === 12).length,
+  };
 
   // ──────────────────────────────────────────────────────────────────────────
   return (
@@ -957,13 +1037,6 @@ export default function ContentPage() {
             </p>
           </div>
           <div className="flex-1 flex items-center justify-end gap-4">
-            <button
-              onClick={openAddSubject}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary/90 cursor-pointer shrink-0"
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add
-            </button>
             <div className="lg:w-100 shrink-0">
               <StorageBar totalBytes={storage.totalBytes} />
             </div>
@@ -1010,6 +1083,40 @@ export default function ContentPage() {
       <div className="flex flex-1 min-h-0 p-3">
         {/* ── Left rail ── */}
         <div className="w-[45%] shrink-0 border-r rounded-2xl border-gray-200 bg-white flex flex-col h-full overflow-hidden">
+          {/* Grade tabs + Add, right at the top of the subject card */}
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+            <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+              {([11, 12] as Grade[]).map((g) => (
+                <button
+                  key={g}
+                  onClick={() => {
+                    setActiveGrade(g);
+                    setOpenSubjectId(null);
+                    setOpenChapterId(null);
+                    setSelectedItemId(null);
+                  }}
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    activeGrade === g
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {g}th
+                  <span className="ml-1.5 text-xs text-gray-400">
+                    {gradeCounts[g]}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={openAddSubject}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition hover:bg-primary/90 cursor-pointer shrink-0"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Add
+            </button>
+          </div>
+
           <div className="flex-1 overflow-y-auto">
             {loading && (
               <div className="p-8 text-center text-gray-400 text-base">
@@ -1026,46 +1133,96 @@ export default function ContentPage() {
               <div className="p-8 text-center text-gray-400 text-base">
                 No matches for &quot;{searchQuery}&quot;
               </div>
+            ) : visibleSubjects.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-base">
+                {`No subjects in Class ${activeGrade} yet — click "+ Add" above to create one.`}
+              </div>
             ) : (
-              orderedVisibleSubjects.map((subject, subjectIdx) => {
+              visibleSubjects.map((subject) => {
                 const subjectOpen = openSubjectId === subject.id;
                 const chapters = (chaptersMap[subject.id] ??
                   []) as BackendChapter[];
-                const group = subjectGroup(subject);
-                const prevGroup =
-                  subjectIdx > 0
-                    ? subjectGroup(orderedVisibleSubjects[subjectIdx - 1])
-                    : null;
-                const showGroupHeader = group !== null && group !== prevGroup;
+                const isRenaming = renamingSubjectId === subject.id;
 
                 return (
                   <div key={subject.id}>
-                  {showGroupHeader && (
-                    <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                        Class {group}
-                      </span>
-                      <span className="flex-1 h-px bg-gray-100" />
-                    </div>
-                  )}
                   <div
                     className="border-b border-gray-100 last:border-0"
                   >
                     {/* Subject row */}
-                    <button
-                      onClick={() => toggleSubject(subject.id)}
-                      className={`w-full flex items-center gap-3 pl-4 pr-4 py-3 text-left transition-colors ${
-                        subjectOpen ? "bg-gray-50" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="flex-1 text-lg text-gray-800 font-medium">
-                        {subject.name}
-                      </span>
-                      <ChevronIcon
-                        open={subjectOpen}
-                        className="w-3.5 h-3.5 text-gray-400"
-                      />
-                    </button>
+                    {isRenaming ? (
+                      <div className="flex items-center gap-2 pl-4 pr-4 py-2.5">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={renameSubjectValue}
+                          onChange={(e) => setRenameSubjectValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") submitRenameSubject(subject.id);
+                            if (e.key === "Escape") cancelRenameSubject();
+                          }}
+                          className="flex-1 rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-base text-gray-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                        <button
+                          onClick={() => submitRenameSubject(subject.id)}
+                          disabled={renamingSubjectBusy || !renameSubjectValue.trim()}
+                          className="shrink-0 rounded-lg bg-primary p-1.5 text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                          title="Save"
+                        >
+                          {renamingSubjectBusy ? (
+                            <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          ) : (
+                            <CheckIcon className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={cancelRenameSubject}
+                          className="shrink-0 rounded-lg border border-gray-200 p-1.5 text-gray-400 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-600"
+                          title="Cancel"
+                        >
+                          <XMarkIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className={`group w-full flex items-center gap-1 pl-4 pr-2 py-1.5 transition-colors ${
+                          subjectOpen ? "bg-gray-50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <button
+                          onClick={() => toggleSubject(subject.id)}
+                          className="flex-1 flex items-center gap-3 py-1.5 text-left cursor-pointer"
+                        >
+                          <span className="flex-1 text-lg text-gray-800 font-medium">
+                            {subject.name}
+                          </span>
+                          <ChevronIcon
+                            open={subjectOpen}
+                            className="w-3.5 h-3.5 text-gray-400"
+                          />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startRenameSubject(subject);
+                          }}
+                          className="shrink-0 rounded-lg p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+                          title="Rename subject"
+                        >
+                          <PencilIcon className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSubject(subject);
+                          }}
+                          className="shrink-0 rounded-lg p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition hover:bg-red-100 hover:text-red-500 cursor-pointer"
+                          title="Delete subject"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Chapters accordion */}
                     <AnimatePresence initial={false}>
@@ -2034,7 +2191,7 @@ export default function ContentPage() {
         </div>
       </div>
 
-      {/* ── Add Subject (11th / 12th) modal ── */}
+      {/* ── Add Subject modal (grade comes from the active tab) ── */}
       <AnimatePresence>
         {addSubjectOpen && (
           <motion.div
@@ -2051,108 +2208,52 @@ export default function ContentPage() {
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              {!addSubjectStandard ? (
-                <>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Add subject
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Choose which class this new subject belongs to.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 mt-5">
-                    {(["11", "12"] as Standard[]).map((std) => (
-                      <button
-                        key={std}
-                        onClick={() => setAddSubjectStandard(std)}
-                        className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-gray-200 py-6 text-gray-700 transition hover:border-primary hover:bg-primary/5 hover:text-primary cursor-pointer"
-                      >
-                        <span className="text-2xl font-semibold">
-                          {std}th
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          Standard {std}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex justify-end mt-5">
-                    <button
-                      onClick={closeAddSubject}
-                      className="px-4 py-2 text-base text-gray-600 hover:text-gray-800"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setAddSubjectStandard(null)}
-                      disabled={addingSubject}
-                      className="text-gray-400 hover:text-gray-600 disabled:opacity-50 cursor-pointer"
-                      title="Back"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 12 12" fill="none">
-                        <path
-                          d="M 7,2 L 3,6 L 7,10"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                    <h3 className="text-lg font-medium text-gray-900">
-                      New subject — Class {addSubjectStandard}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1 ml-6">
-                    This is added alongside the existing subjects — nothing
-                    else changes.
-                  </p>
-                  <div className="mt-4">
-                    <label className="text-sm text-gray-500 block mb-1">
-                      Subject name <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newSubjectName}
-                      onChange={(e) => setNewSubjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") submitAddSubject();
-                      }}
-                      placeholder="e.g. Physical Chemistry"
-                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-base text-gray-800 placeholder-gray-300 outline-none focus:border-primary"
-                    />
-                  </div>
-                  {addSubjectError && (
-                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {addSubjectError}
-                    </p>
-                  )}
-                  <div className="flex justify-end gap-2 mt-5">
-                    <button
-                      onClick={closeAddSubject}
-                      disabled={addingSubject}
-                      className="px-4 py-2 text-base text-gray-600 hover:text-gray-800 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={submitAddSubject}
-                      disabled={addingSubject || !newSubjectName.trim()}
-                      className="px-4 py-2 text-base bg-primary text-white hover:bg-primary/90 rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {addingSubject && (
-                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      )}
-                      {addingSubject ? "Creating…" : "Create subject"}
-                    </button>
-                  </div>
-                </>
+              <h3 className="text-lg font-medium text-gray-900">
+                New subject — Class {activeGrade}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Added under Class {activeGrade} — nothing else changes.
+              </p>
+              <div className="mt-4">
+                <label className="text-sm text-gray-500 block mb-1">
+                  Subject name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitAddSubject();
+                  }}
+                  placeholder="e.g. Physical Chemistry"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-base text-gray-800 placeholder-gray-300 outline-none focus:border-primary"
+                />
+              </div>
+              {addSubjectError && (
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {addSubjectError}
+                </p>
               )}
+              <div className="flex justify-end gap-2 mt-5">
+                <button
+                  onClick={closeAddSubject}
+                  disabled={addingSubject}
+                  className="px-4 py-2 text-base text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitAddSubject}
+                  disabled={addingSubject || !newSubjectName.trim()}
+                  className="px-4 py-2 text-base bg-primary text-white hover:bg-primary/90 rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {addingSubject && (
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  )}
+                  {addingSubject ? "Creating…" : "Create subject"}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -2320,6 +2421,58 @@ export default function ContentPage() {
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 )}
                 {confirmingDelete ? "Deleting…" : "Yes, Delete Chapter"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Subject Modal */}
+      {deletingSubject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-200"
+            onClick={() => !confirmingDeleteSubject && setDeletingSubject(null)}
+          />
+
+          {/* Modal Container */}
+          <div className="relative mx-4 w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-200 animate-in fade-in zoom-in-95">
+            <div className="p-6 pb-3">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-50">
+                <TrashIcon className="h-5 w-5 text-red-500" />
+              </div>
+
+              <h2 className="text-lg font-semibold text-gray-900">
+                Delete &quot;{deletingSubject.name}&quot;?
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                This permanently deletes the subject
+                {deletingSubject.chapterCount > 0
+                  ? ` and all ${deletingSubject.chapterCount} chapter${deletingSubject.chapterCount === 1 ? "" : "s"} (with their PDFs and videos) inside it`
+                  : ""}
+                . This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4">
+              <button
+                onClick={() => setDeletingSubject(null)}
+                disabled={confirmingDeleteSubject}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmDeleteSubject}
+                disabled={confirmingDeleteSubject}
+                className="flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-red-600 focus:ring-2 focus:ring-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {confirmingDeleteSubject && (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                )}
+                {confirmingDeleteSubject ? "Deleting…" : "Yes, Delete Subject"}
               </button>
             </div>
           </div>
