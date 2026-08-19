@@ -63,6 +63,26 @@ export function IconBarChart({ className = 'w-5 h-5' }: IconProps) {
   )
 }
 
+export function IconPieChart({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <path d="M 10,2 A 8,8 0 1 1 3.5,15.2 L 10,10 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M 10,2 L 10,10 L 3.5,15.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconLineChart({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <path d="M 2,17 L 18,17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M 3,13 L 7.5,8 L 11,11.5 L 17,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7.5" cy="8" r="1.1" fill="currentColor" />
+      <circle cx="11" cy="11.5" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function IconPlay({ className = 'w-5 h-5' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none">

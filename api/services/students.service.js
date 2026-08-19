@@ -8,7 +8,7 @@
  * - No HTTP knowledge (no req/res)
  * ─────────────────────────────────────────────────────────────
  */
-
+const { uploadStudentDocument } = require("./upload.service");
 const  supabase  = require("../config/supabase");
 const { generateTempPassword, generateUsername , generateAdmissionNumber } = require("../utils/helpers");
 const { sendWelcomeEmail } = require("../utils/email");
@@ -18,9 +18,23 @@ console.log('Checking environment:');
 console.log('BREVO_FROM_EMAIL:', process.env.BREVO_FROM_EMAIL);
 console.log('BREVO_SMTP_HOST:', process.env.BREVO_SMTP_HOST);
 
-
-
-
+// ─── Attendance bridge ────────────────────────────────────────────────────
+// The attendance system (calendar, roster, summary) reads enrollment from
+// `batch_enrollments`, not from `students.preferred_batch`. Every place that
+// creates/approves an APPROVED student must also mirror them into
+// batch_enrollments, or their attendance calendar stays permanently blank.
+async function enrollInPreferredBatch(studentId, preferredBatch) {
+    if (!preferredBatch) return;
+    const { error } = await supabase
+        .from("batch_enrollments")
+        .upsert(
+            { batch_id: preferredBatch, student_id: studentId },
+            { onConflict: "batch_id,student_id", ignoreDuplicates: true }
+        );
+    if (error) {
+        console.error(`[batch_enrollments] upsert failed for student ${studentId} / batch ${preferredBatch}:`, error.message);
+    }
+}
 
 // ========================= GET /students =========================
 async function getAllStudents({ batch, mode, status, search, limit = 100, offset = 0 }) {
@@ -75,34 +89,173 @@ async function getStudentById(id) {
 }
 
 // ========================= POST /students =========================
-async function createStudent(studentData) {
-    const { name, email, preferred_batch, learning_mode, ...rest } = studentData;
-    if (!name || !email) throw new Error("Name and email are required");
-    // Check existing
+async function createStudent(studentData, files) {
+
+    const {
+
+        name,
+        email,
+
+        date_of_birth,
+
+        mobile_number,
+        whatsapp_number,
+        telegram_number,
+
+        tenth_school,
+        tenth_score,
+
+        class_grade,
+        school_college,
+
+        subjects,
+
+        maths_tuition,
+        physics_tuition,
+        other_tuition,
+
+        neet_jee_details,
+
+        future_plan,
+
+        preferred_batch,
+        learning_mode,
+
+        father_name,
+        father_mobile,
+        father_whatsapp,
+        father_telegram,
+        father_email,
+        father_profession,
+
+        mother_name,
+        mother_mobile,
+        mother_whatsapp,
+        mother_telegram,
+        mother_email,
+        mother_profession,
+
+        address,
+        landmark,
+        city,
+        pincode,
+
+    } = studentData;
+
+    // Upload documents
+    const idCardUrl = files?.id_card?.[0]
+        ? await uploadStudentDocument(files.id_card[0], "id-cards")
+        : null;
+
+    const marksheetUrl = files?.marksheet?.[0]
+        ? await uploadStudentDocument(files.marksheet[0], "marksheets")
+        : null;
+
+    if (!name || !email) {
+        throw new Error("Name and email are required");
+    }
+
+    // Check duplicate email
     const { data: existing } = await supabase
         .from("students")
         .select("id")
         .eq("email", email)
         .maybeSingle();
-    if (existing) throw new Error("Student with this email already exists");
+
+    if (existing) {
+        throw new Error("Student with this email already exists");
+    }
+
+    // Parse subjects
+    let parsedSubjects = [];
+
+    try {
+        parsedSubjects = JSON.parse(subjects || "[]");
+    } catch {
+        parsedSubjects = subjects
+            ? subjects.split(",").map(s => s.trim())
+            : [];
+    }
+
     const { data, error } = await supabase
         .from("students")
         .insert({
+
+            // Student
             name,
             email,
+            date_of_birth,
+
+            mobile_number,
+            whatsapp_number,
+            telegram_number,
+
+            // Academic
+            tenth_school,
+            tenth_score,
+
+            class_grade,
+            school_college,
+
+            subjects: parsedSubjects,
+
+            maths_tuition,
+            physics_tuition,
+            other_tuition,
+
+            neet_jee_details,
+
+            future_plan,
+
             preferred_batch: preferred_batch || "EVENING",
+
             learning_mode: learning_mode || "OFFLINE",
-            ...rest,
+
+            // Father
+            father_name,
+            father_mobile,
+            father_whatsapp,
+            father_telegram,
+            father_email,
+            father_profession,
+
+            // Mother
+            mother_name,
+            mother_mobile,
+            mother_whatsapp,
+            mother_telegram,
+            mother_email,
+            mother_profession,
+
+            // Address
+            address,
+            landmark,
+            city,
+            pincode,
+
+            // Documents
+            school_id_card_url: idCardUrl,
+            marksheet_10th_url: marksheetUrl,
+
             status: "PENDING"
+
         })
         .select()
         .single();
-    if (error) throw error;
+
+    if (error) {
+        throw error;
+    }
+
     delete data.password_hash;
     delete data.temp_password;
-    return { success: true, message: "Application submitted", data };
-}
 
+    return {
+        success: true,
+        message: "Application submitted successfully",
+        data,
+    };
+}
 // ========================= PUT /students/:id =========================
 async function updateStudent(id, updates) {
     // Prevent updating sensitive/system fields
@@ -145,6 +298,7 @@ async function deleteStudent(id) {
 
 async function bulkImportStudents(studentsArray) {
     console.log('First student record:', studentsArray[0]);
+    console.log("Total students:", studentsArray.length);
     if (!studentsArray || !studentsArray.length) throw new Error("No students provided");
     
     const results = [];
@@ -172,27 +326,35 @@ async function bulkImportStudents(studentsArray) {
             const { authUserId, tempPassword, username } = await createStudentAuthUser(student, admissionNumber);
             console.log(`[${student.email}] Auth user created: ${authUserId}`);
 
+            const preferredBatch = student.preferred_batch || "EVENING";
+
             // 4. Insert into students table – do NOT store temp_password
             const { data: newStudent, error: dbError } = await supabase
                 .from("students")
                 .insert({
+                    ...student,
+
                     id: authUserId,
                     auth_user_id: authUserId,
                     admission_number: admissionNumber,
                     name: student.name,
                     email: student.email,
-                    preferred_batch: student.preferred_batch || "EVENING",
+                    preferred_batch: preferredBatch,
                     learning_mode: student.learning_mode || "OFFLINE",
                     status: "APPROVED",
                     username,
-                    // ✅ temp_password is NOT stored here
-                    ...student                    // all other CSV fields
+                    // temp_password is NOT stored here
+                                       // all other CSV fields
                 })
                 .select()
                 .single();
 
             if (dbError) throw dbError;
             console.log(`[${student.email}] Insert successful.`);
+
+            // 4b. Mirror into batch_enrollments so the attendance system
+            // (calendar / roster / summary) actually sees this student.
+            await enrollInPreferredBatch(authUserId, preferredBatch);
 
             // 5. Send welcome email (non‑blocking)
             try {
@@ -205,7 +367,7 @@ async function bulkImportStudents(studentsArray) {
 
             results.push(newStudent);
         } catch (err) {
-            console.error(`[${student.email}] ❌ FAILED:`, err.message);
+            console.error(`[${student.email}] FAILED:`, err.message);
             console.error(err.stack);
             errors.push({ email: student.email, error: err.message });
         }
@@ -226,24 +388,12 @@ async function approveStudent(id) {
     if (fetchError || !student) throw new Error("Pending student not found");
     const admissionNumber = generateAdmissionNumber();
     const { authUserId, tempPassword, username } = await createStudentAuthUser(student, admissionNumber);
-    // Create auth user
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email: student.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-            name: student.name,
-            role: "student",
-            admission_number: admissionNumber
-        }
-    });
-    if (authError) throw authError;
     // Update student record
     const { data: approved, error: updateError } = await supabase
         .from("students")
         .update({
-            id: authUser.user.id,
-            auth_user_id: authUser.user.id,
+            id: authUserId,
+            auth_user_id: authUserId,
             admission_number: admissionNumber,
             status: "APPROVED",
             username
@@ -252,6 +402,11 @@ async function approveStudent(id) {
         .select()
         .single();
     if (updateError) throw updateError;
+
+    // Mirror preferred_batch into batch_enrollments so the attendance system
+    // (calendar / roster / summary) actually sees this student.
+    await enrollInPreferredBatch(authUserId, student.preferred_batch);
+
     await sendWelcomeEmail(student.email, student.name, tempPassword, admissionNumber);
     return {
         success: true,
@@ -320,7 +475,14 @@ async function getStudentByUserId(userId) {
   
   const { data: student, error } = await supabase
     .from("students")
-    .select("name, email, blocked")
+    .select(`
+    name,
+    email,
+    mobile_number,
+    admission_number,
+    created_at,
+    blocked
+`)
     .eq("auth_user_id", userId)
     .single();
 
@@ -341,9 +503,29 @@ async function getStudentByUserId(userId) {
   return {
     name: student.name,
     email: student.email,
+    mobile: student.mobile_number,
+    rollNumber: student.admission_number,
+    joinedDate: student.created_at,
     blocked: student.blocked,
     avatar: student.avatar,
-  };
+};
+}
+async function getRejectedStudents() {
+
+    const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("status", "REJECTED")
+        .order("created_at", {
+            ascending: false
+        });
+
+    if (error) throw error;
+
+    return {
+        success: true,
+        data,
+    };
 }
 
 module.exports = {
@@ -358,5 +540,6 @@ module.exports = {
     rejectStudent,
     getStudentsByBatch,
     getDashboardStats,
-    getStudentByUserId
+    getStudentByUserId,
+    getRejectedStudents
 };

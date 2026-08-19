@@ -17,8 +17,25 @@
 const express = require("express");
 const cors = require("cors");
 const app = express();
-app.use(cors());
 
+app.use(cors({
+  origin(origin, callback) {
+
+    if (!origin) return callback(null, true);
+
+    if (
+      origin.startsWith("http://localhost") ||
+      origin.startsWith("http://192.168.") ||
+      origin.endsWith(".trycloudflare.com")
+    ) {
+      return callback(null, true);
+    }
+
+    callback(new Error("Not allowed by CORS"));
+  },
+
+  credentials: true,
+}));
 // ── Middleware ────────────────────────────────────────────────
 // express.json() parses incoming request bodies that have the
 // Content-Type: application/json header. Without this, req.body
@@ -28,6 +45,8 @@ app.use(express.json());
 // express.urlencoded() handles form submissions (HTML <form> POST).
 // { extended: true } allows nested objects in the body.
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // ── Routers ───────────────────────────────────────────────────
 // Each router file defines a group of related routes.
@@ -47,6 +66,11 @@ const analyticsRouter = require("./routes/analytics.routes")
 const attendanceRouter = require("./routes/attendance.routes");
 const securityRouter = require("./routes/security.routes")
 const searchRouter = require("./routes/search.routes")
+const onlineClassesRouter = require("./routes/onlineClasses.routes");
+const googleAuthRouter = require("./routes/googleAuth.routes");
+const googleIdentityRouter = require("./routes/googleIdentity.routes");
+const attendanceSettingsRouter = require("./routes/attendanceSettings.routes");
+const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
 
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
@@ -66,6 +90,12 @@ app.use("/api/students", studentRouter);
  
 // For Attendance related Ops:
 app.use("/api/attendance", attendanceRouter);
+
+// Online classes (Google Calendar + Google Meet integration)
+app.use("/api/online-classes", onlineClassesRouter);
+app.use("/api/google", googleAuthRouter);
+app.use("/api/google-identity", googleIdentityRouter);
+app.use("/api/attendance-settings", attendanceSettingsRouter);
 
 app.use("/api/security" , securityRouter)
  
@@ -95,6 +125,13 @@ app.use((err, req, res, next) => {
 
 // ── Start listening ───────────────────────────────────────────
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+  // Post-class Google Meet attendance sync — checks periodically for
+  // classes whose scheduled end + configured delay has passed and
+  // calculates/writes their attendance automatically. See
+  // services/onlineAttendanceSync.service.js.
+  startAttendanceSyncScheduler();
 });

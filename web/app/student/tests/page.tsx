@@ -2,13 +2,31 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { tests } from '@/lib/mockData'
 import { IconClipboard, IconRuler, IconBook } from '@/components/ui/SvgIcons'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-type Test = typeof tests[0]
+// No backend endpoint for tests exists yet. Rather than show fabricated
+// sample records, this page renders honestly empty until that's wired up —
+// the type below is what a real test record is expected to look like.
+type Test = {
+  id: string
+  title: string
+  type: 'online' | 'offline'
+  date: string // "YYYY-MM-DD"
+  time: string
+  duration: string
+  totalMarks: number
+  status: 'completed' | 'upcoming' | 'missed'
+  marksObtained: number | null
+  percentage: number | null
+  rank: number | null
+  totalStudents: number | null
+  studyMaterials: { id: string; title: string; type: string }[] | null
+}
+
+const tests: Test[] = []
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -20,8 +38,8 @@ const STATUS: Record<string, { label: string; text: string; bar: string; chip: s
 }
 
 function TestCalendar({ selectedDate, onSelectDate }: { selectedDate: string | null; onSelectDate: (d: string) => void }) {
-  const today = new Date(2024, 11, 10) // Dec 10, 2024
-  const [current, setCurrent] = useState({ year: 2024, month: 11 })
+  const today = new Date()
+  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
 
   const firstDay = new Date(current.year, current.month, 1).getDay()
   const daysInMonth = new Date(current.year, current.month + 1, 0).getDate()
@@ -256,7 +274,9 @@ export default function TestsPage() {
             ))}
             {displayTests.length === 0 && (
               <div className="text-center py-12 text-muted">
-                <p className="text-[15px]">No tests for this filter.</p>
+                <p className="text-[15px]">
+                  {tests.length === 0 ? 'No tests have been scheduled yet.' : 'No tests for this filter.'}
+                </p>
               </div>
             )}
           </div>

@@ -5,6 +5,9 @@ import { useState, useEffect, useCallback } from "react";
 interface Subject {
   id: string;
   name: string;
+  // Which class this subject belongs to — 11 or 12. Required on every
+  // subject at the DB level (see api/sql/subject_grade.sql).
+  grade: number;
 }
 
 interface Chapter {
@@ -82,8 +85,13 @@ function toArray<T>(payload: ArrayResponse<T>): T[] {
   return [];
 }
 
-// Define-once auth header helper — only the video routes require this today.
-async function authHeaders(): Promise<Record<string, string>> {
+// Every subject/chapter/PDF route requires a logged-in user (see
+// api/routes/subject.routes.js, chapter.routes.js, pdf.routes.js) — this
+// attaches the current Supabase session's Bearer token to every request
+// made from this hook. Exported so callers making their own raw fetch()
+// calls against these same routes (e.g. the content pages' PDF upload/edit
+// forms) can reuse it instead of re-deriving the token.
+export async function authHeaders(): Promise<Record<string, string>> {
   const session = await getSession();
   return session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
@@ -110,10 +118,11 @@ export function useContentTree(autoLoadChapters = true) {
   // Fetch subjects on mount
   useEffect(() => {
     let cancelled = false;
-      
+
     async function fetchSubjects() {
       try {
-        const res = await fetch(`${BASE}/api/subjects/`);
+        const headers = await authHeaders();
+        const res = await fetch(`${BASE}/api/subjects/`, { headers });
         const data = await res.json();
 
         if (!res.ok) {
@@ -129,7 +138,7 @@ export function useContentTree(autoLoadChapters = true) {
           if (autoLoadChapters && subjectsList.length > 0) {
             // Load chapters for each subject in parallel
             const loadAllChapters = subjectsList.map((subject) =>
-              fetch(`${BASE}/api/chapters/subject/${subject.id}`)
+              fetch(`${BASE}/api/chapters/subject/${subject.id}`, { headers })
                 .then(async (res) => {
                   const data = await res.json();
                   const chapters = res.ok ? toArray<Chapter>(data) : [];
@@ -175,7 +184,8 @@ export function useContentTree(autoLoadChapters = true) {
       // If chapters already exist (either from auto‑load or previous manual load), skip
       if (chaptersMap[subjectId]) return;
       try {
-        const res = await fetch(`${BASE}/api/chapters/subject/${subjectId}`);
+        const headers = await authHeaders();
+        const res = await fetch(`${BASE}/api/chapters/subject/${subjectId}`, { headers });
         const data = await res.json();
         const arr = res.ok ? toArray<Chapter>(data) : [];
         setChaptersMap((prev) => ({ ...prev, [subjectId]: arr }));
@@ -194,13 +204,15 @@ export function useContentTree(autoLoadChapters = true) {
 
       if (pdfsMap[chapterId] === undefined) {
         fetches.push(
-          fetch(`${BASE}/api/content/pdf/chapter/${chapterId}`)
-            .then(async (r) => ({ ok: r.ok, data: await r.json() }))
-            .then(({ ok, data }) => {
-              const arr = ok ? toArray<Pdf>(data) : [];
-              setPdfsMap((prev) => ({ ...prev, [chapterId]: arr }));
-            })
-            .catch(() => setPdfsMap((prev) => ({ ...prev, [chapterId]: [] }))),
+          authHeaders().then((headers) =>
+            fetch(`${BASE}/api/content/pdf/chapter/${chapterId}`, { headers })
+              .then(async (r) => ({ ok: r.ok, data: await r.json() }))
+              .then(({ ok, data }) => {
+                const arr = ok ? toArray<Pdf>(data) : [];
+                setPdfsMap((prev) => ({ ...prev, [chapterId]: arr }));
+              })
+              .catch(() => setPdfsMap((prev) => ({ ...prev, [chapterId]: [] }))),
+          ),
         );
       }
 
@@ -220,17 +232,18 @@ export function useContentTree(autoLoadChapters = true) {
         );
       }
 
-      
+
 
       await Promise.all(fetches);
     },
     [BASE, pdfsMap, videosMap],
   );
 
-  // Fetch storage usage
+  // Fetch storage usage (admin only)
   const getStorage = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE}/api/storage/usage`);
+      const headers = await authHeaders();
+      const res = await fetch(`${BASE}/api/storage/usage`, { headers });
       const data = await res.json();
 
       if (!res.ok) {
@@ -263,6 +276,86 @@ export function useContentTree(autoLoadChapters = true) {
     }
   }, [BASE]);
 
+  // Create a subject under a specific grade (11 or 12).
+  const createSubject = useCallback(
+    async (name: string, grade: 11 | 12) => {
+      const headers = await authHeaders();
+      const res = await fetch(`${BASE}/api/subjects/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ name, grade }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(getResponseMessage(data, "Failed to create subject"));
+      }
+      const subject = (data?.subject ?? data) as Subject;
+      setSubjects((prev) => [...prev, subject]);
+      // Seed an empty chapters list so the accordion opens straight into the
+      // "Add Chapter" prompt instead of a perpetual loading state.
+      setChaptersMap((prev) => ({ ...prev, [subject.id]: [] }));
+      return subject;
+    },
+    [BASE],
+  );
+
+  // Rename a subject.
+  const renameSubject = useCallback(
+    async (subjectId: string, name: string) => {
+      const headers = await authHeaders();
+      const res = await fetch(`${BASE}/api/subjects/${subjectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(getResponseMessage(data, "Failed to rename subject"));
+      }
+      const updated = (data?.subject ?? data) as Subject;
+      setSubjects((prev) => prev.map((s) => (s.id === subjectId ? { ...s, ...updated } : s)));
+      return updated;
+    },
+    [BASE],
+  );
+
+  // Delete a subject — the backend cascades to its chapters/PDFs/videos.
+  const deleteSubject = useCallback(
+    async (subjectId: string) => {
+      const headers = await authHeaders();
+      const res = await fetch(`${BASE}/api/subjects/${subjectId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(getResponseMessage(data, "Failed to delete subject"));
+      }
+
+      setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
+
+      // Clean up every chapter (and that chapter's files) that belonged to
+      // this subject, so nothing orphaned lingers in local state.
+      setChaptersMap((prev) => {
+        const chapters = prev[subjectId] ?? [];
+        const next = { ...prev };
+        delete next[subjectId];
+        setPdfsMap((pPrev) => {
+          const pNext = { ...pPrev };
+          chapters.forEach((ch) => delete pNext[ch.id]);
+          return pNext;
+        });
+        setVideosMap((vPrev) => {
+          const vNext = { ...vPrev };
+          chapters.forEach((ch) => delete vNext[ch.id]);
+          return vNext;
+        });
+        return next;
+      });
+    },
+    [BASE],
+  );
+
   // Add a chapter optimistically
   function addChapter(subjectId: string, chapter: Chapter) {
     setChaptersMap((prev) => ({
@@ -276,9 +369,10 @@ export function useContentTree(autoLoadChapters = true) {
   // Delete a chapter
   async function deleteChapter(subjectId: string, chapterId: string) {
     try {
+      const authed = await authHeaders();
       const response = await fetch(`${BASE}/api/chapters/${chapterId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authed },
       });
 
       if (!response.ok) {
@@ -343,6 +437,9 @@ export function useContentTree(autoLoadChapters = true) {
     error,
     loadChapters,
     loadChapterContent,
+    createSubject,
+    renameSubject,
+    deleteSubject,
     addChapter,
     deleteChapter,
     updatePdfs,

@@ -25,33 +25,70 @@ export interface StudentRecord {
   id: string
   auth_user_id: string | null
   admission_number: string | null
+
   name: string
   email: string
+  username: string | null
+
   date_of_birth: string | null
+
   mobile_number: string | null
   whatsapp_number: string | null
   telegram_number: string | null
+
   tenth_school: string | null
   tenth_score: string | null
   class_grade: string | null
   school_college: string | null
   subjects: string[] | null
-  preferred_batch: string | null // MORNING | EVENING | NIGHT
-  learning_mode: string | null // ONLINE | OFFLINE | HYBRID
+
+  maths_tuition: string | null
+  physics_tuition: string | null
+  other_tuition: string | null
+
+  neet_jee_details: string | null
+  future_plan: string | null
+
+  preferred_batch: string | null
+  learning_mode: string | null
+
   father_name: string | null
+  father_mobile: string | null
+  father_whatsapp: string | null
+  father_telegram: string | null
+  father_email: string | null
+  father_profession: string | null
+
   mother_name: string | null
+  mother_mobile: string |null
+  mother_whatsapp: string | null
+  mother_telegram: string | null
+  mother_email: string | null
+  mother_profession: string | null
+
   address: string | null
+  landmark: string | null
   city: string | null
+  pincode: string | null
+
   marksheet_10th_url: string | null
   school_id_card_url: string | null
   uniform_photo_url: string | null
+
   status: StudentStatus | null
-  username: string | null
+
   admin_notes: string | null
+
   created_at: string | null
   updated_at: string | null
+
   blocked: boolean
-  father_mobile : string | null
+
+  // Computed server-side from real attendance_sessions/attendance_records
+  // rows (see attendanceService.getAttendancePercentagesForStudents) — not
+  // a students-table column. Null until the student has at least one
+  // scheduled session in an enrolled batch.
+  attendance_pct?: number | null
 }
 
 interface ListFilters {
@@ -66,8 +103,12 @@ interface ListFilters {
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
 export function useStudents() {
-  const [applications, setApplications] = useState<StudentRecord[]>([])
-  const [students, setStudents] = useState<StudentRecord[]>([])
+const [applications, setApplications] = useState<StudentRecord[]>([]);
+
+const [students, setStudents] = useState<StudentRecord[]>([]);
+  
+const [rejectedStudents, setRejectedStudents] =
+useState<StudentRecord[]>([])
   const [loadingApplications, setLoadingApplications] = useState(false)
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -114,22 +155,47 @@ export function useStudents() {
     }
   }, [])
 
+  const fetchRejectedStudents = useCallback(async () => {
+  try {
+    const json = await authedFetch("/api/students/rejected");
+
+    setRejectedStudents(
+      Array.isArray(json)
+        ? json
+        : json.data ?? json.students ?? []
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}, []);
+
   // POST /api/students/:id/approve
   const approveStudent = useCallback(async (id: string) => {
-    const json = await authedFetch(`/api/students/${id}/approve`, { method: 'POST' })
-    setApplications((prev) => prev.filter((a) => a.id !== id))
-    return json
-  }, [])
+    const json = await authedFetch(`/api/students/${id}/approve`, {
+        method: "POST",
+    });
+
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+
+    await fetchStudents();
+
+    return json;
+}, [fetchStudents]);
 
   // POST /api/students/:id/reject
   const rejectStudent = useCallback(async (id: string, reason?: string) => {
     const json = await authedFetch(`/api/students/${id}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason: reason ?? '' }),
-    })
-    setApplications((prev) => prev.filter((a) => a.id !== id))
-    return json
-  }, [])
+        method: 'POST',
+        body: JSON.stringify({ reason: reason ?? "" }),
+    });
+
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+
+    // Refresh rejected students
+    await fetchRejectedStudents();
+
+    return json;
+}, [fetchRejectedStudents]);
 
   // PUT /api/students/:id  { blocked: true|false }
   const setBlocked = useCallback(async (id: string, blocked: boolean) => {
@@ -142,18 +208,25 @@ export function useStudents() {
   }, [])
 
   useEffect(() => {
-    fetchApplications()
-    fetchStudents()
-  }, [fetchApplications, fetchStudents])
+    fetchApplications();
+    fetchStudents();
+    fetchRejectedStudents();
+}, [
+    fetchApplications,
+    fetchStudents,
+    fetchRejectedStudents,
+]);
 
   return {
     applications,
     students,
+    rejectedStudents,
     loadingApplications,
     loadingStudents,
     error,
     fetchApplications,
     fetchStudents,
+    fetchRejectedStudents,
     approveStudent,
     rejectStudent,
     setBlocked,

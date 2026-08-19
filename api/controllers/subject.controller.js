@@ -13,16 +13,32 @@
 
 const subjectService = require("../services/subject.service");
 
+function handleError(res, err, fallbackMessage) {
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || fallbackMessage });
+}
+
+/** Accepts "11", 11, "12", 12 from the client and normalizes to a number. */
+function parseGrade(value) {
+  const n = Number(value);
+  return Number.isInteger(n) ? n : null;
+}
+
 /** POST /api/subjects  →  create a subject */
 const createSubject = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, grade } = req.body;
     if (!name) return res.status(400).json({ error: "Subject name is required" });
 
-    const subject = await subjectService.createSubject({ name, description });
+    const parsedGrade = parseGrade(grade);
+    if (parsedGrade === null || ![11, 12].includes(parsedGrade)) {
+      return res.status(400).json({ error: "Grade must be 11 or 12" });
+    }
+
+    const subject = await subjectService.createSubject({ name, description, grade: parsedGrade });
     res.status(201).json(subject);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleError(res, err, "Failed to create subject");
   }
 };
 
@@ -32,7 +48,7 @@ const getAllSubjects = async (req, res) => {
     const subjects = await subjectService.getAllSubjects();
     res.status(200).json(subjects);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleError(res, err, "Failed to load subjects");
   }
 };
 
@@ -43,18 +59,30 @@ const getSubjectById = async (req, res) => {
     if (!subject) return res.status(404).json({ error: "Subject not found" });
     res.status(200).json(subject);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleError(res, err, "Failed to load subject");
   }
 };
 
-/** PUT /api/subjects/:id */
+/** PATCH /api/subjects/:id */
 const updateSubject = async (req, res) => {
   try {
-    const updated = await subjectService.updateSubject(req.params.id, req.body);
+    const updates = { ...req.body };
+    if (updates.grade !== undefined) {
+      const parsedGrade = parseGrade(updates.grade);
+      if (parsedGrade === null || ![11, 12].includes(parsedGrade)) {
+        return res.status(400).json({ error: "Grade must be 11 or 12" });
+      }
+      updates.grade = parsedGrade;
+    }
+    if (updates.name !== undefined && !String(updates.name).trim()) {
+      return res.status(400).json({ error: "Subject name cannot be empty" });
+    }
+
+    const updated = await subjectService.updateSubject(req.params.id, updates);
     if (!updated) return res.status(404).json({ error: "Subject not found" });
     res.status(200).json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleError(res, err, "Failed to update subject");
   }
 };
 
@@ -63,11 +91,10 @@ const deleteSubject = async (req, res) => {
   try {
     const deleted = await subjectService.deleteSubject(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Subject not found" });
-    
-    res.status(200).json({ message: "Subject deleted successfully", id: deleted.id });
 
+    res.status(200).json({ message: "Subject deleted successfully", id: deleted.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleError(res, err, "Failed to delete subject");
   }
 };
 

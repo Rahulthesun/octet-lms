@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { useContentTree } from '../../../hooks/admin/useContentTree'
+import { useContentTree, authHeaders } from '../../../hooks/admin/useContentTree'
 import { PdfViewer } from '../../../components/student/PDFViewer'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8000'
@@ -104,10 +104,12 @@ function PdfOverlay({
     if (!openDoc?.pdf?.id) return
     setPdfUrl(null)
 
-    fetch(`${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`)
-      .then(res => res.json())
-      .then(data => setPdfUrl(data.url))
-      .catch(() => setPdfUrl(null))
+    authHeaders().then((headers) =>
+      fetch(`${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`, { headers })
+        .then(res => res.json())
+        .then(data => setPdfUrl(data.url))
+        .catch(() => setPdfUrl(null)),
+    )
   }, [openDoc?.pdf?.id])
 
   if (!mounted || !openDoc) return null

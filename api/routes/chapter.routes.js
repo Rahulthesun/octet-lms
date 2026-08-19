@@ -4,27 +4,34 @@
  * Routes for Chapters – always belong to a Subject.
  *
  * Mounted at: /api/chapters  (see server.js)
+ *
+ * Reads are shared by admin (content manager) and students (browsing their
+ * own notes) — any authenticated user. Writes (create/update/delete) are
+ * admin/developer only.
  * ─────────────────────────────────────────────────────────────
  */
 
 const express = require("express");
 const router  = express.Router();
 const chapterController = require("../controllers/chapter.controller");
+const { verifyToken, requireRole } = require("../middleware/auth");
 
-// POST  /api/chapters                      → create a chapter
+const adminOnly = requireRole(["admin", "developer"]);
+
+// POST  /api/chapters                      → create a chapter (admin only)
 //   body should include { subjectId, name, ... }
-router.post("/", chapterController.createChapter);
+router.post("/", verifyToken, adminOnly, chapterController.createChapter);
 
-// GET   /api/chapters/chapter/:id          → get a single chapter by id
-router.get("/:id", chapterController.getChapterById);
+// GET   /api/chapters/:id                  → get a single chapter by id
+router.get("/:id", verifyToken, chapterController.getChapterById);
 
-// GET   /api/chapters/:subjectId           → get all chapters for a subject
-router.get("/subject/:subjectId", chapterController.getChaptersBySubject);
+// GET   /api/chapters/subject/:subjectId   → get all chapters for a subject
+router.get("/subject/:subjectId", verifyToken, chapterController.getChaptersBySubject);
 
-// PUT   /api/chapters/:id                  → update a chapter
-router.patch("/:id", chapterController.updateChapter);
+// PATCH /api/chapters/:id                  → update a chapter (admin only)
+router.patch("/:id", verifyToken, adminOnly, chapterController.updateChapter);
 
-// DELETE /api/chapters/:id                 → delete a chapter
-router.delete("/:id", chapterController.deleteChapter);
+// DELETE /api/chapters/:id                 → delete a chapter (admin only)
+router.delete("/:id", verifyToken, adminOnly, chapterController.deleteChapter);
 
 module.exports = router;

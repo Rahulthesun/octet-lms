@@ -6,7 +6,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+const PDFDocument = require("pdfkit");
 const svc = require("../services/attendance.service");
+const {
+  buildStudentReportCsv,
+  buildBatchReportCsv,
+  buildStudentReportPdf,
+  buildBatchReportPdf,
+  normalizeChartType,
+} = require("../utils/attendanceReportFormat");
 
 // ─── Shared error handler ─────────────────────────────────────────────────────
 
@@ -37,14 +45,14 @@ async function getBatches(req, res) {
  * Body: { name, mode, days?, start_time?, end_time?, meet_link?, location? }
  */
 async function createBatch(req, res) {
-  const { id, name, days, start_time, end_time, meet_link, location } = req.body;
+  const { id, name, mode, days, start_time, end_time, meet_link, location } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: "name is required" });
   }
 
   try {
-    const batch = await svc.createBatch({ id , name, days, start_time, end_time, meet_link, location });
+    const batch = await svc.createBatch({ id, name, mode, days, start_time, end_time, meet_link, location });
     res.status(201).json({ batch });
   } catch (err) {
     handleError(res, err);
@@ -98,6 +106,38 @@ async function addStudentsToBatch(req, res) {
   try {
     await svc.addStudentsToBatch(batchId, studentIds);
     res.json({ success: true });
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/batches/:batchId/today
+ * Returns today's session (if started) plus the FULL enrolled roster,
+ * with absent defaulted for anyone not yet marked.
+ */
+async function getTodayRoster(req, res) {
+  const { batchId } = req.params;
+
+  try {
+    const result = await svc.getTodayRoster(batchId);
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/batches/:batchId/summary
+ * Aggregate stats: total students, total sessions, avg attendance %,
+ * today's present/absent snapshot.
+ */
+async function getBatchSummary(req, res) {
+  const { batchId } = req.params;
+
+  try {
+    const summary = await svc.getBatchSummary(batchId);
+    res.json(summary);
   } catch (err) {
     handleError(res, err);
   }
@@ -164,6 +204,8 @@ async function refreshSession(req, res) {
 
 /**
  * GET /api/attendance/sessions/:sessionId/roster
+ * Returns the FULL enrolled roster for that session (name, roll, present,
+ * markedAt), defaulting present:false for anyone without a record.
  */
 async function getRoster(req, res) {
   const { sessionId } = req.params;
@@ -223,6 +265,341 @@ async function scanQrToken(req, res) {
   }
 }
 
+// ─── Logged-in student's own attendance ───────────────────────────────────────
+
+/**
+ * GET /api/attendance/me
+ * Overall summary for the logged-in student (all their batches, all-time).
+ */
+async function getMyAttendance(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const summary = await svc.getMyAttendanceSummary(authUserId);
+    res.json(summary);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/history
+ * Query: limit (default 50, max 200)
+ */
+async function getMyAttendanceHistory(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const limit = parseInt(req.query.limit, 10) || 50;
+  if (limit < 1 || limit > 200) {
+    return res.status(400).json({ error: "limit must be between 1 and 200" });
+  }
+
+  try {
+    const history = await svc.getMyAttendanceHistory(authUserId, limit);
+    res.json({ history });
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/month
+ * Query: year (default current), month 1-12 (default current)
+ */
+async function getMyMonthAttendance(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const now = new Date();
+  const year = parseInt(req.query.year, 10) || now.getFullYear();
+  const month = parseInt(req.query.month, 10) || now.getMonth() + 1;
+
+  if (month < 1 || month > 12) {
+    return res.status(400).json({ error: "month must be between 1 and 12" });
+  }
+
+  try {
+    const result = await svc.getMyMonthAttendance(authUserId, year, month);
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/schedule/today
+ * Batches scheduled for today for the logged-in student, with join link
+ * (online/hybrid) or location (offline).
+ */
+async function getMyTodaySchedule(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const result = await svc.getMyTodaySchedule(authUserId);
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/report
+ * The logged-in student's OWN full attendance report — studentId is always
+ * resolved server-side from the verified JWT, never accepted from the
+ * client, so a student can never request another student's report this way.
+ */
+async function getMyReport(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    res.json(report);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/report/csv
+ */
+async function downloadMyReportCsv(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    const csv = buildStudentReportCsv(report);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/me/report/pdf
+ * Query: chartType = bar | pie | line (default bar) — the chart the
+ * student had selected on screen, redrawn identically into the PDF.
+ */
+async function downloadMyReportPdf(req, res) {
+  const authUserId = req.user?.id;
+  if (!authUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const report = await svc.getMyAttendanceReport(authUserId);
+    const chartType = normalizeChartType(req.query.chartType);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+    buildStudentReportPdf(doc, report, chartType);
+    doc.end();
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+// ─── Admin: per-student & per-batch attendance reports ────────────────────────
+
+/**
+ * GET /api/attendance/students/:studentId/report
+ * Full attendance history + summary for one student (admin view).
+ */
+async function getStudentReport(req, res) {
+  const { studentId } = req.params;
+  try {
+    const report = await svc.getStudentAttendanceReport(studentId);
+    res.json(report);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/students/:studentId/report/csv
+ */
+async function downloadStudentReportCsv(req, res) {
+  const { studentId } = req.params;
+  try {
+    const report = await svc.getStudentAttendanceReport(studentId);
+    const csv = buildStudentReportCsv(report);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/students/:studentId/report/pdf
+ */
+async function downloadStudentReportPdf(req, res) {
+  const { studentId } = req.params;
+  try {
+    const report = await svc.getStudentAttendanceReport(studentId);
+    const chartType = normalizeChartType(req.query.chartType);
+    const filename = `attendance_${(report.student.roll || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+    buildStudentReportPdf(doc, report, chartType);
+    doc.end();
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/batches/:batchId/report
+ * Full batch statistics: per-student totals + day-by-day breakdown.
+ */
+async function getBatchReport(req, res) {
+  const { batchId } = req.params;
+  try {
+    const report = await svc.getBatchAttendanceReport(batchId);
+    res.json(report);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/batches/:batchId/report/csv
+ */
+async function downloadBatchReportCsv(req, res) {
+  const { batchId } = req.params;
+  try {
+    const report = await svc.getBatchAttendanceReport(batchId);
+    const csv = buildBatchReportCsv(report);
+    const filename = `batch_${report.batch.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * GET /api/attendance/batches/:batchId/report/pdf
+ */
+async function downloadBatchReportPdf(req, res) {
+  const { batchId } = req.params;
+  try {
+    const report = await svc.getBatchAttendanceReport(batchId);
+    const chartType = normalizeChartType(req.query.chartType);
+    const filename = `batch_${report.batch.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+    buildBatchReportPdf(doc, report, chartType);
+    doc.end();
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+// ─── Session attendance detail, override, unmatched-participant review ────────
+// (used by both the QR/offline roster drill-down and the Google Meet
+// online-class attendance view — same session concept, same endpoints)
+
+/**
+ * GET /api/attendance/sessions/:sessionId/detail
+ * Full per-student roster for one session — duration, automatic vs final
+ * pct/status, override audit, plus (for Google Meet sessions) sync status
+ * and any unmatched participants awaiting manual review.
+ */
+async function getSessionDetail(req, res) {
+  try {
+    res.json(await svc.getSessionAttendanceDetail(req.params.sessionId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * POST /api/attendance/sessions/:sessionId/override
+ * Body: { studentId, status: 'present'|'partial'|'absent', reason? }
+ * Overrides an automatically-calculated (or QR-based) result without
+ * destroying the original automatic_pct/automatic_status audit trail.
+ */
+async function overrideAttendance(req, res) {
+  const { studentId, status, reason } = req.body;
+  if (!studentId || !status) {
+    return res.status(400).json({ error: "studentId and status are required" });
+  }
+  try {
+    const authUserId = req.user?.id;
+    res.json(await svc.overrideAttendanceRecord(req.params.sessionId, studentId, { status, reason }, authUserId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
+ * POST /api/attendance/sessions/:sessionId/unmatched/:participantIndex/assign
+ * Body: { studentId }
+ * Assigns a Google Meet participant Google couldn't confidently match to
+ * an LMS student, and links their Google identity for future classes.
+ */
+async function assignUnmatchedParticipant(req, res) {
+  const { studentId } = req.body;
+  if (!studentId) {
+    return res.status(400).json({ error: "studentId is required" });
+  }
+  try {
+    const authUserId = req.user?.id;
+    res.json(
+      await svc.assignUnknownParticipant(req.params.sessionId, req.params.participantIndex, studentId, authUserId)
+    );
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/** POST /api/attendance/sessions/:sessionId/unmatched/:participantIndex/ignore */
+async function ignoreUnmatchedParticipant(req, res) {
+  try {
+    res.json(await svc.ignoreUnknownParticipant(req.params.sessionId, req.params.participantIndex));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/** POST /api/attendance/sessions/:sessionId/mark-reviewed */
+async function markSessionReviewed(req, res) {
+  try {
+    res.json(await svc.markSessionReviewed(req.params.sessionId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
 // ─── Trend ────────────────────────────────────────────────────────────────────
 
 /**
@@ -251,11 +628,31 @@ module.exports = {
   getBatchStudents,
   getEligibleStudents,
   addStudentsToBatch,
+  getTodayRoster,
+  getBatchSummary,
   overrideStudentBlock,
   startSession,
   refreshSession,
   getRoster,
   manualMark,
   scanQrToken,
+  getMyAttendance,
+  getMyAttendanceHistory,
+  getMyMonthAttendance,
+  getMyTodaySchedule,
+  getMyReport,
+  downloadMyReportCsv,
+  downloadMyReportPdf,
+  getStudentReport,
+  downloadStudentReportCsv,
+  downloadStudentReportPdf,
+  getBatchReport,
+  downloadBatchReportCsv,
+  downloadBatchReportPdf,
+  getSessionDetail,
+  overrideAttendance,
+  assignUnmatchedParticipant,
+  ignoreUnmatchedParticipant,
+  markSessionReviewed,
   getStudentTrend,
 };

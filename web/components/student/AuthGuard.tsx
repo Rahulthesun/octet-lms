@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { isGuestModeActive } from '@/hooks/useGuestMode'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -21,8 +22,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       const role = session.user?.app_metadata?.role ?? 'student'
 
       // Pure admins never see the student site - send them to /admin.
-      // 'both' (or 'student') roles are allowed through.
-      if (role === 'admin') {
+      // 'both' (or 'student') roles are allowed through. The one exception
+      // is an admin who has explicitly switched on Guest Mode from the
+      // admin sidebar — they're let through so they can preview the exact
+      // student UI/experience.
+      if (role === 'admin' && !isGuestModeActive()) {
         router.replace('/admin')
         return
       }
