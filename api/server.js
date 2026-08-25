@@ -18,6 +18,13 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 
+// Allowed production origins: FRONTEND_URL can hold a comma-separated
+// list (e.g. "https://octet-lms.vercel.app,https://app.mydomain.com").
+const allowedOrigins = (process.env.FRONTEND_URL || "https://octet-lms.vercel.app")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
   origin(origin, callback) {
 
@@ -26,7 +33,9 @@ app.use(cors({
     if (
       origin.startsWith("http://localhost") ||
       origin.startsWith("http://192.168.") ||
-      origin.endsWith(".trycloudflare.com")
+      origin.endsWith(".trycloudflare.com") ||
+      origin.endsWith(".vercel.app") ||
+      allowedOrigins.includes(origin)
     ) {
       return callback(null, true);
     }
