@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   useVideoHook,
@@ -155,15 +156,30 @@ function BlockedOverlay({ reason }: { reason: 'devtools' | 'screenshot' }) {
 
 // ─── Video Player — full-bleed, same design system as PdfViewer ─────────────
 
+interface WatchEventProgress {
+  watchedSecs: number
+  lastPositionSecs: number
+  maxPositionSecs: number
+  completed: boolean
+  bucketsPlayed: number[]
+}
+
 interface VideoPlayerProps {
   topic: VideoTopic | null
   getStreamUrl: (videoId: string) => Promise<string | null>
-  getWatchSession: (videoId: string) => Promise<{ position_secs: number } | null>
-  sendHeartbeat: (videoId: string, positionSecs: number) => Promise<void>
+  getWatchSession: (videoId: string) => Promise<{ watched_secs: number; last_position_secs: number; completed: boolean } | null>
+  sendHeartbeat: (videoId: string, progress: { watchedSecs: number; lastPositionSecs: number; completed: boolean }) => Promise<void>
+  startWatchEvent: (videoId: string, positionSecs: number) => Promise<string | null>
+  updateWatchEvent: (videoId: string, eventId: string, progress: WatchEventProgress) => Promise<void>
+  endWatchEvent: (videoId: string, eventId: string, progress: WatchEventProgress) => Promise<void>
   className?: string
 }
 
-function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, className = '' }: VideoPlayerProps) {
+const BUCKET_COUNT = 20 // must match api/services/videoAnalytics.service.js
+
+function VideoPlayer({
+  topic, getStreamUrl, getWatchSession, sendHeartbeat, startWatchEvent, updateWatchEvent, endWatchEvent, className = '',
+}: VideoPlayerProps) {
   const [playing, setPlaying] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -177,7 +193,17 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const resumeAppliedRef = useRef(false)
+
+  // ── Session-wise / drop-off / heatmap tracking for the current "sitting" ──
+  const eventIdRef = useRef<string | null>(null)
+  const watchedSecsRef = useRef(0)
+  const maxPositionRef = useRef(0)
+  const pendingBucketsRef = useRef<Set<number>>(new Set())
+  const lastTimeRef = useRef(0)
+  const pendingSessionRef = useRef<{ watched_secs: number; last_position_secs: number; completed: boolean } | null>(null)
+
+  const [showResumeModal, setShowResumeModal] = useState(false)
+  const [resumePositionSecs, setResumePositionSecs] = useState(0)
 
   const isMobile = useIsMobileDevice()
   const studentToken = useWatermarkToken()
@@ -244,7 +270,14 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
     setUrlError(null)
     setCurrentTime(0)
     setDuration(0)
-    resumeAppliedRef.current = false
+    setShowResumeModal(false)
+    setResumePositionSecs(0)
+    eventIdRef.current = null
+    watchedSecsRef.current = 0
+    maxPositionRef.current = 0
+    pendingBucketsRef.current = new Set()
+    lastTimeRef.current = 0
+    pendingSessionRef.current = null
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current)
       heartbeatIntervalRef.current = null
@@ -263,10 +296,17 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
         if (!cancelled) setUrlLoading(false)
       })
 
+    // Fetched eagerly, but the resume-popup decision waits for the video's
+    // real duration (onLoadedMetadata) — a position stored close to the end
+    // of a short clip shouldn't offer to "resume" 3 seconds from the finish.
+    getWatchSession(topic.id).then((session) => {
+      if (!cancelled) pendingSessionRef.current = session
+    })
+
     return () => {
       cancelled = true
     }
-  }, [topic?.id, getStreamUrl])
+  }, [topic?.id, getStreamUrl, getWatchSession])
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
@@ -281,26 +321,114 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
     else el.requestFullscreen?.()
   }
 
-  const reportHeartbeat = () => {
-    if (!topic || !videoRef.current) return
-    sendHeartbeat(topic.id, videoRef.current.currentTime)
+  const isCompletedNow = () => {
+    const v = videoRef.current
+    return !!v && !!v.duration && v.currentTime / v.duration >= 0.9
   }
 
-  const handlePlay = async () => {
+  // Cumulative-summary heartbeat (resume point / watched flag / completed)
+  // PLUS this sitting's session-wise progress and any newly-played buckets.
+  // Runs every 30s while playing, and once more on pause/visibility-hidden.
+  const reportHeartbeat = () => {
+    if (!topic || !videoRef.current) return
+    const completed = isCompletedNow()
+    sendHeartbeat(topic.id, {
+      watchedSecs: watchedSecsRef.current,
+      lastPositionSecs: videoRef.current.currentTime,
+      completed,
+    })
+    if (eventIdRef.current) {
+      const buckets = Array.from(pendingBucketsRef.current)
+      pendingBucketsRef.current = new Set()
+      updateWatchEvent(topic.id, eventIdRef.current, {
+        watchedSecs: watchedSecsRef.current,
+        lastPositionSecs: videoRef.current.currentTime,
+        maxPositionSecs: maxPositionRef.current,
+        completed,
+        bucketsPlayed: buckets,
+      })
+    }
+  }
+
+  // Ends the current sitting (video finished, tab hidden, unmounting, or the
+  // page closing) so the next play starts a fresh, separately-counted one.
+  const finishEvent = () => {
+    if (!topic || !videoRef.current || !eventIdRef.current) return
+    const completed = isCompletedNow()
+    const buckets = Array.from(pendingBucketsRef.current)
+    pendingBucketsRef.current = new Set()
+    const id = eventIdRef.current
+    eventIdRef.current = null
+    endWatchEvent(topic.id, id, {
+      watchedSecs: watchedSecsRef.current,
+      lastPositionSecs: videoRef.current.currentTime,
+      maxPositionSecs: maxPositionRef.current,
+      completed,
+      bucketsPlayed: buckets,
+    })
+  }
+
+  const beginPlayback = () => {
     const v = videoRef.current
     if (!v || isHardBlocked) return
-    if (!resumeAppliedRef.current && topic) {
-      resumeAppliedRef.current = true
-      const session = await getWatchSession(topic.id)
-      if (session && session.position_secs > 0 && session.position_secs < (v.duration || Infinity) - 3) {
-        v.currentTime = session.position_secs
-      }
-    }
     v.play()
+  }
+
+  // The normal (no meaningful resume point) play trigger.
+  const handlePlay = () => {
+    if (showResumeModal) return
+    beginPlayback()
+  }
+
+  const chooseResume = () => {
+    const v = videoRef.current
+    if (v) v.currentTime = resumePositionSecs
+    setShowResumeModal(false)
+    beginPlayback()
+  }
+
+  const chooseRestart = () => {
+    const v = videoRef.current
+    if (v) v.currentTime = 0
+    setShowResumeModal(false)
+    beginPlayback()
+  }
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const dur = e.currentTarget.duration
+    setDuration(dur)
+    const session = pendingSessionRef.current
+    if (session && dur > 0 && session.last_position_secs > 5 && session.last_position_secs < dur - 5) {
+      setResumePositionSecs(session.last_position_secs)
+      setShowResumeModal(true)
+    }
+  }
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const t = e.currentTarget.currentTime
+    setCurrentTime(t)
+
+    // Only count forward, in-playback progress as "watched" — filters out
+    // seek jumps (both forward skips and rewinds) from the cumulative total.
+    const delta = t - lastTimeRef.current
+    if (playing && delta > 0 && delta <= 2) watchedSecsRef.current += delta
+    lastTimeRef.current = t
+    maxPositionRef.current = Math.max(maxPositionRef.current, t)
+
+    const dur = e.currentTarget.duration
+    if (dur > 0) {
+      const bucket = Math.max(0, Math.min(BUCKET_COUNT - 1, Math.floor((t / dur) * BUCKET_COUNT)))
+      pendingBucketsRef.current.add(bucket)
+    }
   }
 
   const onVideoPlay = () => {
     setPlaying(true)
+    if (!eventIdRef.current && topic) {
+      startWatchEvent(topic.id, videoRef.current?.currentTime || 0).then((id) => {
+        eventIdRef.current = id
+      })
+    }
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
     heartbeatIntervalRef.current = setInterval(reportHeartbeat, 30000)
   }
@@ -320,14 +448,14 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
       clearInterval(heartbeatIntervalRef.current)
       heartbeatIntervalRef.current = null
     }
-    reportHeartbeat()
+    finishEvent()
   }
 
   useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden) reportHeartbeat()
+      if (document.hidden) finishEvent()
     }
-    const onUnload = () => reportHeartbeat()
+    const onUnload = () => finishEvent()
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('beforeunload', onUnload)
     return () => {
@@ -340,8 +468,10 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
   useEffect(() => {
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current)
+      finishEvent()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic?.id])
 
   const seekTo = (fraction: number) => {
     const v = videoRef.current
@@ -463,15 +593,40 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
               onPause={onVideoPause}
               onEnded={onVideoEnded}
               onSeeked={reportHeartbeat}
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
             />
 
             {!status.startsWith('devtools-blocked') && !status.startsWith('screenshot-blocked') && (
               <AnimatedLogoWatermark viewportRef={stageRef} studentToken={studentToken} />
             )}
 
-            {!playing && !isHardBlocked && (
+            {showResumeModal && !isHardBlocked && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/55 z-30 px-6">
+                <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
+                  <p className="text-sm font-semibold text-gray-900 mb-1">Continue where you left off?</p>
+                  <p className="text-xs text-gray-500 mb-5">
+                    You previously watched up to <span className="font-data">{formatTime(resumePositionSecs)}</span> of this lesson.
+                  </p>
+                  <div className="flex gap-2.5">
+                    <button
+                      onClick={chooseRestart}
+                      className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      Start Over
+                    </button>
+                    <button
+                      onClick={chooseResume}
+                      className="flex-1 py-2.5 rounded-lg bg-primary text-white text-sm hover:bg-[#3d2652] transition-colors"
+                    >
+                      Resume
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!playing && !isHardBlocked && !showResumeModal && (
               <div
                 className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer bg-black/20 z-20"
                 onClick={handlePlay}
@@ -488,7 +643,7 @@ function VideoPlayer({ topic, getStreamUrl, getWatchSession, sendHeartbeat, clas
               </div>
             )}
 
-            {!isHardBlocked && (
+            {!isHardBlocked && !showResumeModal && (
               <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-3 px-4">
                 <div
                   className="h-1.5 bg-white/25 rounded-full cursor-pointer mb-3"
@@ -576,11 +731,23 @@ function Chevron({ open, className = 'w-3.5 h-3.5' }: { open: boolean; className
   )
 }
 
+function ReportIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <path d="M4 3.5h9l3 3v10a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M6.5 11l2-2 2 2.5 3-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function VideoLessonsPage() {
-  const { videoSubjects, loading, error, loadChapterVideos, getStreamUrl, getWatchSession, sendHeartbeat } =
-    useVideoHook()
+  const router = useRouter()
+  const {
+    videoSubjects, loading, error, loadChapterVideos, getStreamUrl, getWatchSession, sendHeartbeat,
+    startWatchEvent, updateWatchEvent, endWatchEvent,
+  } = useVideoHook()
 
   const [search, setSearch] = useState('')
   const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set())
@@ -666,6 +833,9 @@ export default function VideoLessonsPage() {
             getStreamUrl={getStreamUrl}
             getWatchSession={getWatchSession}
             sendHeartbeat={sendHeartbeat}
+            startWatchEvent={startWatchEvent}
+            updateWatchEvent={updateWatchEvent}
+            endWatchEvent={endWatchEvent}
             className="flex-1 min-h-0"
           />
 
@@ -722,14 +892,23 @@ export default function VideoLessonsPage() {
   // ── Browse view (accordion) ──────────────────────────────────────────────
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center text-primary">
-            <VideoIcon className="w-5 h-5" />
-          </span>
-          <h1 className="text-3xl md:text-4xl text-primary">Video Lessons</h1>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <span className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center text-primary">
+              <VideoIcon className="w-5 h-5" />
+            </span>
+            <h1 className="text-3xl md:text-4xl text-primary">Video Lessons</h1>
+          </div>
+          <p className="text-muted text-base mt-1">Watch your chemistry lectures, organized by subject and chapter</p>
         </div>
-        <p className="text-muted text-base mt-1">Watch your chemistry lectures, organized by subject and chapter</p>
+        <button
+          onClick={() => router.push('/student/courses/report')}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md border border-border bg-white text-primary text-[15px] hover:bg-accent1/40 transition-colors w-fit shrink-0"
+        >
+          <ReportIcon className="w-4 h-4" />
+          Report
+        </button>
       </motion.div>
 
       <div className="flex items-center gap-4 mb-6">

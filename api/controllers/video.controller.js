@@ -19,6 +19,7 @@
  */
 
 const videoService = require("../services/video.service");
+const videoAnalyticsService = require("../services/videoAnalytics.service");
 
 // ─────────────────────────────────────────────────────────────
 // uploadVideo
@@ -250,6 +251,71 @@ const getVideoAnalytics = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// startWatchEvent / updateWatchEvent / endWatchEvent
+// ─────────────────────────────────────────────────────────────
+/**
+ * A "watch event" is one discrete sitting of watching a video — separate
+ * from the cumulative video_watch_sessions summary above. These three
+ * endpoints are what power session-wise analytics, drop-off analysis, and
+ * the engagement heatmap; they run alongside the existing heartbeat, not
+ * instead of it.
+ */
+const startWatchEvent = async (req, res) => {
+  try {
+    const { id: videoId } = req.params;
+    const { positionSecs = 0 } = req.body;
+    const result = await videoAnalyticsService.startWatchEvent({
+      videoId,
+      userId: req.user.id,
+      positionSecs: Math.max(0, Number(positionSecs) || 0),
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const updateWatchEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { watchedSecs = 0, lastPositionSecs = 0, maxPositionSecs = 0, completed = false, bucketsPlayed = [] } = req.body;
+    await videoAnalyticsService.updateWatchEvent({
+      eventId,
+      userId: req.user.id,
+      watchedSecs: Math.max(0, Number(watchedSecs) || 0),
+      lastPositionSecs: Math.max(0, Number(lastPositionSecs) || 0),
+      maxPositionSecs: Math.max(0, Number(maxPositionSecs) || 0),
+      completed: Boolean(completed),
+      bucketsPlayed,
+    });
+    res.status(204).send();
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+const endWatchEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { watchedSecs = 0, lastPositionSecs = 0, maxPositionSecs = 0, completed = false, bucketsPlayed = [] } = req.body;
+    await videoAnalyticsService.endWatchEvent({
+      eventId,
+      userId: req.user.id,
+      watchedSecs: Math.max(0, Number(watchedSecs) || 0),
+      lastPositionSecs: Math.max(0, Number(lastPositionSecs) || 0),
+      maxPositionSecs: Math.max(0, Number(maxPositionSecs) || 0),
+      completed: Boolean(completed),
+      bucketsPlayed,
+    });
+    res.status(204).send();
+  } catch (err) {
+    // Fires from beforeunload via fetch(keepalive) — never worth a loud
+    // error, the next session-start will auto-close this one anyway.
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   uploadVideo,
   getAllVideos,
@@ -261,4 +327,7 @@ module.exports = {
   heartbeat,
   getWatchSession,
   getVideoAnalytics,
+  startWatchEvent,
+  updateWatchEvent,
+  endWatchEvent,
 };

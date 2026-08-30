@@ -11,6 +11,7 @@ import {
   type Batch,
 } from '@/hooks/useAttendanceData'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
+import { authedFetch } from '@/lib/apiClient'
 import AttendanceChart, {
   ATTENDANCE_STATUS_COLORS,
   buildAttendanceTrend,
@@ -34,6 +35,34 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
   const { report, loading, error } = useStudentReport(studentId)
   const [downloading, setDownloading] = useState<'pdf' | 'csv' | null>(null)
   const [chartType, setChartType] = useState<AttendanceChartType>('bar')
+  const [sendingReport, setSendingReport] = useState(false)
+  const [sendReportMessage, setSendReportMessage] = useState<string | null>(null)
+
+  async function sendMonthlyReportNow() {
+    setSendingReport(true)
+    setSendReportMessage(null)
+    try {
+      const now = new Date()
+      const res = await authedFetch(`/api/parent-reports/students/${studentId}/send`, {
+        method: 'POST',
+        body: JSON.stringify({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+      })
+      if (res.status === 'already_sent') {
+        setSendReportMessage('Already emailed this month.')
+      } else if (res.status === 'skipped_no_recipients') {
+        setSendReportMessage('No father, mother, or student email on file — nothing to send to.')
+      } else if (res.status === 'sent') {
+        const to = (res.recipients ?? []).map((r: { type: string }) => r.type).join(', ')
+        setSendReportMessage(`Sent to ${to}.`)
+      } else {
+        setSendReportMessage('Sent, but one or more recipients failed — check the server log.')
+      }
+    } catch (e) {
+      setSendReportMessage(e instanceof Error ? e.message : 'Failed to send report')
+    } finally {
+      setSendingReport(false)
+    }
+  }
 
   const categoryChartData: ChartDatum[] = report ? buildAttendanceCategoryData(report.records) : []
 
@@ -145,22 +174,34 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
           ) : null}
         </div>
 
-        <div className="flex gap-2 px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
+        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0 space-y-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => download('csv')}
+              disabled={!report || downloading !== null}
+              className="flex-1 py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
+            >
+              {downloading === 'csv' ? 'Preparing…' : 'Download CSV'}
+            </button>
+            <button
+              onClick={() => download('pdf')}
+              disabled={!report || downloading !== null}
+              className="flex-1 py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: ACCENT }}
+            >
+              {downloading === 'pdf' ? 'Preparing…' : 'Download PDF'}
+            </button>
+          </div>
           <button
-            onClick={() => download('csv')}
-            disabled={!report || downloading !== null}
-            className="flex-1 py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
+            onClick={sendMonthlyReportNow}
+            disabled={!report || sendingReport}
+            className="w-full py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
           >
-            {downloading === 'csv' ? 'Preparing…' : 'Download CSV'}
+            {sendingReport ? 'Sending…' : "Email this month's report to parents & student"}
           </button>
-          <button
-            onClick={() => download('pdf')}
-            disabled={!report || downloading !== null}
-            className="flex-1 py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: ACCENT }}
-          >
-            {downloading === 'pdf' ? 'Preparing…' : 'Download PDF'}
-          </button>
+          {sendReportMessage && (
+            <p className="text-xs text-zinc-500 text-center">{sendReportMessage}</p>
+          )}
         </div>
       </motion.div>
     </motion.div>

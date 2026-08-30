@@ -1,5 +1,6 @@
-// services/email.service.js
+// utils/email.js
 const nodemailer = require('nodemailer');
+const { wrapEmailHtml, textToHtmlParagraphs } = require('./emailTemplate');
 
 // Create transporter (fail gracefully if env vars missing)
 const transporter = nodemailer.createTransport({
@@ -53,12 +54,29 @@ Let's crush the chemistry boards.
 -- Chemistry@OCTET
     `.trim();
 
+    const html = wrapEmailHtml({
+        preheader: `Your Chemistry@OCTET LMS portal is ready — Admission No: ${admissionNumber}`,
+        bodyHtml: `
+            <p style="margin:0 0 16px;">Hey ${name},</p>
+            <p style="margin:0 0 16px;">Raju Sir wanted your LMS active immediately so you can access all class notes and the exclusive Exam Eve Study material.</p>
+            <p style="margin:0 0 8px;">Your Chemistry@OCTET LMS portal is ready:</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;width:100%;background:#faf9fb;border-radius:6px;">
+                <tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">Admission No</td><td style="padding:6px 14px;font-weight:bold;">${admissionNumber}</td></tr>
+                <tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">Login Email</td><td style="padding:6px 14px;font-weight:bold;">${to}</td></tr>
+                <tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">Temp Password</td><td style="padding:6px 14px;font-weight:bold;">${tempPassword}</td></tr>
+            </table>
+            <p style="margin:0 0 16px;">Good luck for your exams — let's crush the chemistry boards.</p>
+        `,
+        cta: { text: 'Open your portal', url: baseUrl },
+    });
+
     try {
         const info = await transporter.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to: to,
             subject: subject,
             text: text,
+            html: html,
         });
         console.log(`Welcome email sent to ${to} (${info.messageId})`);
     } catch (err) {
@@ -92,12 +110,23 @@ If you didn't request this, ignore this email.
 – OCTET Team
     `.trim();
 
+    const html = wrapEmailHtml({
+        preheader: 'Reset your Chemistry@OCTET LMS password',
+        bodyHtml: `
+            <p style="margin:0 0 16px;">Hello,</p>
+            <p style="margin:0 0 16px;">Click the button below to reset your password. This link is valid for 1 hour.</p>
+            <p style="margin:0 0 16px;color:#6b6478;font-size:13px;">If you didn't request this, you can safely ignore this email.</p>
+        `,
+        cta: { text: 'Reset password', url: resetLink },
+    });
+
     try {
         const info = await transporter.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to: to,
             subject: subject,
             text: text,
+            html: html,
         });
         console.log(`Reset email sent to ${to} (${info.messageId})`);
     } catch (err) {
@@ -169,12 +198,31 @@ async function sendOnlineClassEmail(to, {
 
     lines.push('', `The class is also available in your LMS portal: ${loginUrl}`, '', '-- OCTET Team');
 
+    const bodyHtml = `
+        <p style="margin:0 0 16px;">Hi ${studentName || 'there'},</p>
+        <p style="margin:0 0 16px;">
+            ${action === 'cancelled' ? 'The following online class has been cancelled:' : action === 'rescheduled' ? 'The following online class has been rescheduled:' : 'A new online class has been scheduled:'}
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;width:100%;background:#faf9fb;border-radius:6px;">
+            <tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">Title</td><td style="padding:6px 14px;font-weight:bold;">${title}</td></tr>
+            ${batchName ? `<tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">Batch</td><td style="padding:6px 14px;">${batchName}</td></tr>` : ''}
+            <tr><td style="padding:6px 14px;color:#6b6478;font-size:13px;">When</td><td style="padding:6px 14px;">${startLabel} – ${endLabel}</td></tr>
+        </table>
+        ${description ? `<p style="margin:0 0 16px;">${description}</p>` : ''}
+    `;
+    const html = wrapEmailHtml({
+        preheader: `${actionLabel}: ${title}`,
+        bodyHtml,
+        cta: action !== 'cancelled' && meetUrl ? { text: 'Join Google Meet', url: meetUrl } : { text: 'Open your portal', url: loginUrl },
+    });
+
     try {
         const info = await transporter.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to,
             subject,
             text: lines.join('\n'),
+            html,
         });
         console.log(`Online class ${action} email sent to ${to} (${info.messageId})`);
     } catch (err) {
@@ -184,4 +232,51 @@ async function sendOnlineClassEmail(to, {
     }
 }
 
-module.exports = { sendWelcomeEmail, sendPasswordResetEmail, sendOnlineClassEmail };
+/**
+ * Generic sender with optional attachments and multiple recipients — used
+ * by the parent/student report emails (monthly PDF reports, same-day
+ * absence alerts), where subject/body/recipients/attachments all vary per
+ * call, unlike the templated functions above.
+ *
+ * Unlike the other functions here, this one THROWS on failure instead of
+ * swallowing the error — the caller (parentReports.service.js) needs to
+ * know a send failed so it can record that accurately rather than
+ * silently mark a report as sent when it wasn't.
+ */
+/**
+ * `html`/`cta`/`trackingPixelUrl` are optional — when omitted, `text` is
+ * auto-converted into the same branded template every other email in the
+ * app uses, so every caller gets the formal Chemistry@OCTET look without
+ * having to build HTML itself.
+ */
+async function sendEmail({ to, subject, text, html, cta, trackingPixelUrl, attachments }) {
+    const fromEmail = process.env.BREVO_FROM_EMAIL;
+    const fromName = process.env.BREVO_FROM_NAME || 'OCTET LMS';
+
+    if (!fromEmail) {
+        throw new Error('BREVO_FROM_EMAIL not set - cannot send email');
+    }
+    const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
+    if (recipients.length === 0) {
+        throw new Error('No recipients supplied');
+    }
+
+    const finalHtml = wrapEmailHtml({
+        preheader: subject,
+        bodyHtml: html || textToHtmlParagraphs(text || ''),
+        cta,
+        trackingPixelUrl,
+    });
+
+    const info = await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipients.join(', '),
+        subject,
+        text,
+        html: finalHtml,
+        attachments,
+    });
+    return info;
+}
+
+module.exports = { sendWelcomeEmail, sendPasswordResetEmail, sendOnlineClassEmail, sendEmail };

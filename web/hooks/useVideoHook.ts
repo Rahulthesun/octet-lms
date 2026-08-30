@@ -39,6 +39,15 @@ export interface VideoSubject {
   chapters: VideoChapter[];
 }
 
+// Field names match the real video_watch_sessions row / zeroed-default
+// shape the backend actually returns (video.controller.js::getWatchSession)
+// — watched_secs / last_position_secs / completed, not position_secs.
+export interface WatchSession {
+  watched_secs: number;
+  last_position_secs: number;
+  completed: boolean;
+}
+
 type ChaptersMap = Record<string, Chapter[]>;
 type VideosMap = Record<string, RawVideo[]>;
 type WatchedMap = Record<string, boolean>;
@@ -204,16 +213,18 @@ export function useVideoHook() {
     [BASE],
   );
 
-  // ── Resume position / session lookup for the player ─
+  // ── Resume position / session lookup for the player ──
+  // Field names match the real video_watch_sessions row / zeroed-default
+  // shape the backend actually returns (video.controller.js::getWatchSession)
+  // — watched_secs / last_position_secs / completed, not position_secs.
   const getWatchSession = useCallback(
-    async (videoId: string): Promise<{ position_secs: number } | null> => {
+    async (videoId: string): Promise<WatchSession | null> => {
       const headers = await authHeader();
       try {
         const res = await fetch(`${BASE}/api/content/video/${videoId}/session`, { headers });
         if (res.status === 404) return null;
         if (!res.ok) return null;
         const data = await res.json();
-        // Assumes { position_secs }. Adjust key if video.controller.js differs.
         return data && typeof data === "object" ? data : null;
       } catch {
         return null;
@@ -222,23 +233,91 @@ export function useVideoHook() {
     [BASE],
   );
 
-  // ── Heartbeat: reports watch progress. keepalive:true so it survives
+  // ── Heartbeat: reports cumulative watch progress for the resume point /
+  // "watched" flag / completed threshold. keepalive:true so it survives
   // beforeunload/tab-close (sendBeacon can't carry the Bearer header this
   // route needs, so we use fetch with keepalive instead — that's the
-  // honest tradeoff, not a true sendBeacon). ─
+  // honest tradeoff, not a true sendBeacon). ──
   const sendHeartbeat = useCallback(
-    async (videoId: string, positionSecs: number) => {
+    async (videoId: string, progress: { watchedSecs: number; lastPositionSecs: number; completed: boolean }) => {
       const headers = await authHeader();
       try {
         await fetch(`${BASE}/api/content/video/${videoId}/heartbeat`, {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           keepalive: true,
-          body: JSON.stringify({ position_secs: Math.floor(positionSecs) }),
+          body: JSON.stringify({
+            watchedSecs: Math.floor(progress.watchedSecs),
+            lastPositionSecs: Math.floor(progress.lastPositionSecs),
+            completed: progress.completed,
+          }),
         });
         setWatchedMap((prev) => ({ ...prev, [videoId]: true }));
       } catch {
         // best-effort; a missed heartbeat isn't worth surfacing to the student
+      }
+    },
+    [BASE],
+  );
+
+  // ── Watch-event lifecycle: session-wise/drop-off/heatmap tracking ──
+  // Runs alongside sendHeartbeat above, not instead of it.
+  const startWatchEvent = useCallback(
+    async (videoId: string, positionSecs: number): Promise<string | null> => {
+      const headers = await authHeader();
+      try {
+        const res = await fetch(`${BASE}/api/content/video/${videoId}/watch-events/start`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ positionSecs: Math.floor(positionSecs) }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data?.eventId ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [BASE],
+  );
+
+  interface WatchEventProgress {
+    watchedSecs: number;
+    lastPositionSecs: number;
+    maxPositionSecs: number;
+    completed: boolean;
+    bucketsPlayed: number[];
+  }
+
+  const updateWatchEvent = useCallback(
+    async (videoId: string, eventId: string, progress: WatchEventProgress) => {
+      const headers = await authHeader();
+      try {
+        await fetch(`${BASE}/api/content/video/${videoId}/watch-events/${eventId}`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify(progress),
+        });
+      } catch {
+        // best-effort
+      }
+    },
+    [BASE],
+  );
+
+  const endWatchEvent = useCallback(
+    async (videoId: string, eventId: string, progress: WatchEventProgress) => {
+      const headers = await authHeader();
+      try {
+        await fetch(`${BASE}/api/content/video/${videoId}/watch-events/${eventId}/end`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify(progress),
+        });
+      } catch {
+        // best-effort
       }
     },
     [BASE],
@@ -273,5 +352,8 @@ export function useVideoHook() {
     getStreamUrl,
     getWatchSession,
     sendHeartbeat,
+    startWatchEvent,
+    updateWatchEvent,
+    endWatchEvent,
   };
 }

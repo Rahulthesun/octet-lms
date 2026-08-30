@@ -1,227 +1,141 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { IconClipboard, IconRuler, IconBook } from '@/components/ui/SvgIcons'
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-
-// No backend endpoint for tests exists yet. Rather than show fabricated
-// sample records, this page renders honestly empty until that's wired up —
-// the type below is what a real test record is expected to look like.
-type Test = {
-  id: string
-  title: string
-  type: 'online' | 'offline'
-  date: string // "YYYY-MM-DD"
-  time: string
-  duration: string
-  totalMarks: number
-  status: 'completed' | 'upcoming' | 'missed'
-  marksObtained: number | null
-  percentage: number | null
-  rank: number | null
-  totalStudents: number | null
-  studyMaterials: { id: string; title: string; type: string }[] | null
-}
-
-const tests: Test[] = []
+import { useMyTests, type StudentTestListItem } from '@/hooks/useTests'
+import DescriptiveAnswerPanel from '@/components/student/tests/DescriptiveAnswerPanel'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
-// Status accents (multi-color)
-const STATUS: Record<string, { label: string; text: string; bar: string; chip: string; dot: string }> = {
-  completed: { label: 'Completed', text: 'text-emerald-600', bar: 'border-l-emerald-500', chip: 'bg-emerald-50 text-emerald-700', dot: '#059669' },
-  upcoming: { label: 'Upcoming', text: 'text-amber-600', bar: 'border-l-amber-500', chip: 'bg-amber-50 text-amber-700', dot: '#d97706' },
-  missed: { label: 'Missed', text: 'text-rose-600', bar: 'border-l-rose-500', chip: 'bg-rose-50 text-rose-700', dot: '#e11d48' },
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-function TestCalendar({ selectedDate, onSelectDate }: { selectedDate: string | null; onSelectDate: (d: string) => void }) {
-  const today = new Date()
-  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
-
-  const firstDay = new Date(current.year, current.month, 1).getDay()
-  const daysInMonth = new Date(current.year, current.month + 1, 0).getDate()
-
-  const testDates: Record<string, Test> = {}
-  tests.forEach((t) => {
-    const [y, m, d] = t.date.split('-').map(Number)
-    if (y === current.year && m - 1 === current.month) testDates[d.toString()] = t
-  })
-
-  return (
-    <div className={`${card} p-5`}>
-      <div className="flex items-center justify-between mb-5">
-        <button
-          onClick={() => setCurrent((c) => ({ year: c.month === 0 ? c.year - 1 : c.year, month: c.month === 0 ? 11 : c.month - 1 }))}
-          className="w-8 h-8 rounded-md hover:bg-accent1/60 flex items-center justify-center text-muted hover:text-brand transition-colors"
-        >
-          ←
-        </button>
-        <h3 className="text-primary text-[15px] font-data">{MONTHS[current.month]} {current.year}</h3>
-        <button
-          onClick={() => setCurrent((c) => ({ year: c.month === 11 ? c.year + 1 : c.year, month: c.month === 11 ? 0 : c.month + 1 }))}
-          className="w-8 h-8 rounded-md hover:bg-accent1/60 flex items-center justify-center text-muted hover:text-brand transition-colors"
-        >
-          →
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 mb-2">
-        {DAYS.map((d) => (
-          <div key={d} className="text-center text-[13px] text-muted py-1">{d}</div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-0.5">
-        {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1
-          const test = testDates[day.toString()]
-          const isToday = current.year === today.getFullYear() && current.month === today.getMonth() && day === today.getDate()
-          const isSel = test && test.date === selectedDate
-          return (
-            <button
-              key={day}
-              onClick={() => test && onSelectDate(test.date)}
-              className={`relative aspect-square flex items-center justify-center rounded-md text-[14px] font-data transition-all duration-150 ${
-                test ? 'hover:bg-accent1/60 cursor-pointer' : 'cursor-default'
-              } ${isSel ? 'bg-brand text-white' : isToday ? 'ring-1 ring-brand/40' : ''}`}
-            >
-              <span className={isSel ? 'text-white' : test ? 'text-primary' : 'text-muted'}>{day}</span>
-              {test && !isSel && (
-                <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS[test.status].dot }} />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-[#F4F1F8]">
-        {(['completed', 'upcoming', 'missed'] as const).map((k) => (
-          <div key={k} className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS[k].dot }} />
-            <span className="text-[13px] text-muted">{STATUS[k].label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+function statusOf(test: StudentTestListItem): { label: string; text: string; bar: string; chip: string; dot: string } {
+  const a = test.myAttempt
+  if (a?.status === 'evaluated') return { label: 'Evaluated', text: 'text-emerald-600', bar: 'border-l-emerald-500', chip: 'bg-emerald-50 text-emerald-700', dot: '#059669' }
+  if (test.window === 'ended' && (!a || a.status === 'not_started')) return { label: 'Missed', text: 'text-rose-600', bar: 'border-l-rose-500', chip: 'bg-rose-50 text-rose-700', dot: '#e11d48' }
+  if (a?.status === 'submitted') return { label: 'Awaiting grading', text: 'text-sky-600', bar: 'border-l-sky-500', chip: 'bg-sky-50 text-sky-700', dot: '#0284c7' }
+  if (test.window === 'live') return { label: a?.status === 'in_progress' ? 'In progress' : 'Live now', text: 'text-amber-600', bar: 'border-l-amber-500', chip: 'bg-amber-50 text-amber-700', dot: '#d97706' }
+  return { label: 'Upcoming', text: 'text-zinc-500', bar: 'border-l-zinc-300', chip: 'bg-zinc-100 text-zinc-600', dot: '#a1a1aa' }
 }
 
-function MetaItem({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-muted text-[13px] mb-0.5">{label}</p>
-      <p className="text-primary text-[15px] font-data truncate">{value}</p>
-    </div>
-  )
-}
+function TestCard({ test, onRefetch }: { test: StudentTestListItem; onRefetch: () => void }) {
+  const router = useRouter()
+  const st = statusOf(test)
+  const a = test.myAttempt
+  const [showDescriptive, setShowDescriptive] = useState(false)
 
-function TestCard({ test }: { test: Test }) {
-  const st = STATUS[test.status]
-
-  const studyMaterialIcon = (type: string) => {
-    if (type === 'Cheat Sheet') return <IconClipboard className="w-5 h-5" />
-    if (type === 'Formula Sheet') return <IconRuler className="w-5 h-5" />
-    return <IconBook className="w-5 h-5" />
-  }
+  const canStartMcq = test.type === 'mcq' && test.window === 'live' && (!a || a.status === 'not_started' || a.status === 'in_progress')
+  const canAnswerDescriptive = test.type === 'descriptive' && test.window === 'live' && (!a || a.status === 'not_started' || a.status === 'in_progress')
 
   return (
     <div className={`${card} border-l-4 ${st.bar} p-5`}>
-      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h3 className="text-primary text-base leading-snug mb-1.5">{test.title}</h3>
-          <span className={`inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md ${
-            test.type === 'online' ? 'bg-[#F1EEF5] text-brand' : 'bg-slate-100 text-slate-600'
-          }`}>
-            {test.type === 'online' ? 'Online' : 'Offline'} · {test.duration}
+          <span className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-md bg-[#F1EEF5] text-brand">
+            {test.type === 'mcq' ? 'Multiple Choice' : 'Descriptive'} · {test.subjectName || 'General'}
           </span>
         </div>
         <span className={`shrink-0 text-[13px] px-2.5 py-1 rounded-md ${st.chip}`}>{st.label}</span>
       </div>
 
-      {/* Meta line */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-1">
-        <MetaItem label="Date" value={test.date} />
-        <MetaItem label="Time" value={test.time} />
-        <MetaItem label="Duration" value={test.duration} />
-        <MetaItem label="Total Marks" value={test.totalMarks} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-1">
+        <div>
+          <p className="text-muted text-[13px] mb-0.5">Starts</p>
+          <p className="text-primary text-[15px]">{formatDateTime(test.scheduledStart)}</p>
+        </div>
+        <div>
+          <p className="text-muted text-[13px] mb-0.5">Ends</p>
+          <p className="text-primary text-[15px]">{formatDateTime(test.scheduledEnd)}</p>
+        </div>
+        <div>
+          <p className="text-muted text-[13px] mb-0.5">Max Marks</p>
+          <p className="text-primary text-[15px] font-data">{test.maxMarks}</p>
+        </div>
       </div>
 
-      {/* Conditional block */}
-      {test.status === 'completed' && test.marksObtained !== null && (
+      {a?.status === 'evaluated' && a.marksAwarded !== null && a.maxMarks && (
         <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-muted text-[14px]">Score</span>
-            <span className="text-primary text-[15px] font-data">{test.marksObtained}/{test.totalMarks} ({test.percentage}%)</span>
+            <span className="text-primary text-[15px] font-data">
+              {a.marksAwarded}/{a.maxMarks} ({Math.round((a.marksAwarded / a.maxMarks) * 100)}%)
+            </span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${test.percentage}%` }} />
-          </div>
-          <p className="text-muted text-[14px] mt-2">Rank <span className="font-data">{test.rank}</span> out of <span className="font-data">{test.totalStudents}</span> students</p>
-        </div>
-      )}
-
-      {test.status === 'upcoming' && test.studyMaterials && test.studyMaterials.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
-          <p className="text-primary text-[15px] mb-3">Study Materials for this Test</p>
-          <div className="space-y-2">
-            {test.studyMaterials.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-md">
-                <span className="text-amber-600">{studyMaterialIcon(m.type)}</span>
-                <div>
-                  <p className="text-primary text-[15px]">{m.title}</p>
-                  <p className="text-muted text-[14px]">{m.type}</p>
-                </div>
-              </div>
-            ))}
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((a.marksAwarded / a.maxMarks) * 100)}%` }} />
           </div>
         </div>
       )}
 
-      {test.status === 'missed' && (
+      {a?.status === 'submitted' && (
         <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
-          <p className="text-rose-600 text-[15px]">You missed this test. Contact your instructor if you need to reschedule.</p>
+          <p className="text-sky-600 text-[15px]">Submitted — waiting for your teacher to grade it.</p>
         </div>
+      )}
+
+      {st.label === 'Missed' && (
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
+          <p className="text-rose-600 text-[15px]">You did not attempt this test before the window closed.</p>
+        </div>
+      )}
+
+      {test.window === 'upcoming' && (
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
+          <p className="text-muted text-[14px]">Opens at {formatDateTime(test.scheduledStart)}. Come back then to start.</p>
+        </div>
+      )}
+
+      {canStartMcq && (
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
+          <button onClick={() => router.push(`/student/tests/${test.id}/exam`)}
+            className="px-5 py-2.5 rounded-md bg-brand text-white text-[15px] hover:opacity-90 transition-opacity">
+            {a?.status === 'in_progress' ? 'Resume Test' : 'Start MCQ'}
+          </button>
+          <p className="text-muted text-[13px] mt-2">The test opens in full screen with a countdown timer. Questions are shown in a random order.</p>
+        </div>
+      )}
+
+      {canAnswerDescriptive && !showDescriptive && (
+        <div className="mt-4 pt-4 border-t border-[#F4F1F8]">
+          <button onClick={() => setShowDescriptive(true)}
+            className="px-5 py-2.5 rounded-md bg-brand text-white text-[15px] hover:opacity-90 transition-opacity">
+            {a?.status === 'in_progress' ? 'Continue Answer' : 'Answer This Test'}
+          </button>
+        </div>
+      )}
+      {canAnswerDescriptive && showDescriptive && (
+        <DescriptiveAnswerPanel test={test} onSubmitted={() => { setShowDescriptive(false); onRefetch() }} />
       )}
     </div>
   )
 }
 
-export default function TestsPage() {
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'completed' | 'missed'>('all')
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+export default function StudentTestsPage() {
+  const { tests, loading, error, refetch } = useMyTests()
+  const [filter, setFilter] = useState<'all' | 'live' | 'upcoming' | 'ended'>('all')
 
-  const displayTests = selectedDate
-    ? tests.filter((t) => t.date === selectedDate)
-    : filter === 'all'
-    ? tests
-    : tests.filter((t) => t.status === filter)
+  const displayTests = filter === 'all' ? tests : tests.filter((t) => t.window === filter)
 
   const summary = [
     { label: 'Total Tests', val: tests.length, color: 'text-slate-700' },
-    { label: 'Completed', val: tests.filter((t) => t.status === 'completed').length, color: 'text-emerald-600' },
-    { label: 'Upcoming', val: tests.filter((t) => t.status === 'upcoming').length, color: 'text-amber-600' },
-    { label: 'Missed', val: tests.filter((t) => t.status === 'missed').length, color: 'text-rose-600' },
+    { label: 'Live Now', val: tests.filter((t) => t.window === 'live').length, color: 'text-amber-600' },
+    { label: 'Upcoming', val: tests.filter((t) => t.window === 'upcoming').length, color: 'text-zinc-500' },
+    { label: 'Evaluated', val: tests.filter((t) => t.myAttempt?.status === 'evaluated').length, color: 'text-emerald-600' },
   ]
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
         <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
-        <p className="text-muted text-base">Track your upcoming, completed, and missed tests</p>
+        <p className="text-muted text-base">Attempt live tests and track your results</p>
       </motion.div>
 
-      {/* Summary tiles */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-      >
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.05 }}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {summary.map(({ label, val, color }) => (
           <div key={label} className={`${card} p-5`}>
             <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
@@ -230,69 +144,31 @@ export default function TestsPage() {
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Test list */}
-        <div className="lg:col-span-2 order-2 lg:order-1">
-          {/* Filter tabs */}
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            {(['all', 'upcoming', 'completed', 'missed'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => { setFilter(f); setSelectedDate(null) }}
-                className={`px-4 py-2 rounded-md text-[15px] capitalize transition-all duration-150 ${
-                  filter === f && !selectedDate
-                    ? 'bg-brand text-white'
-                    : 'bg-white border border-border text-primary hover:bg-accent1/50'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-            {selectedDate && (
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-md text-[15px] text-muted hover:text-brand hover:bg-accent1/50 transition-all"
-              >
-                Clear date
-                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                  <path d="M 3,3 L 11,11 M 11,3 L 3,11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            )}
-          </div>
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        {(['all', 'live', 'upcoming', 'ended'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-md text-[15px] capitalize transition-all duration-150 ${
+              filter === f ? 'bg-brand text-white' : 'bg-white border border-border text-primary hover:bg-accent1/50'
+            }`}>
+            {f === 'live' ? 'Live now' : f}
+          </button>
+        ))}
+      </div>
 
-          <div className="space-y-4">
-            {displayTests.map((test, i) => (
-              <motion.div
-                key={test.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-              >
-                <TestCard test={test} />
-              </motion.div>
-            ))}
-            {displayTests.length === 0 && (
-              <div className="text-center py-12 text-muted">
-                <p className="text-[15px]">
-                  {tests.length === 0 ? 'No tests have been scheduled yet.' : 'No tests for this filter.'}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+      {error && <p className="text-rose-600 text-[15px] mb-4">{error}</p>}
+      {loading && <p className="text-muted text-[15px]">Loading tests…</p>}
 
-        {/* Calendar (sticky) */}
-        <div className="lg:col-span-1 order-1 lg:order-2">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="lg:sticky lg:top-6"
-          >
-            <TestCalendar selectedDate={selectedDate} onSelectDate={(d) => setSelectedDate(d === selectedDate ? null : d)} />
+      <div className="space-y-4">
+        {displayTests.map((test, i) => (
+          <motion.div key={test.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
+            <TestCard test={test} onRefetch={refetch} />
           </motion.div>
-        </div>
+        ))}
+        {!loading && displayTests.length === 0 && (
+          <div className="text-center py-12 text-muted">
+            <p className="text-[15px]">{tests.length === 0 ? 'No tests have been scheduled for your batch yet.' : 'No tests for this filter.'}</p>
+          </div>
+        )}
       </div>
     </div>
   )

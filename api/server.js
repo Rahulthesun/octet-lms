@@ -70,7 +70,17 @@ const onlineClassesRouter = require("./routes/onlineClasses.routes");
 const googleAuthRouter = require("./routes/googleAuth.routes");
 const googleIdentityRouter = require("./routes/googleIdentity.routes");
 const attendanceSettingsRouter = require("./routes/attendanceSettings.routes");
+const dashboardRouter = require("./routes/dashboard.routes");
+const personalTasksRouter = require("./routes/personalTasks.routes");
+const parentReportsRouter = require("./routes/parentReports.routes");
+const testsRouter = require("./routes/tests.routes");
+const videoAnalyticsRouter = require("./routes/videoAnalytics.routes");
+const notificationsRouter = require("./routes/notifications.routes");
 const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
+const { startMonthlyReportScheduler } = require("./services/parentReportScheduler.service");
+const { startAbsenceNotifyScheduler } = require("./services/absenceNotifyScheduler.service");
+const { startTestAutoSubmitScheduler } = require("./services/testAutoSubmitScheduler.service");
+const { startNotificationRemindersScheduler } = require("./services/notificationReminders.service");
 
 app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
@@ -96,6 +106,12 @@ app.use("/api/online-classes", onlineClassesRouter);
 app.use("/api/google", googleAuthRouter);
 app.use("/api/google-identity", googleIdentityRouter);
 app.use("/api/attendance-settings", attendanceSettingsRouter);
+app.use("/api/dashboard", dashboardRouter);
+app.use("/api/personal-tasks", personalTasksRouter);
+app.use("/api/parent-reports", parentReportsRouter);
+app.use("/api/tests", testsRouter);
+app.use("/api/video-analytics", videoAnalyticsRouter);
+app.use("/api/notifications", notificationsRouter);
 
 app.use("/api/security" , securityRouter)
  
@@ -134,4 +150,23 @@ app.listen(PORT, "0.0.0.0", () => {
   // calculates/writes their attendance automatically. See
   // services/onlineAttendanceSync.service.js.
   startAttendanceSyncScheduler();
+
+  // Same-day "your ward is absent" parent alerts — checks periodically for
+  // sessions whose class has actually ended. See
+  // services/absenceNotifyScheduler.service.js.
+  startAbsenceNotifyScheduler();
+
+  // Monthly attendance PDF report to father/mother/student — checks
+  // periodically for the last day of the month at/after 6:30 PM IST. See
+  // services/parentReportScheduler.service.js.
+  startMonthlyReportScheduler();
+
+  // Safety net for MCQ test attempts that were never explicitly submitted
+  // (closed tab, lost connection) — auto-grades them once their test's
+  // scheduled end has passed. See services/testAutoSubmitScheduler.service.js.
+  startTestAutoSubmitScheduler();
+
+  // Test-starting-soon and task-due-soon in-app/email reminders. See
+  // services/notificationReminders.service.js.
+  startNotificationRemindersScheduler();
 });

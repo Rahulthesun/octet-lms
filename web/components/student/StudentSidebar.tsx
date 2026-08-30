@@ -10,7 +10,7 @@ import { useStudentName } from '@/hooks/useStudentName'
 import { toTitleCase } from '@/lib/helpers'
 import { useGuestMode } from '@/hooks/useGuestMode'
 import GuestModeSwitch from '@/components/shared/GuestModeSwitch'
-import NotificationBell from '@/components/student/NotificationBell'
+import { useUnreadNotificationCount } from '@/hooks/useNotifications'
 
 // inside component, with other hooks:
 
@@ -115,6 +115,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
   const { role } = useUserRole()
   const studentName = useStudentName()
   const { guestMode, setGuestMode } = useGuestMode()
+  const { count: unreadCount } = useUnreadNotificationCount()
 
   // Only an admin (or an admin+student 'both' account) who explicitly
   // turned Guest Mode on ever sees this — a real student's role is never
@@ -169,7 +170,6 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
               Chemistry<span className="text-[#64748b]">@OCTET</span>
             </p>
           </div>
-          <NotificationBell />
           <button
             onClick={onToggle}
             className="shrink-0 w-7 h-7 flex items-center justify-center text-[#64748b] hover:bg-[#F4F1F8] rounded-md transition-colors"
@@ -254,6 +254,38 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
       </div>
     )
   )}
+
+  {/* Notifications — above Sign Out, per the in-app inbox requirement */}
+  <Link
+    href="/student/notifications"
+    className={`relative flex items-center h-12 w-full border-l-2 transition-colors group ${
+      isActive('/student/notifications')
+        ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
+        : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
+    } ${collapsed ? 'justify-center' : 'gap-3 px-4'}`}
+  >
+    <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+      <path d="M10 2.5c-2.5 0-4.5 2-4.5 4.5v2.5L4 12.5v1h12v-1l-1.5-3V7c0-2.5-2-4.5-4.5-4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8 15.5a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+    {!collapsed && <span className="text-lg whitespace-nowrap flex-1">Notifications</span>}
+    {unreadCount > 0 && (
+      collapsed ? (
+        <span className="absolute top-2 right-3 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] leading-4 text-center">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      ) : (
+        <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-500 text-white text-xs leading-5 text-center">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )
+    )}
+    {collapsed && (
+      <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#3d3354] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+        Notifications
+      </span>
+    )}
+  </Link>
 
   {/* Sign Out */}
   <button

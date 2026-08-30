@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import StudentSidebar from '@/components/student/StudentSidebar'
 import { AtomSVG, FlaskSVG, TestTubeSVG, MicroscopeSVG, CompoundSVG, BeakerSVG } from '@/components/ui/PencilSVGs'
 import AuthGuard from '../../components/student/AuthGuard'
@@ -8,6 +9,22 @@ import TestingGuard from '@/components/TestingGuard'
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
+  const pathname = usePathname()
+
+  // The exam-taking page is a distraction-free, browser-fullscreen
+  // experience by design — it stays behind the same auth/testing guards as
+  // every other student page, it just skips the sidebar chrome around it.
+  const isExamRunner = /^\/student\/tests\/[^/]+\/exam/.test(pathname || '')
+
+  if (isExamRunner) {
+    return (
+      <AuthGuard>
+        <TestingGuard>
+          <div className="student-scope">{children}</div>
+        </TestingGuard>
+      </AuthGuard>
+    )
+  }
 
   return (
     <AuthGuard>

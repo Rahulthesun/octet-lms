@@ -448,6 +448,71 @@ async function getBatchSummary(batchId) {
   };
 }
 
+/**
+ * Org-wide attendance snapshot across every batch at once — for the admin
+ * dashboard. A fixed small number of queries regardless of how many
+ * batches/sessions exist (same shape as getAttendancePercentagesForStudents
+ * below), not one query per batch.
+ */
+async function getOrgAttendanceOverview() {
+  const todayStr = todayDateString();
+
+  const { data: enrollments, error: enrollErr } = await supabase
+    .from("batch_enrollments")
+    .select("batch_id");
+  if (enrollErr) throw enrollErr;
+
+  const enrollCountByBatch = {};
+  (enrollments || []).forEach((e) => {
+    enrollCountByBatch[e.batch_id] = (enrollCountByBatch[e.batch_id] || 0) + 1;
+  });
+
+  const { data: sessions, error: sessErr } = await supabase
+    .from("attendance_sessions")
+    .select("id, batch_id, date");
+  if (sessErr) throw sessErr;
+
+  const allSessions = sessions || [];
+  const todaySessions = allSessions.filter((s) => s.date === todayStr);
+  const sessionIds = allSessions.map((s) => s.id);
+
+  let avgAttendancePct = null;
+  if (sessionIds.length > 0) {
+    const totalPossible = allSessions.reduce(
+      (sum, s) => sum + (enrollCountByBatch[s.batch_id] || 0),
+      0
+    );
+
+    if (totalPossible > 0) {
+      const { data: records, error: recErr } = await supabase
+        .from("attendance_records")
+        .select("id")
+        .in("session_id", sessionIds)
+        .eq("present", true);
+      if (recErr) throw recErr;
+
+      avgAttendancePct = Math.round(((records?.length || 0) / totalPossible) * 100);
+    }
+  }
+
+  let presentTodayCount = 0;
+  if (todaySessions.length > 0) {
+    const { data: records, error: recErr } = await supabase
+      .from("attendance_records")
+      .select("id")
+      .in("session_id", todaySessions.map((s) => s.id))
+      .eq("present", true);
+    if (recErr) throw recErr;
+    presentTodayCount = records?.length || 0;
+  }
+
+  return {
+    liveSessionsToday: todaySessions.length,
+    presentTodayCount,
+    avgAttendancePct,
+  };
+}
+
 // ─── Manual override (unblock) ────────────────────────────────────────────────
 
 async function setStudentOverride(studentId, batchId, unblocked) {
@@ -1621,6 +1686,7 @@ module.exports = {
   addStudentsToBatch,
   getTodayRoster,
   getBatchSummary,
+  getOrgAttendanceOverview,
   setStudentOverride,
   startSession,
   refreshSession,
@@ -1632,6 +1698,8 @@ module.exports = {
   getSessionByOnlineClassId,
   updateSessionSyncStatus,
   getSessionAttendanceDetail,
+  getStudentBatchIds,
+  effectiveStatus,
   overrideAttendanceRecord,
   assignUnknownParticipant,
   ignoreUnknownParticipant,

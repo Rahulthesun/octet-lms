@@ -63,6 +63,18 @@ async function getAllStudents({ batch, mode, status, search, limit = 100, offset
     };
 }
 
+// Bare list of approved student ids — used by the admin dashboard to compute
+// how many students are below the configured attendance threshold, without
+// pulling every field of every student record.
+async function getApprovedStudentIds() {
+    const { data, error } = await supabase
+        .from("students")
+        .select("id")
+        .eq("status", "APPROVED");
+    if (error) throw error;
+    return (data || []).map((s) => s.id);
+}
+
 // ========================= GET /students/pending =========================
 async function getPendingStudents() {
     const { data, error } = await supabase
@@ -530,6 +542,7 @@ async function getRejectedStudents() {
 
 module.exports = {
     getAllStudents,
+    getApprovedStudentIds,
     getPendingStudents,
     getStudentById,
     createStudent,

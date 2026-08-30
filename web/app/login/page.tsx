@@ -58,9 +58,9 @@ const handleLogin = async (e: React.FormEvent) => {
     }
 
     if (role === 'admin' || role === 'both') {
-      router.push('/admin/content')
+      router.push('/admin')
     } else {
-      router.push('/student/notes')
+      router.push('/student')
     }
   } catch (err: any) {
     setError(err.message || 'Something went wrong. Please try again.')

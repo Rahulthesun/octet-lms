@@ -511,4 +511,12 @@ module.exports = {
   buildStudentReportPdf,
   buildBatchReportPdf,
   normalizeChartType,
+  // Exported for reuse by other PDF builders (e.g. parentReportPdf.js) that
+  // want the exact same chart look/colors/math as the reports above.
+  drawStatisticsChart,
+  drawTable,
+  buildCategoryChartData,
+  buildTrendChartData,
+  CHART_STATUS_COLORS,
+  pctColor,
 };
