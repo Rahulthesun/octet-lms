@@ -34,7 +34,9 @@ function requireRole(allowedRoles = ['admin', 'developer' , 'both']) {
 
       const role = data.user.app_metadata?.role;
 
-      if (!role || !allowedRoles.includes(role)) {
+      // 'both' is the full-access role and must pass every admin guard, even
+      // when a caller passes a list that forgot to include it.
+      if (!role || (role !== 'both' && !allowedRoles.includes(role))) {
         return res.status(403).json({ error: 'You do not have access to this resource.' });
       }
 

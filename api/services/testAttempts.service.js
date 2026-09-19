@@ -48,9 +48,12 @@ async function getStudentForUser(authUserId) {
   return data;
 }
 
-async function assertStudentInTestBatch(studentId, batchId) {
+async function assertStudentInTestBatch(studentId, test) {
+  // An All Students test is for every active student (the auth middleware
+  // already turns graduated students away before they get here).
+  if (test.audience === "ALL") return;
   const batchIds = await attendanceService.getStudentBatchIds(studentId);
-  if (!batchIds.includes(batchId)) throw forbidden("This test is not assigned to your batch");
+  if (!batchIds.includes(test.batch_id)) throw forbidden("This test is not assigned to your batch");
 }
 
 // ─── Fetch test + attempt together ─────────────────────────────────────────
@@ -140,14 +143,15 @@ async function autoFinalizeExpiredAttempts() {
 async function listTestsForStudent(authUserId) {
   const student = await getStudentForUser(authUserId);
   const batchIds = await attendanceService.getStudentBatchIds(student.id);
-  if (batchIds.length === 0) return [];
 
   await autoFinalizeExpiredAttempts();
 
+  // Tests for the student's own batches plus every All Students test —
+  // one query, so a test can never appear twice however many batches they are in.
   const { data: tests, error } = await supabase
     .from("tests")
     .select(testsService.TEST_SELECT)
-    .in("batch_id", batchIds)
+    .or(["audience.eq.ALL", batchIds.length > 0 ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
     .neq("status", "cancelled")
     .order("scheduled_start", { ascending: false });
   if (error) throw error;
@@ -202,7 +206,7 @@ async function startAttempt(testId, authUserId) {
   if (!test) throw notFound("Test not found");
   if (test.status === "cancelled") throw badRequest("This test has been cancelled");
 
-  await assertStudentInTestBatch(student.id, test.batch_id);
+  await assertStudentInTestBatch(student.id, test);
 
   const now = Date.now();
   const start = new Date(test.scheduled_start).getTime();

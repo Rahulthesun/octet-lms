@@ -26,6 +26,8 @@ const googleCalendar = require("./googleCalendar.service");
 const attendanceService = require("./attendance.service");
 const { zonedTimeToUtcIso } = require("../utils/timezone");
 const { sendOnlineClassEmail } = require("../utils/email");
+const audienceService = require("./audience.service");
+const { hasGraduated, todayInTz } = require("../utils/graduation");
 
 const DEFAULT_TIMEZONE = process.env.LMS_TIMEZONE || "Asia/Kolkata";
 
@@ -38,40 +40,48 @@ async function assertBatchExists(batchId) {
   return data;
 }
 
-/** Enrolled students for a batch, plus any explicitly-added extra students, de-duplicated. */
+/**
+ * Who a class is for, resolved live: the enrolled students of a batch, or —
+ * for an All Students class (batchId null) — every active student, plus any
+ * explicitly-added extra students. De-duplicated by student id (someone in
+ * two batches is invited once) and never includes alumni/graduated students.
+ */
 async function resolveAttendees(batchId, extraStudentIds = []) {
-  const { data: enrolled, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, email)")
-    .eq("batch_id", batchId);
-  if (enrollErr) throw enrollErr;
+  const base = batchId
+    ? await audienceService.getActiveStudentsInBatches([batchId], "id, name, email, status, is_alumni, graduation_date")
+    : await audienceService.getActiveStudents("id, name, email");
 
   const map = new Map();
-  (enrolled || []).forEach((e) => {
-    if (e.students) map.set(e.students.id, e.students);
-  });
+  base.forEach((s) => map.set(s.id, s));
 
   if (extraStudentIds.length > 0) {
     const { data: extras, error: extraErr } = await supabase
       .from("students")
-      .select("id, name, email")
+      .select("id, name, email, status, is_alumni, graduation_date")
       .in("id", extraStudentIds);
     if (extraErr) throw extraErr;
-    (extras || []).forEach((s) => map.set(s.id, s));
+    const today = todayInTz();
+    (extras || []).forEach((s) => {
+      if (!hasGraduated(s, today)) map.set(s.id, s);
+    });
   }
 
   return Array.from(map.values()).filter((s) => !!s.email);
 }
 
-/** True if this batch already has a *scheduled* class overlapping the given window. */
+/**
+ * True if there is already a *scheduled* class overlapping the given window
+ * for this audience. An All Students class overlaps every batch's classes
+ * (everyone is in it), and a batch class overlaps any All Students class.
+ */
 async function hasTimeConflict(batchId, startIso, endIso, excludeClassId = null) {
   let query = supabase
     .from("online_classes")
     .select("id")
-    .eq("batch_id", batchId)
     .in("status", ["scheduled", "rescheduled"])
     .lt("scheduled_start", endIso)
     .gt("scheduled_end", startIso);
+  if (batchId) query = query.or(`batch_id.eq.${batchId},audience.eq.ALL`);
   if (excludeClassId) query = query.neq("id", excludeClassId);
   const { data, error } = await query;
   if (error) throw error;
@@ -82,7 +92,9 @@ function mapClassRow(row, sessionInfo) {
   return {
     id: row.id,
     batchId: row.batch_id,
-    batchName: row.batches?.name ?? null,
+    audience: row.audience || "BATCH",
+    allStudents: row.audience === "ALL",
+    batchName: row.audience === "ALL" ? "All Students" : (row.batches?.name ?? null),
     subjectId: row.subject_id,
     subjectName: row.subjects?.name ?? null,
     title: row.title,
@@ -130,7 +142,7 @@ async function notifyAttendees(attendees, classRow, action) {
       sendOnlineClassEmail(s.email, {
         studentName: s.name,
         title: classRow.title,
-        batchName: classRow.batches?.name ?? null,
+        batchName: classRow.audience === "ALL" ? "All Students" : (classRow.batches?.name ?? null),
         description: classRow.description,
         scheduledStart: classRow.scheduled_start,
         scheduledEnd: classRow.scheduled_end,
@@ -157,6 +169,8 @@ async function notifyAttendees(attendees, classRow, action) {
  */
 async function scheduleOnlineClass(adminUserId, {
   batchId,
+  allStudents,
+  audience: requestedAudience,
   subjectId,
   title,
   description,
@@ -169,8 +183,16 @@ async function scheduleOnlineClass(adminUserId, {
   sendNotification,
   idempotencyKey,
 }) {
-  if (!batchId || !title || !date || !startTime || !endTime) {
-    throw Object.assign(new Error("batchId, title, date, startTime and endTime are required"), { status: 400 });
+  // "All Students" and a specific batch are mutually exclusive (see audience.service.js).
+  const target = audienceService.normalizeAudience({ audience: requestedAudience, allStudents, batchId });
+  const isAllStudents = target.audience === audienceService.AUDIENCE_ALL;
+  if (!isAllStudents && target.batchIds.length !== 1) {
+    throw Object.assign(new Error("Choose a batch or All Students"), { status: 400 });
+  }
+  batchId = isAllStudents ? null : target.batchIds[0];
+
+  if (!title || !date || !startTime || !endTime) {
+    throw Object.assign(new Error("title, date, startTime and endTime are required"), { status: 400 });
   }
 
   const tz = timezone || DEFAULT_TIMEZONE;
@@ -181,7 +203,7 @@ async function scheduleOnlineClass(adminUserId, {
     throw Object.assign(new Error("End time must be after start time"), { status: 400 });
   }
 
-  await assertBatchExists(batchId);
+  if (batchId) await assertBatchExists(batchId);
 
   const key = idempotencyKey || crypto.randomUUID();
 
@@ -207,6 +229,7 @@ async function scheduleOnlineClass(adminUserId, {
     .from("online_classes")
     .insert({
       batch_id: batchId,
+      audience: isAllStudents ? "ALL" : "BATCH",
       subject_id: subjectId || null,
       title,
       description: description || null,
@@ -274,7 +297,7 @@ async function scheduleOnlineClass(adminUserId, {
     // attendance will be written to — this is what makes it show up in the
     // regular attendance system, not a parallel one.
     if (meetUrl) {
-      await attendanceService.getOrCreateSessionForOnlineClass(batchId, date, finalRow.id);
+      await attendanceService.getOrCreateSessionForOnlineClass(batchId || audienceService.ALL_STUDENTS_TOKEN, date, finalRow.id);
     }
 
     if (sendNotification !== false) {
@@ -360,7 +383,7 @@ async function rescheduleOnlineClass(adminUserId, classId, { title, description,
     if (previousSession && previousSession.date !== newDate) {
       await attendanceService.detachSessionFromOnlineClass(classId);
     }
-    const session = await attendanceService.getOrCreateSessionForOnlineClass(row.batch_id, newDate, classId);
+    const session = await attendanceService.getOrCreateSessionForOnlineClass(row.batch_id || audienceService.ALL_STUDENTS_TOKEN, newDate, classId);
     await attendanceService.updateSessionSyncStatus(session.id, {
       sync_status: "NOT_STARTED",
       sync_error: null,
@@ -437,11 +460,11 @@ async function listForAdmin() {
 async function listForStudent(authUserId) {
   const { data: student, error: stuErr } = await supabase
     .from("students")
-    .select("id")
+    .select("id, status, is_alumni, graduation_date")
     .eq("auth_user_id", authUserId)
     .maybeSingle();
   if (stuErr) throw stuErr;
-  if (!student) return [];
+  if (!student || hasGraduated(student)) return [];
 
   const { data: enrollments, error: enrollErr } = await supabase
     .from("batch_enrollments")
@@ -457,9 +480,8 @@ async function listForStudent(authUserId) {
   if (extraErr) throw extraErr;
   const extraClassIds = (extra || []).map((e) => e.online_class_id);
 
-  if (batchIds.length === 0 && extraClassIds.length === 0) return [];
-
-  const filters = [];
+  // Every student also sees All Students classes, whatever batches they are in.
+  const filters = ["audience.eq.ALL"];
   if (batchIds.length > 0) filters.push(`batch_id.in.(${batchIds.join(",")})`);
   if (extraClassIds.length > 0) filters.push(`id.in.(${extraClassIds.join(",")})`);
 

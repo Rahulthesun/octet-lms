@@ -14,6 +14,11 @@
  */
 
 const supabase = require("../config/supabase");
+const alumniService = require("../services/alumni.service");
+const { REVOKED_MESSAGE } = require("../utils/graduation");
+
+// Roles that are never subject to the student graduation check.
+const STAFF_ROLES = ["admin", "developer", "both"];
 
 /**
  * Extracts and verifies the Bearer token from the Authorization header.
@@ -36,6 +41,25 @@ async function verifyToken(req, res, next) {
   }
 
   req.user = data.user; // { id, email, app_metadata: { role }, user_metadata, ... }
+
+  // Graduation revoke. Decided from students.graduation_date on every
+  // request, so access ends the same day even if the archive job has not
+  // run. Staff accounts are exempt. A revoked student's sessions are also
+  // destroyed so they are logged out, not merely refused.
+  const role = data.user.app_metadata?.role;
+  if (!STAFF_ROLES.includes(role)) {
+    try {
+      const access = await alumniService.getStudentAccessState(data.user.id);
+      if (access.graduated) {
+        alumniService.revokeSessions(data.user.id).catch(() => {});
+        return res.status(403).json({ error: REVOKED_MESSAGE, code: "ACCESS_REVOKED" });
+      }
+    } catch (err) {
+      console.error("[auth] graduation check failed:", err.message);
+      return res.status(500).json({ error: "Unable to verify account status" });
+    }
+  }
+
   next();
 }
 

@@ -82,6 +82,18 @@ const navItems = [
   },
 
   {
+    href: '/student/exam-documents',
+    label: 'Exam Documents',
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 5,2.5 L 12,2.5 L 16,6.5 L 16,17.5 L 5,17.5 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 12,2.5 L 12,6.5 L 16,6.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M 8,10.5 L 13,10.5 M 8,13.5 L 11.5,13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+
+  {
   href: '/student/feedback',
   label: 'Feedback',
   icon: (

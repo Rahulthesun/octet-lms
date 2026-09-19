@@ -129,16 +129,18 @@ function EditField({
   label,
   value,
   onChange,
+  type = 'text',
 }: {
   label: string
   value: string
   onChange: (v: string) => void
+  type?: 'text' | 'date'
 }) {
   return (
     <div>
       <label className="text-sm text-gray-400 block mb-1">{label}</label>
       <input
-        type="text"
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full border border-gray-200 px-3 py-2 text-base text-primary outline-none focus:border-gray-400"
@@ -228,6 +230,7 @@ export default function StudentDetailPage() {
     landmark: '',
     city: '',
     pincode: '',
+    graduation_date: '',
   })
 
   // Sync form when the real record arrives (or changes underneath us)
@@ -242,13 +245,21 @@ export default function StudentDetailPage() {
         landmark: student.landmark ?? '',
         city: student.city ?? '',
         pincode: student.pincode ?? '',
+        graduation_date: student.graduation_date ? student.graduation_date.slice(0, 10) : '',
       })
     }
   }, [student])
 
   const handleSave = async () => {
+    const today = new Date().toLocaleDateString('en-CA')
+    if (form.graduation_date && form.graduation_date <= today) {
+      const ok = window.confirm(
+        'A graduation date of today or earlier revokes access for this student immediately and moves them to Alumni. Continue?'
+      )
+      if (!ok) return
+    }
     try {
-      await updateStudent(form)
+      await updateStudent({ ...form, graduation_date: form.graduation_date || null })
       setEditing(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -388,6 +399,16 @@ export default function StudentDetailPage() {
             <ReadField label="Future Plan" value={student.future_plan} />
             <ReadField label="Preferred Batch" value={student.preferred_batch} />
             <ReadField label="Learning Mode" value={student.learning_mode} />
+            {editing ? (
+              <EditField
+                label="Graduation Date (access ends)"
+                type="date"
+                value={form.graduation_date}
+                onChange={(v) => setForm({ ...form, graduation_date: v })}
+              />
+            ) : (
+              <ReadField label="Graduation Date (access ends)" value={student.graduation_date ? formatDate(student.graduation_date) : null} />
+            )}
           </div>
         </SectionCard>
 

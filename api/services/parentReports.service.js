@@ -49,11 +49,11 @@ async function getStudentMonthlyReportData(studentId, year, month) {
   const batchIds = await attendanceService.getStudentBatchIds(studentId);
 
   let days = [];
-  if (batchIds.length > 0) {
+  {
     const { data: sessions, error: sessErr } = await supabase
       .from("attendance_sessions")
       .select("id, date, source, online_classes(title)")
-      .in("batch_id", batchIds)
+      .or(["audience.eq.ALL", batchIds.length ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
       .gte("date", startDate)
       .lte("date", endDate)
       .order("date", { ascending: true });
@@ -289,7 +289,7 @@ async function findSessionsDueForAbsenceCheck({ bufferMinutes = 45 } = {}) {
 
   const { data: sessions, error } = await supabase
     .from("attendance_sessions")
-    .select("id, date, batches(end_time), online_classes(scheduled_end)")
+    .select("id, date, audience, batches(end_time), online_classes(scheduled_end)")
     .is("absence_notified_at", null)
     .gte("date", lookbackDate)
     .order("date", { ascending: true });
@@ -303,6 +303,10 @@ async function findSessionsDueForAbsenceCheck({ bufferMinutes = 45 } = {}) {
       endInstant = new Date(s.online_classes.scheduled_end);
     } else if (s.batches?.end_time) {
       endInstant = new Date(zonedTimeToUtcIso(s.date, String(s.batches.end_time).slice(0, 5), LMS_TIMEZONE));
+    }
+    // An offline All Students session has no batch end time: treat the end of that calendar day as its end.
+    if (!endInstant && s.audience === "ALL") {
+      endInstant = new Date(zonedTimeToUtcIso(s.date, "23:59", LMS_TIMEZONE));
     }
     if (!endInstant || Number.isNaN(endInstant.getTime())) continue;
 

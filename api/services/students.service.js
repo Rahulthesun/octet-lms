@@ -14,6 +14,16 @@ const { generateTempPassword, generateUsername , generateAdmissionNumber } = req
 const { sendWelcomeEmail } = require("../utils/email");
 
 const { createStudentAuthUser , deleteStudentAuthUser } = require("../utils/auth");
+const { todayInTz } = require("../utils/graduation");
+const alumniService = require("./alumni.service");
+
+// Keeps graduated students (date arrived, or already archived) out of every
+// "active students" list. They live under Alumni instead.
+function excludeGraduated(query) {
+    return query
+        .eq("is_alumni", false)
+        .or(`graduation_date.is.null,graduation_date.gt.${todayInTz()}`);
+}
 console.log('Checking environment:');
 console.log('BREVO_FROM_EMAIL:', process.env.BREVO_FROM_EMAIL);
 console.log('BREVO_SMTP_HOST:', process.env.BREVO_SMTP_HOST);
@@ -38,7 +48,7 @@ async function enrollInPreferredBatch(studentId, preferredBatch) {
 
 // ========================= GET /students =========================
 async function getAllStudents({ batch, mode, status, search, limit = 100, offset = 0 }) {
-    let query = supabase.from("students").select("*", { count: "exact" });
+    let query = excludeGraduated(supabase.from("students").select("*", { count: "exact" }));
     if (batch) query = query.eq("preferred_batch", batch);
     if (mode) query = query.eq("learning_mode", mode);
     if (status) query = query.eq("status", status);
@@ -67,10 +77,9 @@ async function getAllStudents({ batch, mode, status, search, limit = 100, offset
 // how many students are below the configured attendance threshold, without
 // pulling every field of every student record.
 async function getApprovedStudentIds() {
-    const { data, error } = await supabase
-        .from("students")
-        .select("id")
-        .eq("status", "APPROVED");
+    const { data, error } = await excludeGraduated(
+        supabase.from("students").select("id").eq("status", "APPROVED")
+    );
     if (error) throw error;
     return (data || []).map((s) => s.id);
 }
@@ -277,13 +286,38 @@ async function updateStudent(id, updates) {
     delete updates.temp_password;
     delete updates.admission_number; // manual change not allowed
     delete updates.auth_user_id;
-    const { data, error } = await supabase
-        .from("students")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-    if (error) throw error;
+    delete updates.is_alumni; // system-managed by the alumni archive/restore
+
+    // Graduation date is not a plain column write: setting it can revoke
+    // access and archive the student, clearing it can restore them. It is
+    // applied through the alumni service after the other fields are saved.
+    const hasGraduation = Object.prototype.hasOwnProperty.call(updates, "graduation_date");
+    const graduationDate = hasGraduation ? (updates.graduation_date || null) : undefined;
+    delete updates.graduation_date;
+
+    let data;
+    if (Object.keys(updates).length > 0) {
+        const result = await supabase
+            .from("students")
+            .update(updates)
+            .eq("id", id)
+            .select()
+            .single();
+        if (result.error) throw result.error;
+        data = result.data;
+    }
+
+    if (hasGraduation) {
+        await alumniService.setGraduationDate(id, graduationDate);
+    }
+
+    if (!data || hasGraduation) {
+        const refreshed = await supabase.from("students").select("*").eq("id", id).single();
+        if (refreshed.error) throw refreshed.error;
+        data = refreshed.data;
+    }
+    delete data.password_hash;
+    delete data.temp_password;
     return { success: true, data };
 }
 
@@ -292,9 +326,13 @@ async function deleteStudent(id) {
     // First get the student to check for auth_user_id
     const { data: student } = await supabase
         .from("students")
-        .select("auth_user_id")
+        .select("auth_user_id, is_alumni")
         .eq("id", id)
         .single();
+    // Alumni records are kept forever; restore first if it truly must go.
+    if (student?.is_alumni) {
+        throw new Error("This student is in Alumni and cannot be deleted. Records are never hard-deleted.");
+    }
     if (student?.auth_user_id) {
         // Delete the Supabase Auth user as well
         await deleteStudentAuthUser(student.auth_user_id);    }
@@ -446,29 +484,33 @@ async function getStudentsByBatch(batchId) {
     if (!["MORNING", "EVENING", "NIGHT"].includes(batchId)) {
         throw new Error("Invalid batch");
     }
-    const { data, error } = await supabase
-        .from("students")
-        .select("id, name, email, admission_number, learning_mode, status")
-        .eq("preferred_batch", batchId)
-        .eq("status", "APPROVED")
-        .order("name");
+    const { data, error } = await excludeGraduated(
+        supabase
+            .from("students")
+            .select("id, name, email, admission_number, learning_mode, status")
+            .eq("preferred_batch", batchId)
+            .eq("status", "APPROVED")
+    ).order("name");
     if (error) throw error;
     return { success: true, batch: batchId, count: data.length, students: data };
 }
 
 // ========================= GET /students/stats/dashboard =========================
 async function getDashboardStats() {
-    // Get counts
-    const total = await supabase.from("students").select("*", { count: "exact", head: true });
-    const pending = await supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "PENDING");
-    const approved = await supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "APPROVED");
-    const rejected = await supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "REJECTED");
-    const morning = await supabase.from("students").select("*", { count: "exact", head: true }).eq("preferred_batch", "MORNING").eq("status", "APPROVED");
-    const evening = await supabase.from("students").select("*", { count: "exact", head: true }).eq("preferred_batch", "EVENING").eq("status", "APPROVED");
-    const night = await supabase.from("students").select("*", { count: "exact", head: true }).eq("preferred_batch", "NIGHT").eq("status", "APPROVED");
-    const online = await supabase.from("students").select("*", { count: "exact", head: true }).eq("learning_mode", "ONLINE").eq("status", "APPROVED");
-    const offline = await supabase.from("students").select("*", { count: "exact", head: true }).eq("learning_mode", "OFFLINE").eq("status", "APPROVED");
-    const hybrid = await supabase.from("students").select("*", { count: "exact", head: true }).eq("learning_mode", "HYBRID").eq("status", "APPROVED");
+    // Active students only — graduated students are counted under Alumni.
+    const count = (build) => build(excludeGraduated(supabase.from("students").select("*", { count: "exact", head: true })));
+    const [total, pending, approved, rejected, morning, evening, night, online, offline, hybrid] = await Promise.all([
+        count((q) => q),
+        count((q) => q.eq("status", "PENDING")),
+        count((q) => q.eq("status", "APPROVED")),
+        count((q) => q.eq("status", "REJECTED")),
+        count((q) => q.eq("preferred_batch", "MORNING").eq("status", "APPROVED")),
+        count((q) => q.eq("preferred_batch", "EVENING").eq("status", "APPROVED")),
+        count((q) => q.eq("preferred_batch", "NIGHT").eq("status", "APPROVED")),
+        count((q) => q.eq("learning_mode", "ONLINE").eq("status", "APPROVED")),
+        count((q) => q.eq("learning_mode", "OFFLINE").eq("status", "APPROVED")),
+        count((q) => q.eq("learning_mode", "HYBRID").eq("status", "APPROVED")),
+    ]);
     return {
         success: true,
         stats: {
@@ -493,7 +535,9 @@ async function getStudentByUserId(userId) {
     mobile_number,
     admission_number,
     created_at,
-    blocked
+    blocked,
+    graduation_date,
+    is_alumni
 `)
     .eq("auth_user_id", userId)
     .single();
@@ -503,13 +547,13 @@ async function getStudentByUserId(userId) {
   if (error) {
     console.log("C. Error code:", error.code);
     if (error.code === "PGRST116") {
-      throw new NotFoundError(`No student profile found for user ID: ${userId}`);
+      throw Object.assign(new Error(`No student profile found for user ID: ${userId}`), { status: 404 });
     }
     throw new Error(`Database query failed: ${error.message}`);
   }
 
   if (!student) {
-    throw new NotFoundError(`No student profile found for user ID: ${userId}`);
+    throw Object.assign(new Error(`No student profile found for user ID: ${userId}`), { status: 404 });
   }
 
   return {
@@ -519,7 +563,7 @@ async function getStudentByUserId(userId) {
     rollNumber: student.admission_number,
     joinedDate: student.created_at,
     blocked: student.blocked,
-    avatar: student.avatar,
+    avatar: null,
 };
 }
 async function getRejectedStudents() {

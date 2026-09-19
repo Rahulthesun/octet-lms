@@ -15,6 +15,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const supabase = require("../config/supabase");
 const r2 = require("../config/r2");
 const notificationsService = require("./notifications.service");
+const audienceService = require("./audience.service");
 
 const BUCKET = process.env.R2_BUCKET_NAME;
 
@@ -58,7 +59,9 @@ function mapTestRow(t) {
     subjectId: t.subject_id,
     subjectName: t.subjects?.name || null,
     batchId: t.batch_id,
-    batchName: t.batches?.name || null,
+    audience: t.audience || "BATCH",
+    allStudents: t.audience === "ALL",
+    batchName: t.audience === "ALL" ? "All Students" : (t.batches?.name || null),
     status: t.status,
     scheduledStart: t.scheduled_start,
     scheduledEnd: t.scheduled_end,
@@ -143,12 +146,16 @@ async function getQuestionsForAdmin(testId) {
 // ─── Create / list / get / update / delete ─────────────────────────────────
 
 async function createTest({
-  title, type, subjectId, batchId, scheduledStart, scheduledEnd,
+  title, type, subjectId, batchId, allStudents, audience, scheduledStart, scheduledEnd,
   instructions, maxMarks, questionText, createdBy, questions,
 }) {
   if (!title?.trim()) throw badRequest("Title is required");
   if (!["mcq", "descriptive"].includes(type)) throw badRequest("type must be 'mcq' or 'descriptive'");
-  if (!batchId) throw badRequest("A batch is required");
+  // "All Students" (resolved live to every active student) or exactly one batch — never both.
+  const target = audienceService.normalizeAudience({ audience, allStudents, batchId });
+  const isAllStudents = target.audience === audienceService.AUDIENCE_ALL;
+  if (!isAllStudents && target.batchIds.length !== 1) throw badRequest("Choose a batch or All Students");
+  batchId = isAllStudents ? null : target.batchIds[0];
   if (!scheduledStart || !scheduledEnd) throw badRequest("Start and end time are required");
   if (new Date(scheduledEnd) <= new Date(scheduledStart)) throw badRequest("End time must be after start time");
 
@@ -161,6 +168,7 @@ async function createTest({
       type,
       subject_id: subjectId || null,
       batch_id: batchId,
+      audience: isAllStudents ? "ALL" : "BATCH",
       scheduled_start: scheduledStart,
       scheduled_end: scheduledEnd,
       max_marks: type === "descriptive" ? Number(maxMarks) || 0 : 0,
@@ -185,7 +193,7 @@ async function createTest({
   return mapped;
 }
 
-/** Notifies every student enrolled in the test's batch the moment it's scheduled. Best-effort. */
+/** Notifies every student the test is for (its batch, or ALL active students) the moment it's scheduled. Best-effort. */
 async function _notifyTestScheduled(test) {
   const startLabel = new Date(test.scheduledStart).toLocaleString("en-IN", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
@@ -195,7 +203,7 @@ async function _notifyTestScheduled(test) {
     title: `${test.type === "mcq" ? "MCQ" : "Descriptive"} test scheduled: ${test.title}`,
     body: `${test.title} has been scheduled for ${startLabel}${test.batchName ? ` (${test.batchName})` : ""}.`,
     link: "/student/tests",
-    batchIds: test.batchId ? [test.batchId] : [],
+    ...(test.audience === "ALL" ? { allStudents: true } : { batchIds: test.batchId ? [test.batchId] : [] }),
   });
 }
 
@@ -203,7 +211,17 @@ async function updateTest(testId, updates) {
   const allowed = {};
   if (updates.title !== undefined) allowed.title = updates.title.trim();
   if (updates.subjectId !== undefined) allowed.subject_id = updates.subjectId || null;
-  if (updates.batchId !== undefined) allowed.batch_id = updates.batchId;
+  if (updates.batchId !== undefined || updates.allStudents !== undefined || updates.audience !== undefined) {
+    const target = audienceService.normalizeAudience({ audience: updates.audience, allStudents: updates.allStudents, batchId: updates.batchId });
+    if (target.audience === audienceService.AUDIENCE_ALL) {
+      allowed.audience = "ALL";
+      allowed.batch_id = null;
+    } else {
+      if (target.batchIds.length !== 1) throw badRequest("Choose a batch or All Students");
+      allowed.audience = "BATCH";
+      allowed.batch_id = target.batchIds[0];
+    }
+  }
   if (updates.scheduledStart !== undefined) allowed.scheduled_start = updates.scheduledStart;
   if (updates.scheduledEnd !== undefined) allowed.scheduled_end = updates.scheduledEnd;
   if (updates.instructions !== undefined) allowed.instructions = updates.instructions?.trim() || null;
@@ -248,7 +266,8 @@ async function deleteTest(testId) {
 
 async function listTestsForAdmin({ batchId, status } = {}) {
   let query = supabase.from("tests").select(TEST_SELECT).order("scheduled_start", { ascending: false });
-  if (batchId) query = query.eq("batch_id", batchId);
+  if (batchId === audienceService.ALL_STUDENTS_TOKEN) query = query.eq("audience", "ALL");
+  else if (batchId) query = query.eq("batch_id", batchId);
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) throw error;

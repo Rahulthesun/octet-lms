@@ -194,6 +194,30 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/admin/exams",
+    label: "Exam Documents",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 5,2.5 L 12,2.5 L 16,6.5 L 16,17.5 L 5,17.5 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 12,2.5 L 12,6.5 L 16,6.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M 8,10.5 L 13,10.5 M 8,13.5 L 11.5,13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/alumni",
+    label: "Alumni",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 10,3 L 18,7 L 10,11 L 2,7 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 5,9 L 5,13 C 5,14.5 7.2,15.5 10,15.5 C 12.8,15.5 15,14.5 15,13 L 15,9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 18,7 L 18,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 interface AdminSidebarProps {

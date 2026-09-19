@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { IconCheckCircle, IconXCircle, IconDocument } from '@/components/ui/SvgIcons'
 import { useStudents, type StudentRecord } from '@/hooks/admin/useStudents'
 import AttendanceReportsTab from '@/components/admin/AttendanceReportsTab'
 import VideoReportsTab from '@/components/admin/VideoReportsTab'
+import { authedFetch } from '@/lib/apiClient'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,68 @@ export default function StudentsPage() {
     approveStudent,
     rejectStudent,
     setBlocked,
+    setGraduationDate,
+    bulkSetGraduationDate,
   } = useStudents()
+
+  // Graduation date editing (per student) and the per-batch bulk action.
+  const [batches, setBatches] = useState<{ id: string; name: string }[]>([])
+  const [bulkBatch, setBulkBatch] = useState('')
+  const [bulkDate, setBulkDate] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
+
+  useEffect(() => {
+    authedFetch('/api/attendance/batches')
+      .then((json) => setBatches((json.batches ?? []).map((b: { id: string; name: string }) => ({ id: b.id, name: b.name }))))
+      .catch(() => setBatches([]))
+  }, [])
+
+  const todayIso = new Date().toLocaleDateString('en-CA')
+
+  const saveGraduationDate = async (id: string, name: string, value: string) => {
+    setRowError(null)
+    if (value && value <= todayIso) {
+      const ok = window.confirm(
+        `${name} will lose access immediately and move to Alumni (a graduation date of today or earlier). Continue?`
+      )
+      if (!ok) return
+    }
+    try {
+      await setGraduationDate(id, value || null)
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : 'Could not save the graduation date')
+    }
+  }
+
+  const applyBulkGraduation = async () => {
+    setBulkMessage(null)
+    if (!bulkBatch || !bulkDate) {
+      setBulkMessage({ ok: false, text: 'Choose a batch and a graduation date first.' })
+      return
+    }
+    if (bulkDate <= todayIso) {
+      const ok = window.confirm(
+        'This date is today or earlier: every student in the batch will lose access immediately and move to Alumni. Continue?'
+      )
+      if (!ok) return
+    }
+    setBulkBusy(true)
+    try {
+      const result = await bulkSetGraduationDate(bulkBatch, bulkDate)
+      setBulkMessage({
+        ok: result.failed.length === 0,
+        text:
+          `Graduation date set for ${result.updated} student${result.updated === 1 ? '' : 's'}` +
+          (result.failed.length ? `; ${result.failed.length} failed.` : '.'),
+      })
+    } catch (e) {
+      setBulkMessage({ ok: false, text: e instanceof Error ? e.message : 'Bulk update failed' })
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected' | 'attendance' | 'videoReport'>('applications')
   const [search, setSearch] = useState('')
@@ -391,15 +453,59 @@ export default function StudentsPage() {
               </AnimatePresence>
             </div>
 
+            {/* Bulk graduation date for a whole batch */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6 flex flex-col md:flex-row md:items-end gap-3">
+              <div className="flex-1">
+                <p className="text-base text-primary">Set graduation date for a batch</p>
+                <p className="text-sm text-gray-500">
+                  Access ends on this date and students move to Alumni. Clear a single student&apos;s date in the table to undo it.
+                </p>
+              </div>
+              <select
+                value={bulkBatch}
+                onChange={(e) => setBulkBatch(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-base text-gray-700 bg-white outline-none focus:border-primary"
+                aria-label="Batch"
+              >
+                <option value="">Select batch</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={bulkDate}
+                onChange={(e) => setBulkDate(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-base text-gray-700 font-inter outline-none focus:border-primary"
+                aria-label="Graduation date"
+              />
+              <button
+                onClick={applyBulkGraduation}
+                disabled={bulkBusy}
+                className="px-5 py-2 bg-primary text-white text-base rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                {bulkBusy ? 'Applying...' : 'Apply to batch'}
+              </button>
+            </div>
+            {bulkMessage && (
+              <div className={`mb-4 px-4 py-3 rounded-lg text-base border ${bulkMessage.ok ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                {bulkMessage.text}
+              </div>
+            )}
+            {rowError && (
+              <div className="mb-4 px-4 py-3 rounded-lg text-base border bg-red-50 border-red-200 text-red-700">{rowError}</div>
+            )}
+
             {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_100px_60px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
+              <div className="hidden lg:grid lg:grid-cols-[40px_1fr_140px_70px_130px_90px_150px_100px_60px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
                 <span>ID</span>
                 <span>Student</span>
                 <span>Roll</span>
                 <span>Grade</span>
                 <span>Batch</span>
                 <span className="text-right">Attendance</span>
+                <span>Graduation date</span>
                 <span className="text-right">Status</span>
                 <span className="text-center">Actions</span>
               </div>
@@ -411,7 +517,7 @@ export default function StudentsPage() {
                 ) : (
                   filteredStudents.map((s, i) => (
                     <div key={s.id}
-                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_90px_100px_60px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
+                      className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_140px_70px_130px_90px_150px_100px_60px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
                       <span className="text-base text-gray-400 font-inter w-10">{i + 1}</span>
                       <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none">
                         <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
@@ -447,6 +553,21 @@ export default function StudentsPage() {
                         >
                           {s.attendance_pct !== null && s.attendance_pct !== undefined ? `${s.attendance_pct}%` : '—'}
                         </span>
+                      </div>
+                      <div className="hidden lg:block">
+                        <input
+                          type="date"
+                          key={`${s.id}-${s.graduation_date ?? 'none'}`}
+                          defaultValue={s.graduation_date ? s.graduation_date.slice(0, 10) : ''}
+                          onBlur={(e) => {
+                            const next = e.target.value
+                            if (next !== (s.graduation_date ? s.graduation_date.slice(0, 10) : '')) {
+                              saveGraduationDate(s.id, s.name, next)
+                            }
+                          }}
+                          className="w-full px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-700 font-inter outline-none focus:border-primary"
+                          aria-label={`Graduation date for ${s.name}`}
+                        />
                       </div>
                       <div className="text-right hidden lg:block">
                         <button

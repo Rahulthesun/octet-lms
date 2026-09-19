@@ -64,7 +64,10 @@ export interface TestSummary {
   type: TestType
   subjectId: string | null
   subjectName: string | null
-  batchId: string
+  // null (and audience 'ALL') for an All Students test
+  batchId: string | null
+  audience?: 'BATCH' | 'ALL'
+  allStudents?: boolean
   batchName: string | null
   status: TestStatus
   scheduledStart: string
@@ -88,6 +91,7 @@ export interface CreateTestInput {
   title: string
   type: TestType
   subjectId?: string | null
+  // A batch id, or the sentinel 'ALL' for All Students (resolved to every active student)
   batchId: string
   scheduledStart: string // ISO
   scheduledEnd: string // ISO

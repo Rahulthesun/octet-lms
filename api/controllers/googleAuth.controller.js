@@ -42,6 +42,9 @@ async function callback(req, res) {
   const { code, state, error: googleError } = req.query;
 
   if (googleError) {
+    // e.g. access_denied when the Google Cloud consent screen is still in Testing
+    // mode and this account is not a listed test user.
+    console.error(`[google-auth] Google returned an error on callback: ${googleError}`);
     return res.redirect(
       `${frontendUrl}/admin/online-classes?google=error&reason=${encodeURIComponent(String(googleError))}`
     );
@@ -66,6 +69,15 @@ async function status(req, res) {
   }
 }
 
+/** GET /api/google/config-check — what the server is configured with (no secrets), for verifying the Google Cloud Console setup. */
+async function configCheck(req, res) {
+  try {
+    res.json(await svc.getConfigCheck(req.user.id));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
 /** POST /api/google/disconnect */
 async function disconnect(req, res) {
   try {
@@ -76,4 +88,4 @@ async function disconnect(req, res) {
   }
 }
 
-module.exports = { getConnectUrl, callback, status, disconnect };
+module.exports = { getConnectUrl, callback, status, disconnect, configCheck };

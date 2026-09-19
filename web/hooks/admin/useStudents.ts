@@ -84,6 +84,11 @@ export interface StudentRecord {
 
   blocked: boolean
 
+  // Day the student's access ends (inclusive). Once it arrives the student is
+  // blocked from login/API and moved to Alumni. null = not graduating yet.
+  graduation_date?: string | null
+  is_alumni?: boolean
+
   // Computed server-side from real attendance_sessions/attendance_records
   // rows (see attendanceService.getAttendancePercentagesForStudents) — not
   // a students-table column. Null until the student has at least one
@@ -207,6 +212,27 @@ useState<StudentRecord[]>([])
     return json
   }, [])
 
+  // PUT /api/students/:id/graduation-date  — set (YYYY-MM-DD) or clear (null)
+  const setGraduationDate = useCallback(async (id: string, graduationDate: string | null) => {
+    const json = await authedFetch(`/api/students/${id}/graduation-date`, {
+      method: 'PUT',
+      body: JSON.stringify({ graduationDate }),
+    })
+    // A date of today or earlier moves the student to Alumni, so reload the list.
+    await fetchStudents()
+    return json
+  }, [fetchStudents])
+
+  // POST /api/students/graduation-date/bulk  — one date for a whole batch
+  const bulkSetGraduationDate = useCallback(async (batchId: string, graduationDate: string) => {
+    const json = await authedFetch('/api/students/graduation-date/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ batchId, graduationDate }),
+    })
+    await fetchStudents()
+    return json as { updated: number; failed: { studentId: string; error: string }[] }
+  }, [fetchStudents])
+
   useEffect(() => {
     fetchApplications();
     fetchStudents();
@@ -230,6 +256,8 @@ useState<StudentRecord[]>([])
     approveStudent,
     rejectStudent,
     setBlocked,
+    setGraduationDate,
+    bulkSetGraduationDate,
   }
 }
 

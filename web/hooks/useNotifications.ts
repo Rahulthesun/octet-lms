@@ -36,7 +36,15 @@ async function authedFetch(path: string, init?: RequestInit) {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type NotificationType = 'announcement' | 'assignment_due' | 'video_uploaded' | 'test_result' | 'test_scheduled' | 'test_reminder'
+export type NotificationType =
+  | 'announcement'
+  | 'assignment_due'
+  | 'video_uploaded'
+  | 'test_result'
+  | 'test_scheduled'
+  | 'test_reminder'
+  | 'exam_hall_ticket'
+  | 'exam_marksheet'
 
 export interface NotificationItem {
   id: string

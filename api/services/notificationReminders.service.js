@@ -22,7 +22,7 @@ async function checkTestReminders() {
 
   const { data: tests, error } = await supabase
     .from("tests")
-    .select("id, title, type, batch_id, scheduled_start")
+    .select("id, title, type, batch_id, audience, scheduled_start")
     .eq("status", "scheduled")
     .is("reminder_sent_at", null)
     .gte("scheduled_start", now.toISOString())
@@ -39,7 +39,7 @@ async function checkTestReminders() {
         title: `Reminder: ${t.title} starts soon`,
         body: `${t.title} starts at ${startLabel}. Be ready to begin on time — the timer starts automatically.`,
         link: "/student/tests",
-        batchIds: t.batch_id ? [t.batch_id] : [],
+        ...(t.audience === "ALL" ? { allStudents: true } : { batchIds: t.batch_id ? [t.batch_id] : [] }),
       });
       await supabase.from("tests").update({ reminder_sent_at: new Date().toISOString() }).eq("id", t.id);
     } catch (err) {

@@ -22,4 +22,7 @@ router.get("/callback", ctrl.callback);
 router.get("/status", verifyToken, adminOnly, ctrl.status);
 router.post("/disconnect", verifyToken, adminOnly, ctrl.disconnect);
 
+// Verifies redirect URIs / origins / scopes / token state against what Google Cloud must contain.
+router.get("/config-check", verifyToken, adminOnly, ctrl.configCheck);
+
 module.exports = router;

@@ -7,6 +7,7 @@
 // correctly in both portals without depending on either one's own CSS
 // custom-property tokens.
 
+import { useRouter } from 'next/navigation'
 import type { NotificationItem, NotificationType } from '@/hooks/useNotifications'
 
 const TYPE_LABEL: Record<NotificationType, string> = {
@@ -16,6 +17,8 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   test_result: 'Test Result',
   test_scheduled: 'Test Scheduled',
   test_reminder: 'Test Reminder',
+  exam_hall_ticket: 'Hall Ticket',
+  exam_marksheet: 'Marksheet',
 }
 
 const TYPE_DOT: Record<NotificationType, string> = {
@@ -25,6 +28,8 @@ const TYPE_DOT: Record<NotificationType, string> = {
   test_result: '#16A34A',
   test_scheduled: '#5B21B6',
   test_reminder: '#DC2626',
+  exam_hall_ticket: '#0F766E',
+  exam_marksheet: '#0F766E',
 }
 
 function timeAgo(iso: string) {
@@ -49,7 +54,15 @@ export default function NotificationInbox({
   onMarkAllRead: () => void
   accent?: string
 }) {
+  const router = useRouter()
   const unreadCount = notifications.filter((n) => !n.read).length
+
+  // Opening a notification marks it read and, when it carries an in-app link
+  // (for example the hall ticket upload screen), goes straight there.
+  const open = (n: NotificationItem) => {
+    if (!n.read) onMarkRead(n.id)
+    if (n.link && n.link.startsWith('/')) router.push(n.link)
+  }
 
   return (
     <div>
@@ -72,7 +85,7 @@ export default function NotificationInbox({
         {notifications.map((n) => (
           <button
             key={n.id}
-            onClick={() => !n.read && onMarkRead(n.id)}
+            onClick={() => open(n)}
             className={`w-full text-left rounded-lg border px-4 py-3.5 transition-colors ${
               n.read ? 'bg-white border-gray-200' : 'bg-[#FAF8FC] border-gray-200'
             } hover:bg-gray-50`}
@@ -89,6 +102,9 @@ export default function NotificationInbox({
                 </div>
                 <p className={`text-[15px] ${n.read ? 'text-gray-700' : 'text-gray-900 font-medium'}`}>{n.title}</p>
                 <p className="text-sm text-gray-500 mt-0.5">{n.body}</p>
+                {n.link && n.link.startsWith('/') && (
+                  <p className="text-sm mt-1.5 font-medium" style={{ color: TYPE_DOT[n.type] }}>Open</p>
+                )}
               </div>
             </div>
           </button>

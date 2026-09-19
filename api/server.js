@@ -23,10 +23,18 @@ app.use(cors({
 
     if (!origin) return callback(null, true);
 
+    // Production / staging web origins come from the environment so the
+    // live site is never blocked: FRONTEND_URL plus an optional
+    // comma-separated CORS_ORIGINS list.
+    const configured = [process.env.FRONTEND_URL, ...(process.env.CORS_ORIGINS || "").split(",")]
+      .map((o) => (o || "").trim().replace(/\/$/, ""))
+      .filter(Boolean);
+
     if (
       origin.startsWith("http://localhost") ||
       origin.startsWith("http://192.168.") ||
-      origin.endsWith(".trycloudflare.com")
+      origin.endsWith(".trycloudflare.com") ||
+      configured.includes(origin.replace(/\/$/, ""))
     ) {
       return callback(null, true);
     }
@@ -76,6 +84,9 @@ const parentReportsRouter = require("./routes/parentReports.routes");
 const testsRouter = require("./routes/tests.routes");
 const videoAnalyticsRouter = require("./routes/videoAnalytics.routes");
 const notificationsRouter = require("./routes/notifications.routes");
+const alumniRouter = require("./routes/alumni.routes");
+const examDocumentsRouter = require("./routes/examDocuments.routes");
+const { startAlumniScheduler } = require("./services/alumniScheduler.service");
 const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
 const { startMonthlyReportScheduler } = require("./services/parentReportScheduler.service");
 const { startAbsenceNotifyScheduler } = require("./services/absenceNotifyScheduler.service");
@@ -112,6 +123,8 @@ app.use("/api/parent-reports", parentReportsRouter);
 app.use("/api/tests", testsRouter);
 app.use("/api/video-analytics", videoAnalyticsRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/alumni", alumniRouter);
+app.use("/api/exam-documents", examDocumentsRouter);
 
 app.use("/api/security" , securityRouter)
  
@@ -169,4 +182,9 @@ app.listen(PORT, "0.0.0.0", () => {
   // Test-starting-soon and task-due-soon in-app/email reminders. See
   // services/notificationReminders.service.js.
   startNotificationRemindersScheduler();
+
+  // Graduation archive: moves students whose graduation date has arrived
+  // into Alumni. Access is already blocked by the auth middleware from the
+  // date itself; this job is the tidy-up. See services/alumniScheduler.service.js.
+  startAlumniScheduler();
 });

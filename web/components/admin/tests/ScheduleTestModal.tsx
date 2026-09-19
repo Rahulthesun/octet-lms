@@ -135,6 +135,7 @@ export default function ScheduleTestModal({ onClose, onCreate }: {
               <label className={labelCls}>Batch</label>
               <select value={batchId} onChange={(e) => setBatchId(e.target.value)} className={inputCls}>
                 <option value="">Select a batch…</option>
+                <option value="ALL">All Students</option>
                 {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>

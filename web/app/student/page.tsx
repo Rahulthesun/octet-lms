@@ -7,6 +7,7 @@ import { authedFetch } from '@/lib/apiClient'
 import { formatTimeInZone } from '@/lib/helpers'
 import { useStudentName } from '@/hooks/useStudentName'
 import PersonalTasksWidget from '@/components/shared/PersonalTasksWidget'
+import ExamDocumentsBanner from '@/components/student/ExamDocumentsBanner'
 
 // ─── Backend shape (api/services/dashboard.service.js → getStudentOverview) ──
 
@@ -191,6 +192,9 @@ export default function StudentDashboard() {
         </div>
         <p className="text-base text-muted shrink-0">{today}</p>
       </motion.div>
+
+      {/* Reminder until every requested hall ticket / marksheet is uploaded */}
+      <ExamDocumentsBanner />
 
       {loading ? (
         <div className="py-24 text-center text-muted text-base">Loading dashboard…</div>

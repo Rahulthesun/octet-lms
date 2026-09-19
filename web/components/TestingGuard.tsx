@@ -20,14 +20,16 @@ export default function TestingGuard({ children }: { children: React.ReactNode }
   }
 
   // An admin previewing Guest Mode must see EXACTLY what a real student
-  // would see — production pages only. Evaluate them as role 'student' for
-  // this check. This covers both admin role variants: plain 'admin' AND the
-  // internal 'both' preview role — 'both' is exactly the role canAccessPage
-  // treats as "sees everything, testing or not", so leaving it as 'both'
-  // here would silently defeat guest mode's whole purpose and leak
-  // unreleased pages into what's supposed to be a faithful preview of the
-  // live student experience.
-  const isAdminGuest = guestMode && (role === 'admin' || role === 'both')
+  // would see — production pages only — so, on student pages only, they are
+  // evaluated as role 'student'. This covers both admin role variants
+  // ('admin' and 'both').
+  //
+  // Admin pages are never evaluated this way: the guest flag is cleared the
+  // moment an admin page loads, and a stale flag must not be able to turn an
+  // admin page into a "coming soon" placeholder while the switch back to
+  // the admin area is still in flight.
+  const isAdminGuest =
+    guestMode && (role === 'admin' || role === 'both') && pathname.startsWith('/student')
   const effectiveRole = isAdminGuest ? 'student' : role
 
   if (!canAccessPage(effectiveRole, pathname)) {

@@ -13,9 +13,19 @@
 
 const supabase = require("../config/supabase");
 const { sendEmail } = require("../utils/email");
+const { applyActiveStudentFilter, hasGraduated, todayInTz } = require("../utils/graduation");
 
 const API_PUBLIC_URL = (process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 8000}`).replace(/\/$/, "");
 const LOGIN_URL = process.env.LOGIN_URL || "https://your-lms.com/login";
+const FRONTEND_URL = (process.env.FRONTEND_URL || "").replace(/\/$/, "");
+
+// Email button target: deep-link straight to the relevant screen when the
+// notification has an in-app link (e.g. the exam-document upload screen);
+// students who are signed out land on login first and continue from there.
+function emailCtaUrl(link) {
+  if (link && FRONTEND_URL) return `${FRONTEND_URL}${link.startsWith("/") ? link : `/${link}`}`;
+  return LOGIN_URL;
+}
 
 function notFound(message) {
   return Object.assign(new Error(message), { status: 404 });
@@ -23,7 +33,12 @@ function notFound(message) {
 
 // ─── Recipient resolution ───────────────────────────────────────────────────
 
-async function resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFilter, allApproved }) {
+/**
+ * Alumni (graduated / archived) and blocked-by-graduation students never
+ * receive notifications, whichever way they were addressed — by batch, by
+ * grade, by id, or as part of "All Students".
+ */
+async function resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFilter, allApproved, allStudents }) {
   const result = new Set();
 
   if (Array.isArray(userIds)) {
@@ -34,7 +49,9 @@ async function resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFil
   // in the admin compose tool) — client only ever deals in students.id,
   // never a raw auth_user_id, so it's resolved here, not trusted from input.
   if (Array.isArray(studentIds) && studentIds.length > 0) {
-    const { data, error } = await supabase.from("students").select("auth_user_id").in("id", studentIds);
+    const { data, error } = await applyActiveStudentFilter(
+      supabase.from("students").select("auth_user_id").in("id", studentIds)
+    );
     if (error) throw error;
     for (const row of data || []) if (row.auth_user_id) result.add(row.auth_user_id);
   }
@@ -42,11 +59,14 @@ async function resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFil
   if (Array.isArray(batchIds) && batchIds.length > 0) {
     const { data, error } = await supabase
       .from("batch_enrollments")
-      .select("students(auth_user_id)")
+      .select("students(auth_user_id, status, is_alumni, graduation_date)")
       .in("batch_id", batchIds);
     if (error) throw error;
+    const today = todayInTz();
     for (const row of data || []) {
-      if (row.students?.auth_user_id) result.add(row.students.auth_user_id);
+      const s = row.students;
+      if (!s?.auth_user_id || hasGraduated(s, today)) continue;
+      result.add(s.auth_user_id); // a Set, so a student in two batches is notified once
     }
   }
 
@@ -54,17 +74,16 @@ async function resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFil
     // students.class_grade is free-text ("11", "11th", "12th", ...) rather
     // than the clean integer subjects.grade uses — a prefix match is the
     // only reliable way to line the two up.
-    const { data, error } = await supabase
-      .from("students")
-      .select("auth_user_id")
-      .like("class_grade", `${gradeFilter}%`)
-      .eq("status", "APPROVED");
+    const { data, error } = await applyActiveStudentFilter(
+      supabase.from("students").select("auth_user_id").like("class_grade", `${gradeFilter}%`)
+    );
     if (error) throw error;
     for (const row of data || []) if (row.auth_user_id) result.add(row.auth_user_id);
   }
 
-  if (allApproved) {
-    const { data, error } = await supabase.from("students").select("auth_user_id").eq("status", "APPROVED");
+  // "All Students" is resolved live to every active student, never a stored list.
+  if (allApproved || allStudents) {
+    const { data, error } = await applyActiveStudentFilter(supabase.from("students").select("auth_user_id"));
     if (error) throw error;
     for (const row of data || []) if (row.auth_user_id) result.add(row.auth_user_id);
   }
@@ -94,7 +113,7 @@ async function _sendAndLogEmail(notification, recipientEmail) {
       to: recipientEmail,
       subject: notification.title,
       text: notification.body,
-      cta: notification.link ? { text: "Open your portal", url: LOGIN_URL } : undefined,
+      cta: notification.link ? { text: "Open your portal", url: emailCtaUrl(notification.link) } : undefined,
       trackingPixelUrl,
     });
     await supabase
@@ -113,7 +132,7 @@ async function _sendAndLogEmail(notification, recipientEmail) {
 
 /**
  * @param {object} input
- * @param {'announcement'|'assignment_due'|'video_uploaded'|'test_result'|'test_scheduled'|'test_reminder'} input.type
+ * @param {'announcement'|'assignment_due'|'video_uploaded'|'test_result'|'test_scheduled'|'test_reminder'|'exam_hall_ticket'|'exam_marksheet'} input.type
  * @param {string} input.title
  * @param {string} input.body
  * @param {string|null} [input.link]         Deep link within the app, e.g. "/student/tests/<id>"
@@ -122,20 +141,21 @@ async function _sendAndLogEmail(notification, recipientEmail) {
  * @param {string[]} [input.studentIds]      Explicit students.id recipients (resolved to auth ids here)
  * @param {string[]} [input.batchIds]        Every enrolled student in these batches
  * @param {number|string} [input.gradeFilter] Every approved student in this grade
- * @param {boolean} [input.allApproved]      Every approved student in the org
+ * @param {boolean} [input.allApproved]      Every active student in the org (alias of allStudents)
+ * @param {boolean} [input.allStudents]      Every active student — resolved live, excludes alumni
  * @param {string|null} [input.createdBy]    auth_user_id of the admin who triggered this (null for system triggers)
  * @param {boolean} [input.email]            Whether to also send an email (default true)
  */
 async function createNotification({
   type, title, body, link = null, data = {},
-  userIds, studentIds, batchIds, gradeFilter, allApproved,
+  userIds, studentIds, batchIds, gradeFilter, allApproved, allStudents,
   createdBy = null, email: sendEmailToRecipients = true,
 }) {
   if (!title?.trim() || !body?.trim()) {
     throw Object.assign(new Error("title and body are required"), { status: 400 });
   }
 
-  const recipients = await resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFilter, allApproved });
+  const recipients = await resolveRecipientAuthIds({ userIds, studentIds, batchIds, gradeFilter, allApproved, allStudents });
   if (recipients.length === 0) return { notificationCount: 0, emailCount: 0, recipients: [] };
 
   const rows = recipients.map((uid) => ({ user_id: uid, type, title: title.trim(), body: body.trim(), link, data, created_by: createdBy }));

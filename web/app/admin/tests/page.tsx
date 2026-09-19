@@ -232,6 +232,12 @@ export default function AdminTestsPage() {
           }`} style={!batchFilter ? { backgroundColor: ACCENT } : undefined}>
           All batches
         </button>
+        <button onClick={() => setBatchFilter('ALL')}
+          className={`px-3.5 py-1.5 text-sm rounded-full border transition-colors ${
+            batchFilter === 'ALL' ? 'text-white border-transparent' : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'
+          }`} style={batchFilter === 'ALL' ? { backgroundColor: ACCENT } : undefined}>
+          All Students
+        </button>
         {batches.map((b) => (
           <button key={b.id} onClick={() => setBatchFilter(b.id)}
             className={`px-3.5 py-1.5 text-sm rounded-full border transition-colors ${

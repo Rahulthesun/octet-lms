@@ -157,7 +157,41 @@ async function getStatus(adminUserId) {
   return row ? { connected: true, email: row.google_email } : { connected: false, email: null };
 }
 
+/**
+ * Diagnostic for the "Google access blocked" class of problems: reports what
+ * the server is actually configured with, so the redirect URI and origins can
+ * be compared against the Google Cloud Console (APIs & Services > Credentials).
+ * Never returns secrets or tokens.
+ */
+async function getConfigCheck(adminUserId) {
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_IDENTITY_REDIRECT_URI, FRONTEND_URL } = process.env;
+  const row = await getStoredTokenRow(adminUserId);
+  const redirect = GOOGLE_REDIRECT_URI || null;
+  const isLocal = (u) => !!u && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(u);
+  return {
+    clientConfigured: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REDIRECT_URI),
+    redirectUri: redirect,
+    identityRedirectUri: GOOGLE_IDENTITY_REDIRECT_URI || null,
+    frontendUrl: FRONTEND_URL || null,
+    // These must be listed under "Authorised redirect URIs" / "Authorised JavaScript origins".
+    expectedGoogleConsoleEntries: {
+      authorisedRedirectUris: [redirect, GOOGLE_IDENTITY_REDIRECT_URI].filter(Boolean),
+      authorisedJavaScriptOrigins: [FRONTEND_URL].filter(Boolean),
+    },
+    warnings: [
+      isLocal(redirect) ? "GOOGLE_REDIRECT_URI points at localhost - use the production API URL on the live server" : null,
+      isLocal(FRONTEND_URL) ? "FRONTEND_URL points at localhost - use the production web URL on the live server" : null,
+      !FRONTEND_URL ? "FRONTEND_URL is not set" : null,
+    ].filter(Boolean),
+    scopesRequested: SCOPES,
+    thisAccount: row
+      ? { connected: true, googleEmail: row.google_email, tokenExpiry: row.token_expiry, lastUpdated: row.updated_at, hasRefreshToken: !!row.refresh_token }
+      : { connected: false },
+  };
+}
+
 module.exports = {
+  getConfigCheck,
   buildAuthUrl,
   exchangeCodeAndStore,
   getAuthorizedClient,
