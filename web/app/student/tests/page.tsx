@@ -121,28 +121,36 @@ export default function StudentTestsPage() {
   const displayTests = filter === 'all' ? tests : tests.filter((t) => t.window === filter)
 
   const summary = [
-    { label: 'Total Tests', val: tests.length, color: 'text-slate-700' },
-    { label: 'Live Now', val: tests.filter((t) => t.window === 'live').length, color: 'text-amber-600' },
-    { label: 'Upcoming', val: tests.filter((t) => t.window === 'upcoming').length, color: 'text-zinc-500' },
-    { label: 'Evaluated', val: tests.filter((t) => t.myAttempt?.status === 'evaluated').length, color: 'text-emerald-600' },
+    { label: 'Total Tests', val: tests.length, color: 'text-slate-700', stroke: '#475569' },
+    { label: 'Live Now', val: tests.filter((t) => t.window === 'live').length, color: 'text-amber-600', stroke: '#d97706' },
+    { label: 'Upcoming', val: tests.filter((t) => t.window === 'upcoming').length, color: 'text-zinc-500', stroke: '#71717a' },
+    { label: 'Evaluated', val: tests.filter((t) => t.myAttempt?.status === 'evaluated').length, color: 'text-emerald-600', stroke: '#059669' },
   ]
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
-        <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
-        <p className="text-muted text-base">Attempt live tests and track your results</p>
-      </motion.div>
+    <div className="p-6 lg:p-6 max-w-7xl mx-auto">
+      {/* Heading + compact stats, side by side */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
+          <p className="text-muted text-base">Attempt live tests and track your results</p>
+        </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {summary.map(({ label, val, color }) => (
-          <div key={label} className={`${card} p-5`}>
-            <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
-            <p className="text-muted text-sm">{label}</p>
-          </div>
-        ))}
-      </motion.div>
+        {/* Summary tiles, compact and colour-stroked, parallel to the heading (values come from the API) */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-2 w-full lg:flex-1 lg:max-w-4xl"
+        >
+          {summary.map(({ label, val, color, stroke }) => (
+            <div key={label} className={`${card} border-l-3 pl-5 pr-4 py-3`} style={{ borderLeftColor: stroke }}>
+              <p className={`text-3xl font-data leading-none mb-1.5 ${color}`}>{val}</p>
+              <p className="text-muted text-sm">{label}</p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
         {(['all', 'live', 'upcoming', 'ended'] as const).map((f) => (
