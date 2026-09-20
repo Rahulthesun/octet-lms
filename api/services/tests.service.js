@@ -16,6 +16,9 @@ const supabase = require("../config/supabase");
 const r2 = require("../config/r2");
 const notificationsService = require("./notifications.service");
 const audienceService = require("./audience.service");
+const questionBank = require("./questionBank.service");
+const { signKey } = require("./questionImages.service");
+const { toDbColumns, serializeQuestion } = require("../utils/mcqQuestion");
 
 const BUCKET = process.env.R2_BUCKET_NAME;
 
@@ -83,42 +86,45 @@ function validateQuestions(questions) {
   if (!Array.isArray(questions) || questions.length === 0) {
     throw badRequest("At least one question is required for an MCQ test");
   }
-  questions.forEach((q, i) => {
-    const n = i + 1;
-    if (!q.questionText?.trim()) throw badRequest(`Question ${n} is missing its text`);
-    if (!q.optionA?.trim() || !q.optionB?.trim() || !q.optionC?.trim() || !q.optionD?.trim()) {
-      throw badRequest(`Question ${n} is missing one or more options`);
-    }
-    if (!["a", "b", "c", "d"].includes(q.correctOption)) {
-      throw badRequest(`Question ${n} needs a correct option (A, B, C, or D)`);
-    }
-  });
+  // Every question and each of its four options must have an image or text.
+  questions.forEach((q, i) => toDbColumns(q, i + 1));
 }
 
 async function replaceQuestions(testId, questions) {
   validateQuestions(questions);
 
-  const { error: delErr } = await supabase.from("test_questions").delete().eq("test_id", testId);
-  if (delErr) throw delErr;
-
+  // Build (and so validate) every row BEFORE touching the existing questions.
+  // bank_question_id is only a tracking reference to the bank row an imported
+  // copy came from; unknown ids are dropped rather than trusted.
+  const knownBankIds = await questionBank.existingIds(questions.map((q) => q.bankQuestionId));
   const rows = questions.map((q, i) => ({
     test_id: testId,
     order_index: i,
-    question_text: q.questionText.trim(),
-    option_a: q.optionA.trim(),
-    option_b: q.optionB.trim(),
-    option_c: q.optionC.trim(),
-    option_d: q.optionD.trim(),
-    correct_option: q.correctOption,
-    marks: q.marks && Number(q.marks) > 0 ? Number(q.marks) : 1,
+    ...toDbColumns(q, i + 1),
+    bank_question_id: q.bankQuestionId && knownBankIds.has(q.bankQuestionId) ? q.bankQuestionId : null,
   }));
+
+  const { error: delErr } = await supabase.from("test_questions").delete().eq("test_id", testId);
+  if (delErr) throw delErr;
 
   const { data, error } = await supabase.from("test_questions").insert(rows).select();
   if (error) throw error;
 
   const totalMarks = data.reduce((sum, q) => sum + Number(q.marks), 0);
-  const { error: updErr } = await supabase.from("tests").update({ max_marks: totalMarks, updated_at: new Date().toISOString() }).eq("id", testId);
+  const { data: testRow, error: updErr } = await supabase
+    .from("tests")
+    .update({ max_marks: totalMarks, updated_at: new Date().toISOString() })
+    .eq("id", testId)
+    .select("id, title, created_by")
+    .single();
   if (updErr) throw updErr;
+
+  // Automatic question-bank saving. Never blocks saving the test itself.
+  try {
+    await questionBank.syncFromTest(testRow, data);
+  } catch (bankErr) {
+    console.error(`[question-bank] sync failed for test ${testId}:`, bankErr.message);
+  }
 
   return data.sort((a, b) => a.order_index - b.order_index);
 }
@@ -130,17 +136,19 @@ async function getQuestionsForAdmin(testId) {
     .eq("test_id", testId)
     .order("order_index", { ascending: true });
   if (error) throw error;
-  return (data || []).map((q) => ({
-    id: q.id,
-    orderIndex: q.order_index,
-    questionText: q.question_text,
-    optionA: q.option_a,
-    optionB: q.option_b,
-    optionC: q.option_c,
-    optionD: q.option_d,
-    correctOption: q.correct_option,
-    marks: q.marks,
-  }));
+
+  const out = [];
+  for (const q of data || []) {
+    out.push({
+      id: q.id,
+      orderIndex: q.order_index,
+      correctOption: q.correct_option,
+      marks: q.marks,
+      bankQuestionId: q.bank_question_id,
+      ...(await serializeQuestion(q, signKey, { withKeys: true })),
+    });
+  }
+  return out;
 }
 
 // ─── Create / list / get / update / delete ─────────────────────────────────

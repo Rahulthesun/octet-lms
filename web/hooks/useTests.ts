@@ -42,14 +42,42 @@ export type TestStatus = 'scheduled' | 'completed' | 'cancelled'
 export type TestWindow = 'upcoming' | 'live' | 'ended'
 export type OptionKey = 'a' | 'b' | 'c' | 'd'
 
-export interface TestQuestionInput {
-  questionText: string
-  optionA: string
-  optionB: string
-  optionC: string
-  optionD: string
+// Every question and each of its four options is either text or an image.
+export type ContentType = 'text' | 'image'
+export type QuestionField = 'question' | 'optionA' | 'optionB' | 'optionC' | 'optionD'
+
+// What is shown for one field. Images arrive as short-lived signed URLs.
+export interface QuestionContentFields {
+  questionType: ContentType
+  questionText: string | null
+  questionImageUrl?: string | null
+  optionAType: ContentType
+  optionA: string | null
+  optionAImageUrl?: string | null
+  optionBType: ContentType
+  optionB: string | null
+  optionBImageUrl?: string | null
+  optionCType: ContentType
+  optionC: string | null
+  optionCImageUrl?: string | null
+  optionDType: ContentType
+  optionD: string | null
+  optionDImageUrl?: string | null
+}
+
+// What the test creator sends. *ImageKey is the R2 key returned by the
+// presigned upload; *ImageUrl is only a local/signed preview and is ignored
+// by the server. bankQuestionId is a tracking reference to the bank question
+// an imported copy came from.
+export interface TestQuestionInput extends QuestionContentFields {
+  questionImageKey?: string | null
+  optionAImageKey?: string | null
+  optionBImageKey?: string | null
+  optionCImageKey?: string | null
+  optionDImageKey?: string | null
   correctOption: OptionKey
   marks?: number
+  bankQuestionId?: string | null
 }
 
 export interface TestQuestionAdmin extends TestQuestionInput {
@@ -114,13 +142,8 @@ export interface StudentTestListItem extends TestSummary {
   questionFileUrl?: string | null
 }
 
-export interface AttemptQuestion {
+export interface AttemptQuestion extends QuestionContentFields {
   id: string
-  questionText: string
-  optionA: string
-  optionB: string
-  optionC: string
-  optionD: string
   marks: number
   selectedOption: OptionKey | null
   correctOption?: OptionKey
@@ -164,13 +187,8 @@ export interface AdminAttemptRow {
   maxMarks: number | null
 }
 
-export interface AdminAttemptQuestion {
+export interface AdminAttemptQuestion extends QuestionContentFields {
   id: string
-  questionText: string
-  optionA: string
-  optionB: string
-  optionC: string
-  optionD: string
   correctOption: OptionKey
   marks: number
   selectedOption: OptionKey | null

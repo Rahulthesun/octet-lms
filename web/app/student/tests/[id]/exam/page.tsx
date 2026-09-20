@@ -6,6 +6,7 @@ import {
   authedFetch, fetchMyAttempt, saveMyAnswer, startMyAttempt, submitMyAttempt,
   type MyAttemptDetail, type OptionKey, type StudentTestListItem,
 } from '@/hooks/useTests'
+import QuestionContent from '@/components/shared/QuestionContent'
 
 function formatClock(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -251,19 +252,23 @@ export default function ExamRunnerPage() {
             <div className="space-y-3">
               {detail.questions.map((q, i) => (
                 <div key={q.id} className={`rounded-lg border p-4 ${q.isCorrect ? 'border-emerald-200 bg-emerald-50/40' : 'border-rose-200 bg-rose-50/40'}`}>
-                  <p className="text-primary text-[15px] mb-2"><span className="text-muted mr-1">Q{i + 1}.</span>{q.questionText}</p>
-                  <div className="grid grid-cols-2 gap-2 text-[14px]">
+                  <div className="text-primary text-[15px] mb-3">
+                    <span className="text-muted mr-1">Q{i + 1}.</span>
+                    <QuestionContent q={q} field="question" alt={`Question ${i + 1}`} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[14px]">
                     {(['a', 'b', 'c', 'd'] as const).map((key) => {
-                      const text = { a: q.optionA, b: q.optionB, c: q.optionC, d: q.optionD }[key]
+                      const field = `option${key.toUpperCase()}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'
                       const isCorrect = q.correctOption === key
                       const isSelected = q.selectedOption === key
                       return (
-                        <div key={key} className={`px-3 py-1.5 rounded-md border ${
+                        <div key={key} className={`flex items-start gap-1.5 px-3 py-1.5 rounded-md border ${
                           isCorrect ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
                           : isSelected ? 'border-rose-300 bg-rose-100 text-rose-800'
                           : 'border-[#e2e5ec] text-muted'
                         }`}>
-                          <span className="font-semibold mr-1">{key.toUpperCase()}.</span>{text}
+                          <span className="font-semibold shrink-0">{key.toUpperCase()}.</span>
+                          <QuestionContent q={q} field={field} alt={`Option ${key.toUpperCase()} of question ${i + 1}`} />
                         </div>
                       )
                     })}
@@ -309,20 +314,25 @@ export default function ExamRunnerPage() {
           {current && (
             <div className="max-w-2xl mx-auto">
               <p className="text-muted text-[13px] mb-2">Question {currentIdx + 1} of {questions.length} · {current.marks} mark{current.marks === 1 ? '' : 's'}</p>
-              <p className="text-primary text-[18px] mb-6">{current.questionText}</p>
+              <div className="text-primary text-[18px] mb-6">
+                <QuestionContent q={current} field="question" alt={`Question ${currentIdx + 1}`} />
+              </div>
               <div className="space-y-3">
                 {(['a', 'b', 'c', 'd'] as const).map((key) => {
-                  const text = { a: current.optionA, b: current.optionB, c: current.optionC, d: current.optionD }[key]
+                  const field = `option${key.toUpperCase()}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'
                   const selected = current.selectedOption === key
                   return (
                     <button key={key} onClick={() => handleSelect(current.id, key)}
-                      className={`w-full flex items-center gap-3 text-left px-4 py-3.5 rounded-lg border transition-colors ${
+                      aria-pressed={selected}
+                      className={`w-full flex items-center gap-3 text-left px-4 py-3.5 min-h-[52px] rounded-lg border transition-colors ${
                         selected ? 'border-brand bg-[#F1EEF5]' : 'border-[#e2e5ec] hover:bg-[#FAF9FB]'
                       }`}>
                       <span className={`w-6 h-6 shrink-0 rounded-full border flex items-center justify-center text-[13px] ${
                         selected ? 'bg-brand text-white border-brand' : 'border-[#c8b8d8] text-muted'
                       }`}>{key.toUpperCase()}</span>
-                      <span className="text-primary text-[15px]">{text}</span>
+                      <span className="text-primary text-[15px] min-w-0 flex-1">
+                        <QuestionContent q={current} field={field} alt={`Option ${key.toUpperCase()}`} />
+                      </span>
                     </button>
                   )
                 })}

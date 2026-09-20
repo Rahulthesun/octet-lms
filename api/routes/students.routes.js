@@ -40,6 +40,9 @@ router.get("/rejected", verifyToken, adminOnly, studentController.getRejectedStu
 // GET /api/students/profile — the logged-in student's OWN profile (self-service)
 router.get("/profile", verifyToken, studentController.getProfilebyUserID);
 
+// GET /api/students/public/batches — batches offered on the public registration form, read from the database
+router.get("/public/batches", studentController.getPublicBatches);
+
 // GET /api/students/access-check — called right after login. verifyToken itself
 // rejects a graduated student with 403 { code: "ACCESS_REVOKED" }, so reaching
 // the controller means the account is allowed in (or is blocked, reported here).

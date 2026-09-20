@@ -12,6 +12,8 @@
 const supabase = require("../config/supabase");
 const attendanceService = require("./attendance.service");
 const testsService = require("./tests.service");
+const { signKey } = require("./questionImages.service");
+const { serializeQuestion } = require("../utils/mcqQuestion");
 
 function badRequest(message) {
   return Object.assign(new Error(message), { status: 400 });
@@ -290,22 +292,20 @@ async function getMyAttemptDetail(testId, authUserId) {
       myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
     }
 
-    base.questions = ids
-      .map((id) => byId[id])
-      .filter(Boolean)
-      .map((q) => ({
+    // Each question/option is text or an image; images are delivered as
+    // short-lived signed URLs (raw storage keys are never sent to students).
+    base.questions = [];
+    for (const q of ids.map((id) => byId[id]).filter(Boolean)) {
+      base.questions.push({
         id: q.id,
-        questionText: q.question_text,
-        optionA: q.option_a,
-        optionB: q.option_b,
-        optionC: q.option_c,
-        optionD: q.option_d,
+        ...(await serializeQuestion(q, signKey)),
         marks: q.marks,
         selectedOption: myAnswers[q.id]?.selected_option || null,
         // Only revealed once the attempt is fully evaluated:
         correctOption: attempt.status === "evaluated" ? q.correct_option : undefined,
         isCorrect: attempt.status === "evaluated" ? myAnswers[q.id]?.is_correct ?? false : undefined,
-      }));
+      });
+    }
   } else {
     base.descriptive = {
       questionText: test.question_text,
@@ -460,22 +460,18 @@ async function adminGetAttemptDetail(testId, attemptId) {
     const { data: answers } = await supabase.from("test_answers").select("*").eq("attempt_id", attempt.id);
     const answerByQ = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
 
-    base.questions = ids
-      .map((id) => byId[id])
-      .filter(Boolean)
-      .map((q) => ({
+    base.questions = [];
+    for (const q of ids.map((id) => byId[id]).filter(Boolean)) {
+      base.questions.push({
         id: q.id,
-        questionText: q.question_text,
-        optionA: q.option_a,
-        optionB: q.option_b,
-        optionC: q.option_c,
-        optionD: q.option_d,
+        ...(await serializeQuestion(q, signKey)),
         correctOption: q.correct_option,
         marks: q.marks,
         selectedOption: answerByQ[q.id]?.selected_option || null,
         isCorrect: answerByQ[q.id]?.is_correct ?? false,
         marksAwarded: answerByQ[q.id]?.marks_awarded ?? 0,
-      }));
+      });
+    }
   } else {
     base.descriptive = {
       questionText: test.question_text,

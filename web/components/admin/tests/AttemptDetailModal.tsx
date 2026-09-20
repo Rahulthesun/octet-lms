@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { fetchAdminAttemptDetail, gradeDescriptiveAttempt, type AdminAttemptDetail, type TestSummary } from '@/hooks/useTests'
 import { CheckCircleIcon, XIcon } from './icons'
+import QuestionContent from '@/components/shared/QuestionContent'
 
 const ACCENT = '#5B21B6'
 
@@ -89,16 +90,19 @@ export default function AttemptDetailModal({ test, attemptId, onClose, onGraded 
                   {detail.questions.map((q, i) => (
                     <div key={q.id} className="rounded-lg border border-zinc-200 p-4">
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <p className="text-[15px] text-zinc-900"><span className="text-zinc-400 mr-1">Q{i + 1}.</span>{q.questionText}</p>
+                        <div className="text-[15px] text-zinc-900 min-w-0">
+                          <span className="text-zinc-400 mr-1">Q{i + 1}.</span>
+                          <QuestionContent q={q} field="question" alt={`Question ${i + 1}`} />
+                        </div>
                         {q.isCorrect ? (
                           <span className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700"><CheckCircleIcon className="w-3.5 h-3.5" /> {q.marksAwarded}/{q.marks}</span>
                         ) : (
                           <span className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-700"><XIcon className="w-3.5 h-3.5" /> 0/{q.marks}</span>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         {(['a', 'b', 'c', 'd'] as const).map((key) => {
-                          const text = { a: q.optionA, b: q.optionB, c: q.optionC, d: q.optionD }[key]
+                          const field = `option${key.toUpperCase()}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'
                           const isCorrect = q.correctOption === key
                           const isSelected = q.selectedOption === key
                           return (
@@ -108,7 +112,8 @@ export default function AttemptDetailModal({ test, attemptId, onClose, onGraded 
                                 : isSelected ? 'border-rose-300 bg-rose-50 text-rose-800'
                                 : 'border-zinc-200 text-zinc-600'
                               }`}>
-                              <span className="font-semibold mr-1">{key.toUpperCase()}.</span>{text}
+                              <span className="font-semibold mr-1">{key.toUpperCase()}.</span>
+                              <QuestionContent q={q} field={field} alt={`Option ${key.toUpperCase()} of question ${i + 1}`} />
                               {isSelected && !isCorrect && <span className="ml-1.5 text-xs">(student's answer)</span>}
                               {isCorrect && <span className="ml-1.5 text-xs">(correct)</span>}
                             </div>

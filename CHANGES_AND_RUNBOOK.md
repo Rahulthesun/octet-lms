@@ -160,3 +160,30 @@ Verify on production: log in as Mr. Raju, toggle guest mode on and off several t
    date passes, repeat with the marksheet (upload and manual entry).
 5. Create an online class, an attendance session and a test with All Students; confirm every active student sees
    them once and the alumnus does not.
+
+---
+
+# Change set 2: Question bank and image questions
+
+## Setup
+1. Run `api/sql/question_bank_and_image_questions.sql` in the Supabase SQL editor (staging first). It adds the
+   `question_bank` table, the image columns on `test_questions`, and back-fills the bank from every existing test.
+2. The R2 bucket CORS from section 0 must allow PUT from the web origin (question images upload from the browser).
+3. Optional: `POST /api/question-bank/backfill` re-runs the back-fill (idempotent).
+
+## What was built
+- MCQ creator is image-first for the question and each of the four options. Ctrl+V / Cmd+V a screenshot, drag and
+  drop, or click to choose. Images are resized to at most 1600 px wide and encoded as WebP (PNG fallback) in the
+  browser, then uploaded straight to R2 with a presigned URL. A small toggle per field switches it to plain text.
+  Preview, Replace and Remove are available; a question or option with neither image nor text is rejected in the
+  UI and by the API.
+- Students see images (test screen, results, answer review) and admins see them in attempt review, all through
+  6-hour signed URLs, responsive on mobile. Storage keys are never sent to students. Grading is unchanged (compares
+  the chosen option letter).
+- Question bank: every question is saved automatically when a test's questions are written, grouped under the test
+  title. "Import from question bank" in the test creator lists past tests (with search), shows their questions,
+  and imports selected questions or a whole test as independent copies. Copies can be edited or deleted freely; the
+  source is kept only as a tracking reference (`test_questions.bank_question_id`).
+- Deleting a test never deletes bank rows (`source_test_id` is deliberately not a foreign key) and does not delete
+  question images. The same question is never stored twice (unique content hash, matched between JS and SQL).
+- Old text-only tests are untouched: all new type columns default to `text`.

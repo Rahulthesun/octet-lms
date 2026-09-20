@@ -70,6 +70,15 @@ router.post("/:id/attempts/:attemptId/grade", verifyToken, adminOnly, attemptsCt
 
 // ─── Admin: test authoring ─────────────────────────────────────
 
+// POST /api/tests/question-images/upload-url   → presigned R2 PUT URL for a pasted question/option image
+router.post("/question-images/upload-url", verifyToken, adminOnly, async (req, res) => {
+  try {
+    res.status(200).json(await require("../services/questionImages.service").createUploadUrl(req.body || {}));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // POST /api/tests/:id/question-file            → upload/replace the descriptive question paper
 router.post("/:id/question-file", verifyToken, adminOnly, upload.single("file"), handleUploadError, testsCtrl.uploadQuestionFile);
 

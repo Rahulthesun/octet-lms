@@ -2,9 +2,9 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useAdminTests, useAdminAttempts, type TestSummary, type CreateTestInput } from '@/hooks/useTests'
+import { useAdminTests, useAdminAttempts, type TestSummary } from '@/hooks/useTests'
 import { useBatches } from '@/hooks/useAttendanceData'
-import ScheduleTestModal from '@/components/admin/tests/ScheduleTestModal'
+import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
 import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon } from '@/components/admin/tests/icons'
 
@@ -174,20 +174,15 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
 export default function AdminTestsPage() {
   const { batches } = useBatches('all')
   const [batchFilter, setBatchFilter] = useState('')
-  const { tests, loading, error, createTest, deleteTest, uploadQuestionFile, uploadAnswerKeyFile } =
+  const { tests, loading, error, deleteTest, uploadQuestionFile, uploadAnswerKeyFile } =
     useAdminTests(batchFilter ? { batchId: batchFilter } : undefined)
 
-  const [showSchedule, setShowSchedule] = useState(false)
   const [openTestId, setOpenTestId] = useState<string | null>(null)
 
   const withWindow = useMemo(() => tests.map((t) => ({ test: t, window: windowOf(t) })), [tests])
   const live = withWindow.filter((x) => x.window === 'live')
   const upcoming = withWindow.filter((x) => x.window === 'upcoming')
   const ended = withWindow.filter((x) => x.window === 'ended')
-
-  async function handleCreate(input: CreateTestInput) {
-    await createTest(input)
-  }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this test? This removes all student attempts and cannot be undone.')) return
@@ -208,12 +203,12 @@ export default function AdminTestsPage() {
           <h1 className="text-2xl font-semibold text-zinc-900">Tests</h1>
           <p className="text-[15px] text-zinc-500 mt-1">Schedule MCQ and descriptive tests, and grade student answers.</p>
         </div>
-        <button onClick={() => setShowSchedule(true)}
+        <Link href="/admin/tests/new"
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-[15px] transition-colors w-fit"
           style={{ backgroundColor: ACCENT }}>
           <ClockIcon className="w-4 h-4" />
           Schedule New Test
-        </button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -294,9 +289,6 @@ export default function AdminTestsPage() {
         )}
       </div>
 
-      <AnimatePresence>
-        {showSchedule && <ScheduleTestModal onClose={() => setShowSchedule(false)} onCreate={handleCreate} />}
-      </AnimatePresence>
     </div>
   )
 }

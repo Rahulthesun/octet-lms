@@ -68,6 +68,21 @@ exports.bulkGraduationDate = async (req, res) => {
   }
 };
 
+/** Public (no login): the batches a prospective student can pick on the registration form. */
+exports.getPublicBatches = async (req, res) => {
+  try {
+    const supabase = require("../config/supabase");
+    const { data, error } = await supabase
+      .from("batches")
+      .select("id, name, days, start_time, end_time")
+      .order("name", { ascending: true });
+    if (error) throw error;
+    res.json({ batches: data || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.getPendingStudents = async (req, res) => {
   try {
     const result = await studentService.getPendingStudents();

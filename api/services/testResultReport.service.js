@@ -56,7 +56,8 @@ async function buildReportData(attemptId) {
       .map((id) => byId[id])
       .filter(Boolean)
       .map((q) => ({
-        questionText: q.question_text,
+        // Image questions have no text; the emailed report says so instead of showing a blank.
+        questionText: q.question_type === "image" ? "Question shown as an image" : q.question_text,
         correctOption: q.correct_option,
         marks: q.marks,
         selectedOption: answerByQ[q.id]?.selected_option || null,

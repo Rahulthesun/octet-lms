@@ -481,7 +481,10 @@ async function rejectStudent(id, reason) {
 
 // ========================= GET /students/batch/:batchId =========================
 async function getStudentsByBatch(batchId) {
-    if (!["MORNING", "EVENING", "NIGHT"].includes(batchId)) {
+    // Valid batches come from the database (Morning, Evening, Night, Test Batch, ...).
+    const { data: batch, error: batchErr } = await supabase.from("batches").select("id").eq("id", batchId).maybeSingle();
+    if (batchErr) throw batchErr;
+    if (!batch) {
         throw new Error("Invalid batch");
     }
     const { data, error } = await excludeGraduated(
@@ -499,14 +502,17 @@ async function getStudentsByBatch(batchId) {
 async function getDashboardStats() {
     // Active students only — graduated students are counted under Alumni.
     const count = (build) => build(excludeGraduated(supabase.from("students").select("*", { count: "exact", head: true })));
-    const [total, pending, approved, rejected, morning, evening, night, online, offline, hybrid] = await Promise.all([
+    const { data: batchRows, error: batchListErr } = await supabase.from("batches").select("id").order("id");
+    if (batchListErr) throw batchListErr;
+    const batchIds = (batchRows || []).map((b) => b.id);
+    const batchCounts = await Promise.all(
+        batchIds.map((id) => count((q) => q.eq("preferred_batch", id).eq("status", "APPROVED")))
+    );
+    const [total, pending, approved, rejected, online, offline, hybrid] = await Promise.all([
         count((q) => q),
         count((q) => q.eq("status", "PENDING")),
         count((q) => q.eq("status", "APPROVED")),
         count((q) => q.eq("status", "REJECTED")),
-        count((q) => q.eq("preferred_batch", "MORNING").eq("status", "APPROVED")),
-        count((q) => q.eq("preferred_batch", "EVENING").eq("status", "APPROVED")),
-        count((q) => q.eq("preferred_batch", "NIGHT").eq("status", "APPROVED")),
         count((q) => q.eq("learning_mode", "ONLINE").eq("status", "APPROVED")),
         count((q) => q.eq("learning_mode", "OFFLINE").eq("status", "APPROVED")),
         count((q) => q.eq("learning_mode", "HYBRID").eq("status", "APPROVED")),
@@ -518,7 +524,7 @@ async function getDashboardStats() {
             pending: pending.count,
             approved: approved.count,
             rejected: rejected.count,
-            by_batch: { MORNING: morning.count, EVENING: evening.count, NIGHT: night.count },
+            by_batch: Object.fromEntries(batchIds.map((id, i) => [id, batchCounts[i].count])),
             by_mode: { ONLINE: online.count, OFFLINE: offline.count, HYBRID: hybrid.count }
         }
     };

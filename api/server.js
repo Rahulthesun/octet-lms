@@ -85,6 +85,7 @@ const testsRouter = require("./routes/tests.routes");
 const videoAnalyticsRouter = require("./routes/videoAnalytics.routes");
 const notificationsRouter = require("./routes/notifications.routes");
 const alumniRouter = require("./routes/alumni.routes");
+const questionBankRouter = require("./routes/questionBank.routes");
 const examDocumentsRouter = require("./routes/examDocuments.routes");
 const { startAlumniScheduler } = require("./services/alumniScheduler.service");
 const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
@@ -124,6 +125,7 @@ app.use("/api/tests", testsRouter);
 app.use("/api/video-analytics", videoAnalyticsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/alumni", alumniRouter);
+app.use("/api/question-bank", questionBankRouter);
 app.use("/api/exam-documents", examDocumentsRouter);
 
 app.use("/api/security" , securityRouter)
