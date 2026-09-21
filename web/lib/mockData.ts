@@ -379,65 +379,6 @@ export const performanceHistory = [
   { test: 'Redox Reactions', score: 90, date: 'Dec 5' },
 ]
 
-export const landingReviews = [
-  {
-    id: 'r1',
-    name: 'Priya Venkataraman',
-    role: 'Parent of 12th Grade Student',
-    text: 'My daughter went from dreading chemistry to scoring 95 in her boards. Chemistry@OCTET is nothing short of miraculous.',
-    rating: 5,
-  },
-  {
-    id: 'r2',
-    name: 'Karthik Subramanian',
-    role: '12th Grade Student',
-    text: 'The way complex reactions are broken down here made everything click. Never thought I\'d say this — I actually love chemistry now!',
-    rating: 5,
-  },
-  {
-    id: 'r3',
-    name: 'Meena Rajesh',
-    role: 'Parent of 11th Grade Student',
-    text: 'Best investment we made for our son\'s education. The notes, video lectures, and regular tests keep him consistently engaged.',
-    rating: 5,
-  },
-  {
-    id: 'r4',
-    name: 'Aditya Krishnaswamy',
-    role: '11th Grade Student',
-    text: 'The cheat sheets and formula sheets are absolute gold. Cleared my doubts in minutes that my school couldn\'t clear in months.',
-    rating: 5,
-  },
-  {
-    id: 'r5',
-    name: 'Lakshmi Narayan',
-    role: 'Parent of 12th Grade Student',
-    text: 'Transparent tracking of attendance and test performance — I always know exactly where my child stands. Truly professional.',
-    rating: 5,
-  },
-  {
-    id: 'r6',
-    name: 'Sneha Padmanabhan',
-    role: '12th Grade Student',
-    text: 'Electrochemistry was my nightmare. After Chemistry@OCTET, it\'s my strongest chapter. The explanations are just unmatched.',
-    rating: 5,
-  },
-  {
-    id: 'r7',
-    name: 'Rajan Iyer',
-    role: 'Parent of 11th Grade Student',
-    text: 'The structured approach to teaching organic chemistry is phenomenal. My child\'s confidence has skyrocketed.',
-    rating: 5,
-  },
-  {
-    id: 'r8',
-    name: 'Divya Chandrasekhar',
-    role: '12th Grade Student',
-    text: 'I joined just 4 months before boards and still managed to score 91. The team at Chemistry@OCTET is incredible.',
-    rating: 5,
-  },
-]
-
 export const landingCourses = [
   {
     id: 'lc1',
