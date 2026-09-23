@@ -174,22 +174,6 @@ function AnimatedLogoWatermark({
         {/* animated (throttled to ~20fps internally) — every other logo instance
             on this page stays static; this is the only live one */}
         <ChemistryOctetLogo size={LOGO_SIZE} />
-        {studentToken && (
-          <div
-            style={{
-              marginTop: 6,
-              textAlign: "center",
-              fontFamily: '"DM Sans", "Inter", sans-serif',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              color: "#4B2D8F",
-              textShadow: "0 1px 2px rgba(255,255,255,0.6)",
-            }}
-          >
-            Chemistry@OCTET · {studentToken}
-          </div>
-        )}
       </div>
     </div>
   );
