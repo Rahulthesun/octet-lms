@@ -22,6 +22,7 @@ const supabase = require("../config/supabase");
 const attendanceService = require("./attendance.service");
 const attendanceSettingsService = require("./attendanceSettings.service");
 const googleMeet = require("./googleMeet.service");
+const { applyActiveStudentFilter } = require("../utils/graduation");
 const { calculateAttendedMinutes, calculatePercentage, classifyAttendance } = require("../utils/meetInterval");
 
 const MAX_AUTO_ATTEMPTS = 5; // after this many failed automatic attempts, only a manual "Retry Sync" tries again
@@ -58,7 +59,7 @@ async function syncClassAttendance(classId) {
 
   const sessionDate = isoToDateInZone(onlineClass.scheduled_start, onlineClass.timezone);
   const session = await attendanceService.getOrCreateSessionForOnlineClass(
-    onlineClass.batch_id,
+    onlineClass.audience === "ALL" ? "ALL" : onlineClass.batch_id,
     sessionDate,
     onlineClass.id
   );
@@ -88,11 +89,22 @@ async function syncClassAttendance(classId) {
     const participants = await googleMeet.listParticipantSessions(onlineClass.created_by, conferenceRecord.name);
 
     // Full expected roster: batch enrollment + any explicitly-added extra students.
-    const { data: enrollments, error: enrollErr } = await supabase
-      .from("batch_enrollments")
-      .select("student_id, students(id, name, admission_number, google_user_id)")
-      .eq("batch_id", onlineClass.batch_id);
-    if (enrollErr) throw enrollErr;
+    // All Students classes (batch_id null) expect every active student.
+    let enrollments = [];
+    if (onlineClass.audience === "ALL") {
+      const { data: activeStudents, error: activeErr } = await applyActiveStudentFilter(
+        supabase.from("students").select("id, name, admission_number, google_user_id")
+      );
+      if (activeErr) throw activeErr;
+      enrollments = (activeStudents || []).map((s) => ({ student_id: s.id, students: s }));
+    } else {
+      const enrollRes = await supabase
+        .from("batch_enrollments")
+        .select("student_id, students(id, name, admission_number, google_user_id)")
+        .eq("batch_id", onlineClass.batch_id);
+      if (enrollRes.error) throw enrollRes.error;
+      enrollments = enrollRes.data || [];
+    }
 
     const { data: extraLinks, error: extraErr } = await supabase
       .from("online_class_attendees")

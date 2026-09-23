@@ -57,6 +57,12 @@ type Section = 'qr' | 'summary'
 
 const GRADES = ['12th'] as const
 
+// "All Students" is not a real batch: the id 'ALL' tells the API to use every
+// active student, resolved at the moment of use. It is selected instead of
+// (never together with) a batch.
+const ALL_STUDENTS_ID = 'ALL'
+const ALL_STUDENTS_BATCH = { id: ALL_STUDENTS_ID, name: 'All Students', mode: null, meet_link: null } as const
+
 // ─── Status config — readable text/bg pairs, no white-on-light-tint ──────────
 
 const STATUS = {
@@ -294,7 +300,10 @@ export default function AttendancePage() {
   const [selectedStudentIdForScan, setSelectedStudentIdForScan] = useState('')
 
   const { batches, addBatch } = useBatches(selectedGrade)
-  const selectedBatch = batches.find(b => b.id === selectedBatchId) ?? null
+  const isAllStudents = selectedBatchId === ALL_STUDENTS_ID
+  const selectedBatch = isAllStudents
+    ? (ALL_STUDENTS_BATCH as unknown as (typeof batches)[number])
+    : (batches.find(b => b.id === selectedBatchId) ?? null)
 
   const { students, refetch: refetchStudents } = useBatchStudents(selectedBatchId, date)
   const { summary } = useBatchSummary(selectedBatchId)
@@ -341,7 +350,7 @@ export default function AttendancePage() {
   }
 
   async function handleToggleUnblock(s: Student) {
-    if (!selectedBatchId) return
+    if (!selectedBatchId || isAllStudents) return
     try {
       await overrideStudentBlock(s.id, selectedBatchId, !s.unblocked)
       refetchStudents()
@@ -410,6 +419,15 @@ export default function AttendancePage() {
                 {g}
               </button>
             ))}
+            <button
+              onClick={() => { setSelectedGrade('All students'); setSelectedBatchId(ALL_STUDENTS_ID); setAddingBatch(false) }}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                isAllStudents ? 'text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+              style={isAllStudents ? { backgroundColor: ACCENT } : undefined}
+            >
+              All Students
+            </button>
           </div>
         </div>
 
@@ -532,7 +550,7 @@ export default function AttendancePage() {
                   </button>
                 ))}
               </div>
-              {activeSection === 'qr' && (
+              {activeSection === 'qr' && !isAllStudents && (
                 <button
                   onClick={() => setShowAddStudents(true)}
                   className="text-xs px-3 py-1.5 text-white rounded-md mb-1 transition-colors"
@@ -572,7 +590,7 @@ export default function AttendancePage() {
                 <div className="text-center">
                   <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-zinc-400 mb-2">Live Session</p>
                   <p className="text-zinc-900 text-lg font-semibold">
-                    {selectedGrade} · {selectedBatch?.name}
+                    {isAllStudents ? 'All Students' : `${selectedGrade} · ${selectedBatch?.name}`}
                     {selectedBatch?.mode && (
                       <span className="ml-2 align-middle text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500">
                         {selectedBatch.mode}
@@ -795,7 +813,7 @@ export default function AttendancePage() {
 
                         {/* Actions */}
                         <div className="flex sm:justify-end gap-1.5 pl-[22px] sm:pl-0">
-                          {(isBlocked || s.unblocked) && (
+                          {!isAllStudents && (isBlocked || s.unblocked) && (
                             <button
                               onClick={() => handleToggleUnblock(s)}
                               className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
@@ -826,7 +844,7 @@ export default function AttendancePage() {
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showAddStudents && selectedGrade && selectedBatchId && (
+        {showAddStudents && selectedGrade && selectedBatchId && !isAllStudents && (
           <AddStudentsModal
             grade={selectedGrade}
             batchId={selectedBatchId}

@@ -332,9 +332,11 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
   // carries a real `grade` field, so deriving one from the selected batch is
   // always empty and silently keeps the list from ever loading. Pass a fixed
   // truthy placeholder instead so the fetch fires as soon as a batch is picked.
+  // "All Students" already includes every active student, so there is nothing to add individually.
+  const isAllStudents = batchId === 'ALL'
   const { students: eligibleStudents, loading: loadingEligible } = useEligibleStudents(
-    batchId ? 'all' : null,
-    batchId || null
+    batchId && !isAllStudents ? 'all' : null,
+    batchId && !isAllStudents ? batchId : null
   )
 
   // Dropdown only ever offers students not already added, narrowed live by
@@ -484,13 +486,19 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
               className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
             >
               <option value="">Select a batch…</option>
+              <option value="ALL">All Students</option>
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            {isAllStudents && (
+              <p className="text-sm text-zinc-500 mt-2">
+                Every active student is invited, including students added later. Choose a single batch instead to limit it.
+              </p>
+            )}
           </div>
 
-          {batchId && (
+          {batchId && !isAllStudents && (
             <div>
               <button
                 type="button"
@@ -801,7 +809,12 @@ export default function OnlineClassesPage() {
       setBanner('Google account connected successfully.')
       router.replace('/admin/online-classes')
     } else if (google === 'error') {
-      setBanner('Could not connect the Google account. Please try again.')
+      const reason = searchParams.get('reason')
+      setBanner(
+        reason === 'access_denied'
+          ? 'Google blocked the connection (access denied). This Google account is not yet approved for the app. Ask the developer to add it as a test user in the Google Cloud consent screen, or complete Google verification.'
+          : 'Could not connect the Google account. Please try again.'
+      )
       router.replace('/admin/online-classes')
     }
   }, [searchParams, router])

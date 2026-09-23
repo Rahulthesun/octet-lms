@@ -30,6 +30,59 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 
+const alumniService = require("../services/alumni.service");
+
+/** GET /api/students/access-check — see routes file for the contract. */
+exports.accessCheck = async (req, res) => {
+  try {
+    const role = req.user?.app_metadata?.role;
+    if (role === "admin" || role === "developer" || role === "both") {
+      return res.json({ ok: true, role, blocked: false });
+    }
+    const access = await alumniService.getStudentAccessState(req.user.id);
+    if (!access.found) return res.status(404).json({ ok: false, error: "No student record found. Please contact the administrator." });
+    return res.json({ ok: true, role: "student", blocked: access.blocked });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+};
+
+exports.setGraduationDate = async (req, res) => {
+  try {
+    const result = await alumniService.setGraduationDate(req.params.id, req.body.graduationDate || null, req.user.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(error.status || 500).json({ success: false, error: error.message });
+  }
+};
+
+exports.bulkGraduationDate = async (req, res) => {
+  try {
+    const result = await alumniService.bulkSetGraduationDate(
+      { batchId: req.body.batchId, studentIds: req.body.studentIds, graduationDate: req.body.graduationDate },
+      req.user.id
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(error.status || 500).json({ success: false, error: error.message });
+  }
+};
+
+/** Public (no login): the batches a prospective student can pick on the registration form. */
+exports.getPublicBatches = async (req, res) => {
+  try {
+    const supabase = require("../config/supabase");
+    const { data, error } = await supabase
+      .from("batches")
+      .select("id, name, days, start_time, end_time")
+      .order("name", { ascending: true });
+    if (error) throw error;
+    res.json({ batches: data || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.getPendingStudents = async (req, res) => {
   try {
     const result = await studentService.getPendingStudents();

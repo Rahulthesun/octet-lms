@@ -125,6 +125,27 @@ router.post("/:id/heartbeat",
   videoController.heartbeat
 );
 
+// POST  /api/content/video/:id/watch-events/start
+// Any authenticated user — opens a new discrete watch "sitting"
+router.post("/:id/watch-events/start",
+  verifyToken,
+  videoController.startWatchEvent
+);
+
+// POST  /api/content/video/:id/watch-events/:eventId
+// Any authenticated user — updates progress + bucket hits for an open sitting
+router.post("/:id/watch-events/:eventId",
+  verifyToken,
+  videoController.updateWatchEvent
+);
+
+// POST  /api/content/video/:id/watch-events/:eventId/end
+// Any authenticated user — closes a sitting (pause/unmount/tab-close)
+router.post("/:id/watch-events/:eventId/end",
+  verifyToken,
+  videoController.endWatchEvent
+);
+
 // GET   /api/content/video/:id/analytics
 // Admin only — per-video engagement stats for the dashboard
 router.get("/:id/analytics",

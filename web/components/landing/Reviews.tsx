@@ -1,9 +1,13 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { landingReviews } from '@/lib/mockData'
+import testimonials from '@/content/testimonials.json'
+import SectionDecor from '@/components/landing/SectionDecor'
 
 const accentColors = ['#e9deb5', '#daeae4', '#d4c5e2', '#c8e0da', '#f0e8f8', '#daeae4', '#e9deb5', '#c8e0da']
+
+type Testimonial = { id: string; text: string; name?: string; role?: string; rating?: number }
+const landingReviews: Testimonial[] = testimonials
 
 function StarRating({ count }: { count: number }) {
   return (
@@ -22,21 +26,23 @@ function ReviewCard({ review }: { review: typeof landingReviews[0] }) {
   const color = accentColors[colorIdx % accentColors.length]
 
   return (
-    <div className="relative shrink-0 bg-white border border-accent3/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden" style={{ width: 340 }}>
+    <div className="relative shrink-0 w-[min(340px,82vw)] bg-white border border-accent3/60 rounded-2xl p-7 shadow-[0_2px_16px_rgba(94,64,117,0.06)] mx-3 overflow-hidden">
       {/* Colored corner accent */}
       <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-3xl opacity-50" style={{ backgroundColor: color }} />
       <div className="relative z-10">
-        <StarRating count={review.rating} />
-        <p className="text-primary text-[15px] leading-relaxed mt-4 mb-5">&ldquo;{review.text}&rdquo;</p>
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full flex items-center justify-center text-primary text-base shrink-0 border border-accent3/40" style={{ backgroundColor: color }}>
-            {review.name.charAt(0)}
+        {review.rating ? <StarRating count={review.rating} /> : null}
+        <p className="text-primary text-[15px] leading-relaxed mb-5">&ldquo;{review.text}&rdquo;</p>
+        {review.name && (
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center text-primary text-base shrink-0 border border-accent3/40" style={{ backgroundColor: color }}>
+              {review.name.charAt(0)}
+            </div>
+            <div>
+              <p className="text-primary text-base">{review.name}</p>
+              {review.role && <p className="text-muted text-[14px]">{review.role}</p>}
+            </div>
           </div>
-          <div>
-            <p className="text-primary text-base">{review.name}</p>
-            <p className="text-muted text-[14px]">{review.role}</p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )
@@ -60,12 +66,15 @@ function MarqueeRow({ reviews, direction = 1, speed = 40 }: { reviews: typeof la
 }
 
 export default function Reviews() {
-  const firstRow = landingReviews.slice(0, 4)
-  const secondRow = landingReviews.slice(4)
+  // Split the list evenly across the two scrolling rows, whatever its length.
+  const half = Math.ceil(landingReviews.length / 2)
+  const firstRow = landingReviews.slice(0, half)
+  const secondRow = landingReviews.slice(half)
 
   return (
-    <section id="reviews" className="py-24 overflow-hidden" style={{ backgroundColor: '#f0ebe8' }}>
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="reviews" className="relative py-18 overflow-hidden section-fx" style={{ backgroundColor: '#e7dff0' }}>
+      <SectionDecor variant={4} />
+      <div className="relative z-10 max-w-7xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -74,7 +83,7 @@ export default function Reviews() {
           className="text-center mb-14"
         >
           <p className="text-[14px] tracking-[0.25em] text-muted uppercase mb-3">What People Say</p>
-          <h2 className="text-3xl md:text-4xl text-primary mb-4 whitespace-nowrap">
+          <h2 className="text-3xl md:text-4xl text-primary mb-4">
             Real Students. Real Parents. <span className="text-muted">Real Results.</span>
           </h2>
         </motion.div>
@@ -85,7 +94,7 @@ export default function Reviews() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.7, delay: 0.2 }}
-        className="space-y-5"
+        className="relative z-10 space-y-5"
       >
         <MarqueeRow reviews={firstRow} direction={1} speed={45} />
         <MarqueeRow reviews={secondRow} direction={-1} speed={50} />

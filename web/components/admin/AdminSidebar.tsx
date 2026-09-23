@@ -7,6 +7,7 @@ import { canAccessPage } from "@/lib/pageStatus";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useGuestMode } from "@/hooks/useGuestMode";
 import GuestModeSwitch from "@/components/shared/GuestModeSwitch";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 
 import ChemistryOctetLogo from "@/components/ui/ChemistryOctetLogo";
 
@@ -14,7 +15,6 @@ const navItems = [
   {
     href: "/admin",
     label: "Dashboard",
-    status: "testing",
     icon: (
       <svg
         className="w-5.5 h-5.5 shrink-0"
@@ -194,6 +194,30 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/admin/exams",
+    label: "Exam Documents",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 5,2.5 L 12,2.5 L 16,6.5 L 16,17.5 L 5,17.5 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 12,2.5 L 12,6.5 L 16,6.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M 8,10.5 L 13,10.5 M 8,13.5 L 11.5,13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/alumni",
+    label: "Alumni",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 10,3 L 18,7 L 10,11 L 2,7 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 5,9 L 5,13 C 5,14.5 7.2,15.5 10,15.5 C 12.8,15.5 15,14.5 15,13 L 15,9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 18,7 L 18,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 interface AdminSidebarProps {
@@ -209,6 +233,7 @@ export default function AdminSidebar({
   const router = useRouter();
   const { role } = useUserRole()
   const { guestMode, setGuestMode } = useGuestMode()
+  const { count: unreadCount } = useUnreadNotificationCount()
 
 
   const visibleNavItems = navItems.filter((item) => canAccessPage(role, item.href))
@@ -225,7 +250,7 @@ export default function AdminSidebar({
   };
   const handleEnterGuestMode = () => {
     setGuestMode(true);
-    router.push("/student/notes");
+    router.push("/student");
   };
 
   
@@ -353,6 +378,51 @@ export default function AdminSidebar({
               <GuestModeSwitch checked={guestMode} onChange={handleEnterGuestMode} />
             </div>
           )
+        )}
+
+        {/* Notifications — above Sign out, per the in-app inbox requirement */}
+        {collapsed ? (
+          <Link
+            href="/admin/notifications"
+            className={`relative group w-full h-12 flex items-center justify-center border-l-2 transition-colors ${
+              isActive("/admin/notifications")
+                ? "border-primary bg-[#f5f0fa] text-primary"
+                : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2.5c-2.5 0-4.5 2-4.5 4.5v2.5L4 12.5v1h12v-1l-1.5-3V7c0-2.5-2-4.5-4.5-4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M8 15.5a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-3 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 text-center font-inter">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+            <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-gray-900 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              Notifications
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/admin/notifications"
+            className={`flex items-center gap-3 px-4 py-2.5 border-l-2 transition-colors group ${
+              isActive("/admin/notifications")
+                ? "border-primary bg-[#f5f0fa] text-primary"
+                : "border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2.5c-2.5 0-4.5 2-4.5 4.5v2.5L4 12.5v1h12v-1l-1.5-3V7c0-2.5-2-4.5-4.5-4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M8 15.5a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="text-lg whitespace-nowrap flex-1">Notifications</span>
+            {unreadCount > 0 && (
+              <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs leading-5 text-center font-inter">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Link>
         )}
 
         {/* My Profile */}

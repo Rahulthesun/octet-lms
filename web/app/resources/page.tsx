@@ -11,12 +11,7 @@ import {
   IconCalendar,
   IconStar,
 } from '@/components/ui/SvgIcons'
-import {
-  AtomSVG,
-  FlaskSVG,
-  CompoundSVG,
-  MicroscopeSVG,
-} from '@/components/ui/PencilSVGs'
+import { FlaskSVG } from '@/components/ui/PencilSVGs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -557,78 +552,8 @@ export default function ResourcesPage() {
     <main className="bg-bg min-h-screen">
       <Navbar />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
-        <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
-          <MicroscopeSVG width={180} height={180} color="#5e4075" />
-        </div>
-        <div className="absolute bottom-8 right-10 opacity-[0.07] pointer-events-none">
-          <AtomSVG width={220} height={220} color="#5e4075" />
-        </div>
-        <div className="absolute top-48 right-[20%] opacity-[0.05] pointer-events-none">
-          <CompoundSVG width={130} height={130} color="#5e4075" />
-        </div>
-
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-2.5 mb-5"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
-              Resources &amp; Guidance
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
-          >
-            Stay Informed.
-            <br />
-            <span className="text-muted">Stay Ahead.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
-          >
-            Your one-stop chemistry guidance centre — syllabus updates, study articles, exam schedules
-            and important notifications, all in one place.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-4"
-          >
-            {[
-              { value: '5',     label: 'Exam Boards Covered' },
-              { value: '6+',   label: 'Chemistry Articles'  },
-              { value: 'Free', label: 'Access for All'       },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
-              >
-                <div className="text-xl text-primary">{s.value}</div>
-                <div className="text-[14px] text-muted">{s.label}</div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
       {/* ── Tabs + Content ───────────────────────────────────── */}
-      <section id="tab-section" className="pb-24 px-6">
+      <section id="tab-section" className="pt-32 pb-24 px-6">
         <div className="max-w-5xl mx-auto">
 
           {/* Tab Pills */}

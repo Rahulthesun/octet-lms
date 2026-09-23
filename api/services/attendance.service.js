@@ -19,6 +19,51 @@
 
 const  supabase  = require("../config/supabase");
 const crypto = require("crypto");
+const audienceService = require("./audience.service");
+const { applyActiveStudentFilter, hasGraduated, todayInTz } = require("../utils/graduation");
+
+// "All Students" is a virtual target, never a row in `batches`. Wherever a
+// batch id can be supplied, the sentinel "ALL" means "every active student,
+// resolved at the time of use" (see audience.service.js). Sessions for it
+// are stored with audience = 'ALL' and batch_id = NULL.
+const ALL_ID = audienceService.ALL_STUDENTS_TOKEN;
+const isAll = (batchId) => batchId === ALL_ID;
+
+/** PostgREST or() filter: the sessions a student can see — their batches plus every All Students session. */
+function sessionScopeFilter(batchIds) {
+  const parts = ["audience.eq.ALL"];
+  if (batchIds && batchIds.length > 0) parts.push(`batch_id.in.(${batchIds.join(",")})`);
+  return parts.join(",");
+}
+
+/** Sessions that count toward a batch: its own plus every All Students session (or only the latter for ALL). */
+function applyBatchSessionScope(query, batchId) {
+  return isAll(batchId) ? query.eq("audience", "ALL") : query.or(`batch_id.eq.${batchId},audience.eq.ALL`);
+}
+
+/**
+ * Active students on a roster: for a batch, its enrolled students (minus
+ * anyone graduated/archived); for All Students, every active student. Each
+ * student appears once however many batches they are in.
+ */
+async function getRosterStudents(batchId) {
+  const cols = "id, name, admission_number";
+  if (isAll(batchId)) {
+    const rows = await audienceService.getActiveStudents(cols);
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const { data, error } = await supabase
+    .from("batch_enrollments")
+    .select("student_id, students(id, name, admission_number, status, is_alumni, graduation_date)")
+    .eq("batch_id", batchId);
+  if (error) throw error;
+  const today = todayInTz();
+  const map = new Map();
+  (data || []).forEach((e) => {
+    if (e.students && !hasGraduated(e.students, today) && !map.has(e.students.id)) map.set(e.students.id, e.students);
+  });
+  return [...map.values()];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +181,7 @@ async function createBatch({ id, name, mode, days, start_time, end_time, meet_li
 // ─── Batch existence guard ────────────────────────────────────────────────────
 
 async function assertBatchExists(batchId) {
+  if (isAll(batchId)) return; // virtual target — always exists
   const { data, error } = await supabase
     .from("batches")
     .select("id")
@@ -159,22 +205,18 @@ async function assertBatchExists(batchId) {
 async function getBatchStudents(batchId) {
   await assertBatchExists(batchId);
 
-  // 1. Enrolled students
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, admission_number)")
-    .eq("batch_id", batchId);
-
-  if (enrollErr) throw enrollErr;
-  if (!enrollments || enrollments.length === 0) return [];
+  // 1. Active students on this roster (graduated/archived students excluded)
+  const rosterStudents = await getRosterStudents(batchId);
+  const enrollments = rosterStudents.map((s) => ({ student_id: s.id, students: s }));
+  if (enrollments.length === 0) return [];
 
   const studentIds = enrollments.map((e) => e.student_id);
 
-  // 2. All sessions for this batch
-  const { data: sessions, error: sessErr } = await supabase
-    .from("attendance_sessions")
-    .select("id")
-    .eq("batch_id", batchId);
+  // 2. All sessions that count for this batch (its own + All Students sessions)
+  const { data: sessions, error: sessErr } = await applyBatchSessionScope(
+    supabase.from("attendance_sessions").select("id"),
+    batchId
+  );
 
   if (sessErr) throw sessErr;
 
@@ -197,14 +239,17 @@ async function getBatchStudents(batchId) {
     });
   }
 
-  // 4. Manual overrides
-  const { data: overrides, error: ovErr } = await supabase
-    .from("attendance_overrides")
-    .select("student_id, unblocked")
-    .eq("batch_id", batchId)
-    .in("student_id", studentIds);
-
-  if (ovErr) throw ovErr;
+  // 4. Manual overrides (per real batch; All Students has none)
+  let overrides = [];
+  if (!isAll(batchId)) {
+    const ovRes = await supabase
+      .from("attendance_overrides")
+      .select("student_id, unblocked")
+      .eq("batch_id", batchId)
+      .in("student_id", studentIds);
+    if (ovRes.error) throw ovRes.error;
+    overrides = ovRes.data;
+  }
 
   const overrideMap = {};
   (overrides || []).forEach((o) => {
@@ -235,6 +280,7 @@ async function getBatchStudents(batchId) {
  */
 async function getEligibleStudents(batchId) {
   await assertBatchExists(batchId);
+  if (isAll(batchId)) return []; // nobody is "added" to All Students — it always includes everyone active
 
   // Already enrolled in THIS batch
   const { data: enrolled, error: enrErr } = await supabase
@@ -248,10 +294,9 @@ async function getEligibleStudents(batchId) {
 
   // All approved students not already in this batch — pending/rejected
   // applicants are never real candidates for a live class roster.
-  let query = supabase
+  let query = applyActiveStudentFilter(supabase
     .from("students")
-    .select("id, name, admission_number")
-    .eq("status", "APPROVED");
+    .select("id, name, admission_number"));
 
   if (enrolledIds.length > 0) {
     query = query.not("id", "in", `(${enrolledIds.join(",")})`);
@@ -285,6 +330,9 @@ async function getEligibleStudents(batchId) {
 // ─── Enroll students ──────────────────────────────────────────────────────────
 
 async function addStudentsToBatch(batchId, studentIds) {
+  if (isAll(batchId)) {
+    throw Object.assign(new Error("All Students is not a batch — it always includes every active student"), { status: 400 });
+  }
   await assertBatchExists(batchId);
 
   if (!Array.isArray(studentIds) || studentIds.length === 0) {
@@ -311,23 +359,16 @@ async function getTodayRoster(batchId) {
 
   const todayStr = todayDateString();
 
-  const { data: session, error: sessErr } = await supabase
+  let sessionQuery = supabase
     .from("attendance_sessions")
     .select("id, date, qr_token, expires_at, refresh_interval_seconds, created_at, source")
-    .eq("batch_id", batchId)
-    .eq("date", todayStr)
-    .maybeSingle();
+    .eq("date", todayStr);
+  sessionQuery = isAll(batchId) ? sessionQuery.eq("audience", "ALL") : sessionQuery.eq("batch_id", batchId);
+  const { data: session, error: sessErr } = await sessionQuery.maybeSingle();
 
   if (sessErr) throw sessErr;
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, admission_number)")
-    .eq("batch_id", batchId);
-
-  if (enrollErr) throw enrollErr;
-
-  const students = enrollments || [];
+  const students = (await getRosterStudents(batchId)).map((s) => ({ student_id: s.id, students: s }));
 
   let recordMap = {};
   if (session && students.length > 0) {
@@ -389,20 +430,14 @@ async function getTodayRoster(batchId) {
 async function getBatchSummary(batchId) {
   await assertBatchExists(batchId);
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id")
-    .eq("batch_id", batchId);
+  const rosterStudents = await getRosterStudents(batchId);
+  const rosterIds = new Set(rosterStudents.map((s) => s.id));
+  const totalStudents = rosterStudents.length;
 
-  if (enrollErr) throw enrollErr;
-
-  const totalStudents = enrollments?.length || 0;
-
-  const { data: sessions, error: sessErr } = await supabase
-    .from("attendance_sessions")
-    .select("id, date")
-    .eq("batch_id", batchId)
-    .order("date", { ascending: false });
+  const { data: sessions, error: sessErr } = await applyBatchSessionScope(
+    supabase.from("attendance_sessions").select("id, date"),
+    batchId
+  ).order("date", { ascending: false });
 
   if (sessErr) throw sessErr;
 
@@ -413,13 +448,14 @@ async function getBatchSummary(batchId) {
   if (totalSessions > 0 && totalStudents > 0 && sessionIds.length > 0) {
     const { data: records, error: recErr } = await supabase
       .from("attendance_records")
-      .select("present")
+      .select("student_id")
       .in("session_id", sessionIds)
       .eq("present", true);
 
     if (recErr) throw recErr;
 
-    const totalPresentMarks = records?.length || 0;
+    // Only this roster's students count (an All Students session also has records from other batches' students).
+    const totalPresentMarks = (records || []).filter((r) => rosterIds.has(r.student_id)).length;
     avgAttendancePct = Math.round((totalPresentMarks / (totalStudents * totalSessions)) * 100);
   }
 
@@ -430,12 +466,12 @@ async function getBatchSummary(batchId) {
   if (todaySession) {
     const { data: records, error: recErr } = await supabase
       .from("attendance_records")
-      .select("present")
+      .select("student_id")
       .eq("session_id", todaySession.id)
       .eq("present", true);
 
     if (recErr) throw recErr;
-    presentToday = records?.length || 0;
+    presentToday = (records || []).filter((r) => rosterIds.has(r.student_id)).length;
   }
 
   return {
@@ -445,6 +481,74 @@ async function getBatchSummary(batchId) {
     todaySessionActive: !!todaySession,
     presentToday,
     absentToday: todaySession ? totalStudents - presentToday : null,
+  };
+}
+
+/**
+ * Org-wide attendance snapshot across every batch at once — for the admin
+ * dashboard. A fixed small number of queries regardless of how many
+ * batches/sessions exist (same shape as getAttendancePercentagesForStudents
+ * below), not one query per batch.
+ */
+async function getOrgAttendanceOverview() {
+  const todayStr = todayDateString();
+
+  const { data: enrollments, error: enrollErr } = await supabase
+    .from("batch_enrollments")
+    .select("batch_id");
+  if (enrollErr) throw enrollErr;
+
+  const enrollCountByBatch = {};
+  (enrollments || []).forEach((e) => {
+    enrollCountByBatch[e.batch_id] = (enrollCountByBatch[e.batch_id] || 0) + 1;
+  });
+
+  const { data: sessions, error: sessErr } = await supabase
+    .from("attendance_sessions")
+    .select("id, batch_id, audience, date");
+  if (sessErr) throw sessErr;
+
+  const allSessions = sessions || [];
+  const activeCount = allSessions.some((s) => s.audience === "ALL")
+    ? (await audienceService.getActiveStudents("id")).length
+    : 0;
+  const todaySessions = allSessions.filter((s) => s.date === todayStr);
+  const sessionIds = allSessions.map((s) => s.id);
+
+  let avgAttendancePct = null;
+  if (sessionIds.length > 0) {
+    const totalPossible = allSessions.reduce(
+      (sum, s) => sum + (s.audience === "ALL" ? activeCount : (enrollCountByBatch[s.batch_id] || 0)),
+      0
+    );
+
+    if (totalPossible > 0) {
+      const { data: records, error: recErr } = await supabase
+        .from("attendance_records")
+        .select("id")
+        .in("session_id", sessionIds)
+        .eq("present", true);
+      if (recErr) throw recErr;
+
+      avgAttendancePct = Math.round(((records?.length || 0) / totalPossible) * 100);
+    }
+  }
+
+  let presentTodayCount = 0;
+  if (todaySessions.length > 0) {
+    const { data: records, error: recErr } = await supabase
+      .from("attendance_records")
+      .select("id")
+      .in("session_id", todaySessions.map((s) => s.id))
+      .eq("present", true);
+    if (recErr) throw recErr;
+    presentTodayCount = records?.length || 0;
+  }
+
+  return {
+    liveSessionsToday: todaySessions.length,
+    presentTodayCount,
+    avgAttendancePct,
   };
 }
 
@@ -482,13 +586,10 @@ async function setStudentOverride(studentId, batchId, unblocked) {
 async function startSession(batchId, date) {
   await assertBatchExists(batchId);
 
-  // Check existing
-  const { data: existing, error: findErr } = await supabase
-    .from("attendance_sessions")
-    .select("*")
-    .eq("batch_id", batchId)
-    .eq("date", date)
-    .maybeSingle();
+  // Check existing (an All Students session is unique per date)
+  let existingQuery = supabase.from("attendance_sessions").select("*").eq("date", date);
+  existingQuery = isAll(batchId) ? existingQuery.eq("audience", "ALL") : existingQuery.eq("batch_id", batchId);
+  const { data: existing, error: findErr } = await existingQuery.maybeSingle();
 
   if (findErr) throw findErr;
   if (existing) {
@@ -507,7 +608,8 @@ async function startSession(batchId, date) {
   const { data, error } = await supabase
     .from("attendance_sessions")
     .insert({
-      batch_id:                 batchId,
+      batch_id:                 isAll(batchId) ? null : batchId,
+      audience:                 isAll(batchId) ? "ALL" : "BATCH",
       date,
       qr_token:                 qrToken,
       expires_at:               expiresAt,
@@ -563,21 +665,17 @@ async function refreshSession(sessionId) {
 async function getRoster(sessionId) {
   const { data: session, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, batch_id, date, source")
+    .select("id, batch_id, audience, date, source")
     .eq("id", sessionId)
     .maybeSingle();
 
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, admission_number)")
-    .eq("batch_id", session.batch_id);
-
-  if (enrollErr) throw enrollErr;
-
-  const students = enrollments || [];
+  const students = (await getRosterStudents(session.audience === "ALL" ? ALL_ID : session.batch_id)).map((s) => ({
+    student_id: s.id,
+    students: s,
+  }));
 
   let recordMap = {};
   if (students.length > 0) {
@@ -667,7 +765,7 @@ async function scanQrToken(qrToken, authUserId) {
   // 2. Find the active session for this token (not expired)
   const { data: session, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, batch_id, expires_at")
+    .select("id, batch_id, audience, expires_at")
     .eq("qr_token", qrToken)
     .maybeSingle();
 
@@ -679,17 +777,22 @@ async function scanQrToken(qrToken, authUserId) {
     throw Object.assign(new Error("QR token has expired"), { status: 400 });
   }
 
-  // 4. Check enrollment
-  const { data: enrollment, error: enrErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id")
-    .eq("batch_id", session.batch_id)
-    .eq("student_id", student.id)
-    .maybeSingle();
+  // 4. Check enrollment — an All Students session admits every active student
+  if (session.audience === "ALL") {
+    const active = await audienceService.filterActiveStudentIds([student.id]);
+    if (active.length === 0) throw Object.assign(new Error("Student is not active"), { status: 403 });
+  } else {
+    const { data: enrollment, error: enrErr } = await supabase
+      .from("batch_enrollments")
+      .select("student_id")
+      .eq("batch_id", session.batch_id)
+      .eq("student_id", student.id)
+      .maybeSingle();
 
-  if (enrErr) throw enrErr;
-  if (!enrollment) {
-    throw Object.assign(new Error("Student not enrolled in this batch"), { status: 403 });
+    if (enrErr) throw enrErr;
+    if (!enrollment) {
+      throw Object.assign(new Error("Student not enrolled in this batch"), { status: 403 });
+    }
   }
 
   // 5. Mark present (upsert — idempotent if they scan twice)
@@ -716,12 +819,11 @@ async function scanQrToken(qrToken, authUserId) {
  * else in this file.
  */
 async function getOrCreateSessionForOnlineClass(batchId, date, onlineClassId) {
-  const { data: existing, error: findErr } = await supabase
-    .from("attendance_sessions")
-    .select("*")
-    .eq("batch_id", batchId)
-    .eq("date", date)
-    .maybeSingle();
+  // batchId null/"ALL" = an All Students class -> the single All Students session for that date.
+  const forAll = !batchId || isAll(batchId);
+  let findQuery = supabase.from("attendance_sessions").select("*").eq("date", date);
+  findQuery = forAll ? findQuery.eq("audience", "ALL") : findQuery.eq("batch_id", batchId);
+  const { data: existing, error: findErr } = await findQuery.maybeSingle();
   if (findErr) throw findErr;
 
   if (existing) {
@@ -743,7 +845,8 @@ async function getOrCreateSessionForOnlineClass(batchId, date, onlineClassId) {
   const { data: created, error: insertErr } = await supabase
     .from("attendance_sessions")
     .insert({
-      batch_id: batchId,
+      batch_id: forAll ? null : batchId,
+      audience: forAll ? "ALL" : "BATCH",
       date,
       qr_token: generateQrToken(), // unused for Meet-sourced sessions, generated only to satisfy the existing column
       expires_at: expiresFromNow(DEFAULT_REFRESH_INTERVAL),
@@ -805,11 +908,10 @@ async function getSessionAttendanceDetail(sessionId) {
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, admission_number)")
-    .eq("batch_id", session.batch_id);
-  if (enrollErr) throw enrollErr;
+  const enrollments = (await getRosterStudents(session.audience === "ALL" ? ALL_ID : session.batch_id)).map((s) => ({
+    student_id: s.id,
+    students: s,
+  }));
 
   const studentIds = (enrollments || []).map((e) => e.student_id);
   let recordMap = {};
@@ -846,7 +948,8 @@ async function getSessionAttendanceDetail(sessionId) {
     session: {
       id:                      session.id,
       batchId:                 session.batch_id,
-      batchName:               session.batches?.name ?? null,
+      batchName:               session.audience === "ALL" ? "All Students" : (session.batches?.name ?? null),
+      audience:                session.audience || "BATCH",
       date:                    session.date,
       source:                  session.source || "OFFLINE",
       syncStatus:              session.sync_status,
@@ -1054,14 +1157,12 @@ async function getMyAttendanceSummary(authUserId) {
   const student = await getStudentByAuthUserId(authUserId);
   const batchIds = await getStudentBatchIds(student.id);
 
-  if (batchIds.length === 0) {
-    return { totalSessions: 0, presentCount: 0, absentCount: 0, attendancePct: null };
-  }
-
+  // Own batches' sessions plus All Students sessions — each session once,
+  // however many batches the student is in.
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id")
-    .in("batch_id", batchIds);
+    .or(sessionScopeFilter(batchIds));
 
   if (sessErr) throw sessErr;
 
@@ -1099,12 +1200,10 @@ async function getMyAttendanceHistory(authUserId, limit = 50) {
   const student = await getStudentByAuthUserId(authUserId);
   const batchIds = await getStudentBatchIds(student.id);
 
-  if (batchIds.length === 0) return [];
-
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, date, source, batches(name, delivery_type, start_time), online_classes(title)")
-    .in("batch_id", batchIds)
+    .select("id, date, source, audience, batches(name, delivery_type, start_time), online_classes(title)")
+    .or(sessionScopeFilter(batchIds))
     .order("date", { ascending: false })
     .limit(limit);
 
@@ -1147,7 +1246,7 @@ async function getMyAttendanceHistory(authUserId, limit = 50) {
       time,
       status:    present ? "present" : "absent",
       type:      s.batches?.delivery_type || "offline",
-      batchName: s.batches?.name || null,
+      batchName: s.audience === "ALL" ? "All Students" : (s.batches?.name || null),
       source:    s.source || "OFFLINE",
       classTitle: s.online_classes?.title || null,
       attendanceStatus: effectiveStatus(record),
@@ -1166,10 +1265,6 @@ async function getMyMonthAttendance(authUserId, year, month) {
   const student = await getStudentByAuthUserId(authUserId);
   const batchIds = await getStudentBatchIds(student.id);
 
-  if (batchIds.length === 0) {
-    return { days: [], totalSessions: 0, presentCount: 0, attendancePct: null };
-  }
-
   const monthStr = String(month).padStart(2, "0");
   const startDate = `${year}-${monthStr}-01`;
   const lastDay = new Date(year, month, 0).getDate(); // last day of that month
@@ -1178,7 +1273,7 @@ async function getMyMonthAttendance(authUserId, year, month) {
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id, date")
-    .in("batch_id", batchIds)
+    .or(sessionScopeFilter(batchIds))
     .gte("date", startDate)
     .lte("date", endDate)
     .order("date", { ascending: true });
@@ -1282,28 +1377,34 @@ async function getAttendancePercentagesForStudents(studentIds) {
     .select("student_id, batch_id")
     .in("student_id", studentIds);
   if (enrollErr) throw enrollErr;
-  if (!enrollments || enrollments.length === 0) return result;
 
   const batchIdsByStudent = {};
   const allBatchIds = new Set();
-  enrollments.forEach((e) => {
+  (enrollments || []).forEach((e) => {
     if (!batchIdsByStudent[e.student_id]) batchIdsByStudent[e.student_id] = [];
     batchIdsByStudent[e.student_id].push(e.batch_id);
     allBatchIds.add(e.batch_id);
   });
 
+  // Every session that could count for anyone in the list: their batches'
+  // sessions plus All Students sessions (which count once for everybody).
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, batch_id")
-    .in("batch_id", Array.from(allBatchIds));
+    .select("id, batch_id, audience")
+    .or(sessionScopeFilter(Array.from(allBatchIds)));
   if (sessErr) throw sessErr;
 
   const sessionIdsByBatch = {};
+  const allStudentsSessionIds = [];
   const allSessionIds = [];
   (sessions || []).forEach((s) => {
+    allSessionIds.push(s.id);
+    if (s.audience === "ALL") {
+      allStudentsSessionIds.push(s.id);
+      return;
+    }
     if (!sessionIdsByBatch[s.batch_id]) sessionIdsByBatch[s.batch_id] = [];
     sessionIdsByBatch[s.batch_id].push(s.id);
-    allSessionIds.push(s.id);
   });
   if (allSessionIds.length === 0) return result;
 
@@ -1315,18 +1416,20 @@ async function getAttendancePercentagesForStudents(studentIds) {
     .eq("present", true);
   if (recErr) throw recErr;
 
-  const presentCountByStudent = {};
+  const presentSessionsByStudent = {};
   (records || []).forEach((r) => {
-    presentCountByStudent[r.student_id] = (presentCountByStudent[r.student_id] || 0) + 1;
+    if (!presentSessionsByStudent[r.student_id]) presentSessionsByStudent[r.student_id] = new Set();
+    presentSessionsByStudent[r.student_id].add(r.session_id);
   });
 
   studentIds.forEach((id) => {
-    const batchIds = batchIdsByStudent[id] || [];
-    const totalSessions = batchIds.reduce((sum, bId) => sum + (sessionIdsByBatch[bId]?.length || 0), 0);
-    if (totalSessions > 0) {
-      const presentCount = presentCountByStudent[id] || 0;
-      result[id] = Math.round((presentCount / totalSessions) * 100);
-    }
+    // A Set of session ids: a session can never be counted twice for a
+    // student, even one enrolled in several batches.
+    const mine = new Set(allStudentsSessionIds);
+    (batchIdsByStudent[id] || []).forEach((bId) => (sessionIdsByBatch[bId] || []).forEach((sid) => mine.add(sid)));
+    if (mine.size === 0) return;
+    const present = [...mine].filter((sid) => presentSessionsByStudent[id]?.has(sid)).length;
+    result[id] = Math.round((present / mine.size) * 100);
   });
 
   return result;
@@ -1352,11 +1455,11 @@ async function getStudentAttendanceReport(studentId) {
   const batchIds = await getStudentBatchIds(studentId);
 
   let records = [];
-  if (batchIds.length > 0) {
+  {
     const { data: sessions, error: sessErr } = await supabase
       .from("attendance_sessions")
-      .select("id, date, source, batches(name, delivery_type, start_time), online_classes(title)")
-      .in("batch_id", batchIds)
+      .select("id, date, source, audience, batches(name, delivery_type, start_time), online_classes(title)")
+      .or(sessionScopeFilter(batchIds))
       .order("date", { ascending: false });
 
     if (sessErr) throw sessErr;
@@ -1390,7 +1493,7 @@ async function getStudentAttendanceReport(studentId) {
 
       return {
         date:         s.date,
-        batchName:    s.batches?.name || null,
+        batchName:    s.audience === "ALL" ? "All Students" : (s.batches?.name || null),
         deliveryType: s.batches?.delivery_type || null,
         status:       present ? "present" : "absent",
         time,
@@ -1445,25 +1548,26 @@ async function getMyAttendanceReport(authUserId) {
 async function getBatchAttendanceReport(batchId) {
   await assertBatchExists(batchId);
 
-  const { data: batch, error: batchErr } = await supabase
-    .from("batches")
-    .select("id, name, delivery_type, days, start_time, end_time")
-    .eq("id", batchId)
-    .single();
-  if (batchErr) throw batchErr;
+  let batch;
+  if (isAll(batchId)) {
+    batch = { id: ALL_ID, name: "All Students", delivery_type: null, days: null, start_time: null, end_time: null };
+  } else {
+    const { data, error: batchErr } = await supabase
+      .from("batches")
+      .select("id, name, delivery_type, days, start_time, end_time")
+      .eq("id", batchId)
+      .single();
+    if (batchErr) throw batchErr;
+    batch = data;
+  }
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, students(id, name, admission_number)")
-    .eq("batch_id", batchId);
-  if (enrollErr) throw enrollErr;
-  const students = enrollments || [];
+  const students = (await getRosterStudents(batchId)).map((s) => ({ student_id: s.id, students: s }));
+  const rosterIds = new Set(students.map((e) => e.student_id));
 
-  const { data: sessions, error: sessErr } = await supabase
-    .from("attendance_sessions")
-    .select("id, date, source, sync_status, online_classes(title)")
-    .eq("batch_id", batchId)
-    .order("date", { ascending: true });
+  const { data: sessions, error: sessErr } = await applyBatchSessionScope(
+    supabase.from("attendance_sessions").select("id, date, source, sync_status, online_classes(title)"),
+    batchId
+  ).order("date", { ascending: true });
   if (sessErr) throw sessErr;
 
   const sessionIds = (sessions || []).map((s) => s.id);
@@ -1516,7 +1620,8 @@ async function getBatchAttendanceReport(batchId) {
     const recordsForSession = recordsBySession[sess.id] || new Map();
     let presentCount = 0;
     let partialCount = 0;
-    recordsForSession.forEach((rec) => {
+    recordsForSession.forEach((rec, recStudentId) => {
+      if (!rosterIds.has(recStudentId)) return; // ignore other batches' students on All Students sessions
       const status = effectiveStatus(rec);
       if (status === "present") presentCount++;
       else if (status === "partial") partialCount++;
@@ -1568,21 +1673,14 @@ async function getStudentTrend(studentId, sessionCount = 5) {
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
-  // Find their batch
-  const { data: enrollment, error: enrErr } = await supabase
-    .from("batch_enrollments")
-    .select("batch_id")
-    .eq("student_id", studentId)
-    .maybeSingle();
+  // Their batches (a student may be in several)
+  const batchIds = await getStudentBatchIds(studentId);
 
-  if (enrErr) throw enrErr;
-  if (!enrollment) return []; // Not in any batch → no trend data
-
-  // Get last N sessions for that batch
+  // Get last N sessions across their batches plus All Students sessions
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
     .select("id, date")
-    .eq("batch_id", enrollment.batch_id)
+    .or(sessionScopeFilter(batchIds))
     .order("date", { ascending: false })
     .limit(sessionCount);
 
@@ -1621,6 +1719,7 @@ module.exports = {
   addStudentsToBatch,
   getTodayRoster,
   getBatchSummary,
+  getOrgAttendanceOverview,
   setStudentOverride,
   startSession,
   refreshSession,
@@ -1632,6 +1731,8 @@ module.exports = {
   getSessionByOnlineClassId,
   updateSessionSyncStatus,
   getSessionAttendanceDetail,
+  getStudentBatchIds,
+  effectiveStatus,
   overrideAttendanceRecord,
   assignUnknownParticipant,
   ignoreUnknownParticipant,

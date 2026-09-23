@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- disc -->
+  <circle cx="32" cy="32" r="31" fill="#f8f9ed"/>
+  <!-- outer ring -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="#7a6898" stroke-width="3.2"/>
+  <!-- orbit A -->
+  <g transform="rotate(0 32 32)">
+    <ellipse cx="32" cy="32" rx="20" ry="8" fill="none" stroke="#7a5ca0" stroke-opacity="0.6" stroke-width="1"/>
+    <circle cx="48.38" cy="36.59" r="2.6" fill="#6f4f96"/>
+    <circle cx="15.62" cy="27.41" r="2.6" fill="#6f4f96"/>
+  </g>
+  <!-- orbit B -->
+  <g transform="rotate(60 32 32)">
+    <ellipse cx="32" cy="32" rx="20" ry="8" fill="none" stroke="#7a5ca0" stroke-opacity="0.6" stroke-width="1"/>
+    <circle cx="32" cy="40" r="2.6" fill="#6f4f96"/>
+    <circle cx="32" cy="24" r="2.6" fill="#6f4f96"/>
+  </g>
+  <!-- orbit C -->
+  <g transform="rotate(-60 32 32)">
+    <ellipse cx="32" cy="32" rx="20" ry="8" fill="none" stroke="#7a5ca0" stroke-opacity="0.6" stroke-width="1"/>
+    <circle cx="14.68" cy="36" r="2.6" fill="#6f4f96"/>
+    <circle cx="49.32" cy="28" r="2.6" fill="#6f4f96"/>
+  </g>
+  <!-- nucleus -->
+  <circle cx="32" cy="32" r="2.4" fill="#cc2040"/>
+  <circle cx="34.6" cy="31" r="2.1" fill="#2040cc"/>
+  <circle cx="30" cy="33.4" r="2.1" fill="#2040cc"/>
+  <circle cx="33" cy="34.2" r="1.9" fill="#cc2040"/>
+</svg>

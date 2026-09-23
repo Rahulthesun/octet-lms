@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Navbar from '@/components/landing/Navbar'
 import Footer from '@/components/landing/Footer'
-import { AtomSVG, FlaskSVG, CompoundSVG, MicroscopeSVG, TestTubeSVG } from '@/components/ui/PencilSVGs'
+import { AtomSVG, FlaskSVG, CompoundSVG } from '@/components/ui/PencilSVGs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,7 +164,7 @@ function ResultsCarousel() {
         <CompoundSVG width={260} height={260} color="#ffffff" />
       </div>
 
-      <div className="relative max-w-5xl mx-auto px-6 py-20">
+      <div className="relative max-w-5xl mx-auto px-6 pt-28 pb-20">
         {/* Header */}
         <div className="text-center mb-14">
           <motion.p
@@ -490,76 +490,6 @@ export default function OutcomesPage() {
   return (
     <main className="bg-bg min-h-screen">
       <Navbar />
-
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="pt-40 pb-20 px-6 text-center relative overflow-hidden bg-bg">
-        <div className="absolute top-20 left-8 opacity-[0.07] pointer-events-none">
-          <TestTubeSVG width={180} height={180} color="#5e4075" />
-        </div>
-        <div className="absolute bottom-8 right-10 opacity-[0.07] pointer-events-none">
-          <MicroscopeSVG width={220} height={220} color="#5e4075" />
-        </div>
-        <div className="absolute top-48 right-[20%] opacity-[0.05] pointer-events-none">
-          <FlaskSVG width={130} height={130} color="#5e4075" />
-        </div>
-
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-2.5 mb-5"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-            <span className="text-[14px] tracking-[0.25em] text-muted uppercase">
-              Proven Outcomes
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-muted animate-pulse" />
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl text-primary leading-tight mb-6"
-          >
-            Our Students Succeed.
-            <br />
-            <span className="text-muted">Consistently.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="text-base text-muted max-w-2xl mx-auto leading-relaxed mb-10"
-          >
-            Over 500 students have walked through Chemistry@OCTET and walked into their dream
-            colleges and careers. The results below are real — and they speak for themselves.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-4"
-          >
-            {[
-              { value: '500+', label: 'Students Taught'   },
-              { value: '45+',  label: 'JEE Qualifiers'    },
-              { value: '38+',  label: 'NEET Qualifiers'   },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="px-6 py-3.5 bg-white border border-accent1 rounded-2xl text-center shadow-[0_2px_12px_rgba(94,64,117,0.06)]"
-              >
-                <div className="text-xl text-primary">{s.value}</div>
-                <div className="text-[14px] text-muted">{s.label}</div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
 
       <ResultsCarousel />
       <ResultsSummary />

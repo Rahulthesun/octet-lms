@@ -1,0 +1,132 @@
+/**
+ * utils/parentReportPdf.js
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Builds the monthly attendance PDF sent to a student's parents/own email.
+ * Reuses the exact same chart-drawing primitives and colors as the existing
+ * admin attendance reports (utils/attendanceReportFormat.js) — same visual
+ * language across every PDF the app produces, not a one-off design.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+const {
+  drawStatisticsChart,
+  drawTable,
+  buildCategoryChartData,
+} = require("./attendanceReportFormat");
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function monthName(month) {
+  return MONTH_NAMES[month - 1] || String(month);
+}
+
+function statusLabel(status) {
+  if (status === "present") return "Present";
+  if (status === "partial") return "Partial";
+  return "Absent";
+}
+
+/**
+ * Writes the monthly report onto an already-open PDFDocument.
+ *
+ * @param {import('pdfkit')} doc
+ * @param {{
+ *   student: { name: string, roll: string|null, grade: string|null, batch: string|null },
+ *   year: number,
+ *   month: number, // 1-12
+ *   totalSessions: number,
+ *   presentCount: number,
+ *   partialCount: number,
+ *   absentCount: number,
+ *   attendancePct: number|null,
+ *   days: Array<{ date: string, status: 'present'|'partial'|'absent', source: string, classTitle: string|null }>,
+ *   testResults: Array<{ name: string, date: string, marks: number, maxMarks: number }>, // currently always [] — see getTestResultsForMonth
+ * }} report
+ */
+function buildParentMonthlyReportPdf(doc, report) {
+  const monthLabel = `${monthName(report.month)} ${report.year}`;
+
+  doc.font("Helvetica-Bold").fontSize(20).fillColor("#1f2937").text("Monthly Attendance Report");
+  doc.fillColor("black");
+  doc.font("Helvetica").fontSize(11).text(monthLabel);
+  doc.moveDown(0.6);
+
+  doc.font("Helvetica-Bold").fontSize(12).text(report.student.name);
+  doc.font("Helvetica").fontSize(10).fillColor("#4b5563");
+  const metaParts = [
+    report.student.roll ? `Roll No: ${report.student.roll}` : null,
+    report.student.grade ? `Grade: ${report.student.grade}` : null,
+    report.student.batch ? `Batch: ${report.student.batch}` : null,
+  ].filter(Boolean);
+  if (metaParts.length) doc.text(metaParts.join("   |   "));
+  doc.fillColor("black");
+  doc.moveDown(1);
+
+  doc.font("Helvetica-Bold").fontSize(12).text("Summary");
+  doc.font("Helvetica").fontSize(11);
+  doc.text(`Total Sessions: ${report.totalSessions}`);
+  doc.text(`Present: ${report.presentCount}`);
+  if (report.partialCount > 0) doc.text(`Partial: ${report.partialCount}`);
+  doc.text(`Absent: ${report.absentCount}`);
+  doc.text(`Attendance %: ${report.attendancePct !== null ? report.attendancePct + "%" : "N/A"}`);
+  doc.moveDown(1);
+
+  // Composition chart — same fixed status palette used everywhere else in
+  // the app, so Present/Partial/Absent always mean the same colors.
+  const categoryData = buildCategoryChartData(
+    report.days.map((d) => ({ status: d.status, attendanceStatus: d.status }))
+  );
+  drawStatisticsChart(doc, {
+    type: "pie",
+    barData: categoryData,
+    pieData: categoryData,
+    lineData: [],
+    valueSuffix: "",
+    description: `How ${report.student.name.split(" ")[0]}'s sessions this month split across Present, Partial, and Absent.`,
+  });
+  doc.moveDown(0.5);
+
+  doc.font("Helvetica-Bold").fontSize(12).text("Day-by-day breakdown");
+  doc.moveDown(0.3);
+  drawTable(doc, {
+    headers: ["Date", "Day", "Status", "Class"],
+    rows: report.days.map((d) => [
+      new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+      new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" }),
+      statusLabel(d.status),
+      d.classTitle || (d.source === "GOOGLE_MEET" ? "Online class" : "In-person class"),
+    ]),
+    colWidths: [90, 70, 90, 200],
+  });
+
+  // Test results — only appears once the LMS has a real test-results
+  // backend to draw from (see parentReports.service.js::getTestResultsForMonth,
+  // which currently always returns [] since no tests have real DB-backed
+  // results yet). Written this way on purpose so this section starts
+  // appearing automatically the moment that data exists, no PDF changes
+  // needed.
+  if (report.testResults && report.testResults.length > 0) {
+    doc.addPage();
+    doc.font("Helvetica-Bold").fontSize(12).text("Test Results This Month");
+    doc.moveDown(0.3);
+    drawTable(doc, {
+      headers: ["Test", "Date", "Marks"],
+      rows: report.testResults.map((t) => [
+        t.name,
+        new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        `${t.marks} / ${t.maxMarks}`,
+      ]),
+      colWidths: [220, 90, 90],
+    });
+  }
+
+  doc.moveDown(1.5);
+  doc.font("Helvetica").fontSize(9).fillColor("#9ca3af")
+    .text("This is an automated report generated by the Chemistry@OCTET LMS.", { align: "center" });
+  doc.fillColor("black");
+}
+
+module.exports = { buildParentMonthlyReportPdf, monthName };

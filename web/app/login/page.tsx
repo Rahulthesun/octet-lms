@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AtomSVG, FlaskSVG } from '@/components/ui/PencilSVGs'
 import { signIn } from '../../lib/auth'
 import { supabase } from '@/lib/supabase/client'
+import { authedFetch, REVOKED_MESSAGE } from '@/lib/apiClient'
 import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 
 export default function LoginPage() {
@@ -16,6 +17,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+
+  // A student whose access was revoked while they were signed in is sent here
+  // by the API client with ?revoked=1.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('revoked') === '1') {
+      setError(REVOKED_MESSAGE)
+    }
+  }, [])
 
 const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault()
@@ -31,36 +40,37 @@ const handleLogin = async (e: React.FormEvent) => {
   try {
     const { user } = await signIn(email, password)
 
-    const role = user?.app_metadata?.role // 'admin' | 'both' | undefined (students)
+    const role = user?.app_metadata?.role // 'admin' | 'both' | 'developer' | undefined (students)
+    const isStaff = role === 'admin' || role === 'both' || role === 'developer'
 
-    
-
-    if (role !== 'admin' && role !== 'both') {
-      const { data: student, error } = await supabase
-        .from('students')
-        .select('blocked')
-        .eq('auth_user_id', user.id)
-        .maybeSingle()
-
-      if (error) {
-        throw new Error('Unable to verify student account.')
-      }
-
-      if (!student) {
-        throw new Error('No student record found. Please contact the administrator.')
-      }
-
-      if (student.blocked) {
+    if (!isStaff) {
+      // The server decides whether this student may come in: it rejects a
+      // graduated student (403 ACCESS_REVOKED) and reports blocked accounts.
+      // A revoked student is signed straight back out.
+      try {
+        const access = await authedFetch('/api/students/access-check')
+        if (access.blocked) {
+          await supabase.auth.signOut()
+          setError('Your account has been blocked. Please contact the administrator.')
+          return
+        }
+      } catch (accessErr: any) {
         await supabase.auth.signOut()
-        setError('Your account has been blocked. Please contact the administrator.')
+        if (accessErr?.code === 'ACCESS_REVOKED') {
+          setError(REVOKED_MESSAGE)
+        } else {
+          setError(accessErr?.message || 'Unable to verify student account.')
+        }
         return
       }
     }
 
     if (role === 'admin' || role === 'both') {
-      router.push('/admin/content')
+      router.push('/admin')
+    } else if (role === 'developer') {
+      router.push('/analytics')
     } else {
-      router.push('/student/notes')
+      router.push('/student')
     }
   } catch (err: any) {
     setError(err.message || 'Something went wrong. Please try again.')

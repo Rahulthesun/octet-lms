@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -14,6 +14,15 @@ export default function RegisterPage() {
   const [marksheet, setMarksheet] = useState<File | null>(null);
   const [step, setStep] = useState(1);
   const TOTAL_STEPS = 7;
+
+  // Batches come from the database (Morning, Evening, Night, Test Batch, ...).
+  const [batchOptions, setBatchOptions] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/students/public/batches`)
+      .then((r) => r.json())
+      .then((json) => setBatchOptions(json.batches ?? []))
+      .catch(() => setBatchOptions([]))
+  }, [])
 
   const [form, setForm] = useState({
     // Student
@@ -533,10 +542,10 @@ export default function RegisterPage() {
                         onChange={handleChange}
                         className={inputClass}
                       >
-                        <option value="">Select Batch</option>
-                        <option value="MORNING">Morning</option>
-                        <option value="EVENING">Evening</option>
-                        <option value="NIGHT">Night</option>
+                        <option value="">{batchOptions.length === 0 ? 'Loading batches...' : 'Select Batch'}</option>
+                        {batchOptions.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
                       </select>
                     </div>
 

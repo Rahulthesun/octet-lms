@@ -35,6 +35,7 @@ const fs = require("fs");
 
 const supabase = require("../config/supabase");
 const r2 = require("../config/r2");
+const notificationsService = require("./notifications.service");
 
 const BUCKET = process.env.R2_BUCKET_NAME;
 
@@ -171,8 +172,31 @@ const createVideo = async ({
     throw new Error(error.message);
   }
 
+  if (data.is_visible) {
+    _notifyVideoUploaded(data).catch((err) => console.error("video_uploaded notification failed:", err.message));
+  }
+
   return formatVideo(data);
 };
+
+/** Notifies every approved student in the video's grade (via chapter -> subject -> grade). Best-effort — a notification failure never undoes a successful upload. */
+async function _notifyVideoUploaded(video) {
+  const { data: chapter } = await supabase
+    .from("chapters")
+    .select("name, subjects(name, grade)")
+    .eq("id", video.chapter_id)
+    .maybeSingle();
+  if (!chapter?.subjects?.grade) return;
+
+  await notificationsService.createNotification({
+    type: "video_uploaded",
+    title: `New video: ${video.title}`,
+    body: `A new lesson "${video.title}" was added to ${chapter.subjects.name} > ${chapter.name}.`,
+    link: "/student/courses",
+    gradeFilter: chapter.subjects.grade,
+    createdBy: video.uploaded_by || null,
+  });
+}
 
 // ─────────────────────────────────────────────────────────────
 // getAllVideos
