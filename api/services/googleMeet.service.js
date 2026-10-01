@@ -200,4 +200,84 @@ async function listParticipantSessions(adminUserId, conferenceRecordName) {
   return results;
 }
 
-module.exports = { extractMeetingCode, extractGoogleUserId, findConferenceRecord, listParticipantSessions };
+/**
+ * True if the Meet space currently has a LIVE conference (people are in the
+ * room right now). A Meet link created through Calendar never closes by
+ * itself: as long as one person stays connected the conference — and the
+ * link — stays live indefinitely, long after the scheduled end.
+ */
+async function getActiveConference(adminUserId, meetUrl) {
+  const meetingCode = extractMeetingCode(meetUrl);
+  if (!meetingCode) return null;
+  const auth = await getAuthorizedClient(adminUserId);
+  const meet = google.meet({ version: "v2", auth });
+  try {
+    const { data } = await meet.spaces.get({ name: `spaces/${meetingCode}` });
+    return data.activeConference?.conferenceRecord ? { spaceName: data.name, conferenceRecord: data.activeConference.conferenceRecord } : null;
+  } catch (err) {
+    throw normalizeGoogleError(err, "Could not read the Google Meet space for this class");
+  }
+}
+
+/**
+ * Ends the live conference for a class's Meet link — everyone in the room is
+ * removed and the meeting stops. Needs the meetings.space.created /
+ * meetings.space.settings scope (an admin who connected before those were
+ * requested must reconnect once: GOOGLE_MEET_CLOSE_SCOPE_MISSING).
+ * Returns true if a live conference was ended, false if none was running.
+ */
+async function endActiveConference(adminUserId, meetUrl) {
+  const active = await getActiveConference(adminUserId, meetUrl);
+  if (!active) return false;
+
+  const auth = await getAuthorizedClient(adminUserId);
+  const meet = google.meet({ version: "v2", auth });
+  try {
+    await meet.spaces.endActiveConference({ name: active.spaceName, requestBody: {} });
+    return true;
+  } catch (err) {
+    const status = err?.response?.status || err?.code;
+    if (status === 403) {
+      throw Object.assign(
+        new Error("Google needs one more permission to close meetings automatically — reconnect the Google account once (Admin > Online Classes)."),
+        { status: 424, code: "GOOGLE_MEET_CLOSE_SCOPE_MISSING" }
+      );
+    }
+    throw normalizeGoogleError(err, "Could not end the Google Meet conference");
+  }
+}
+
+const organizerIdCache = new Map(); // adminUserId -> { id, at } — only ever holds a CONFIRMED id, never a failure
+const ORGANIZER_CACHE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * The organizer's own numeric Google account id (same id Meet reports as
+ * users/{id}), so the host can be told apart from students in attendance.
+ * A failure here is never cached and never silently swallowed to null —
+ * misreading "couldn't check" as "definitely not the host" would risk
+ * counting the teacher as a student (or vice versa), so the caller is
+ * expected to let this throw and retry the whole sync later instead.
+ */
+async function getOrganizerGoogleUserId(adminUserId) {
+  const cached = organizerIdCache.get(adminUserId);
+  if (cached && Date.now() - cached.at < ORGANIZER_CACHE_TTL_MS) return cached.id;
+
+  const auth = await getAuthorizedClient(adminUserId);
+  const { data } = await google.oauth2({ auth, version: "v2" }).userinfo.get();
+  if (!data?.id) {
+    throw Object.assign(new Error("Could not confirm the organizer's Google account id"), { status: 502, code: "GOOGLE_ORGANIZER_UNKNOWN" });
+  }
+  const id = String(data.id);
+  organizerIdCache.set(adminUserId, { id, at: Date.now() });
+  return id;
+}
+
+module.exports = {
+  extractMeetingCode,
+  extractGoogleUserId,
+  findConferenceRecord,
+  listParticipantSessions,
+  getActiveConference,
+  endActiveConference,
+  getOrganizerGoogleUserId,
+};

@@ -22,6 +22,9 @@ const adminOnly = requireRole(["admin", "developer"]);
 //   body should include { subjectId, name, ... }
 router.post("/", verifyToken, adminOnly, chapterController.createChapter);
 
+// GET   /api/chapters                      → every chapter, across every subject (flat list)
+router.get("/", verifyToken, chapterController.getAllChapters);
+
 // GET   /api/chapters/:id                  → get a single chapter by id
 router.get("/:id", verifyToken, chapterController.getChapterById);
 

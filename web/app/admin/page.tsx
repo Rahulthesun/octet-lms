@@ -288,12 +288,18 @@ export default function AdminDashboard() {
                           </p>
                         </div>
                         {c.meetUrl && (
-                          <a
-                            href={c.meetUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-sm shrink-0 hover:underline" style={{ color: ACCENT }}
-                          >
-                            Join
-                          </a>
+                          new Date(c.scheduledEnd).getTime() > Date.now() ? (
+                            <a
+                              href={c.meetUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-sm shrink-0 hover:underline" style={{ color: ACCENT }}
+                            >
+                              Join
+                            </a>
+                          ) : (
+                            <span className="text-sm shrink-0 text-gray-300 cursor-not-allowed" title="This class's scheduled time has ended">
+                              Join
+                            </span>
+                          )
                         )}
                       </div>
                     ))}

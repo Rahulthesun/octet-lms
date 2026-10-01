@@ -104,7 +104,31 @@ async function exchangeCodeAndLink(code, studentAuthUserId) {
     .eq("id", student.id);
   if (updateErr) throw updateErr;
 
+  // If this Google account was already seen in a recent class and left
+  // "unmatched" (the student attended before linking), re-run that class's
+  // attendance now so they are credited without anyone pressing a button.
+  resyncClassesWithUnmatchedParticipant(payload.sub).catch((e) =>
+    console.error("[google-identity] re-sync after link failed:", e.message)
+  );
+
   return { email: payload.email || null };
+}
+
+async function resyncClassesWithUnmatchedParticipant(googleUserId) {
+  const sinceIso = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: sessions, error } = await supabase
+    .from("attendance_sessions")
+    .select("online_class_id, unmatched_participants")
+    .not("online_class_id", "is", null)
+    .gte("created_at", sinceIso);
+  if (error) throw error;
+
+  const { syncClassAttendance } = require("./onlineAttendanceSync.service");
+  for (const s of sessions || []) {
+    if ((s.unmatched_participants || []).some((p) => p.googleUserId === googleUserId)) {
+      await syncClassAttendance(s.online_class_id);
+    }
+  }
 }
 
 async function getStatus(studentAuthUserId) {

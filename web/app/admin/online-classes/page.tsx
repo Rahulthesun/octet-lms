@@ -243,13 +243,24 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
 function GoogleAccountPanel() {
   const { status, loading, connect, disconnect } = useGoogleAccountStatus()
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleConnect() {
     setBusy(true)
+    setError(null)
     try {
+      // connect() navigates the whole page to Google on success, so this
+      // function never returns in the success case — only a failure (the
+      // server refused connect-url, e.g. not signed in, not an admin, or
+      // Google OAuth not configured on the server) reaches the catch below.
+      // Previously that failure was only logged to the console — the button
+      // just silently did nothing, which is exactly what "I can't connect"
+      // looks like from the outside.
       await connect()
     } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not start the Google connection.'
       console.error(e)
+      setError(message)
       setBusy(false)
     }
   }
@@ -257,10 +268,11 @@ function GoogleAccountPanel() {
   async function handleDisconnect() {
     if (!confirm('Disconnect the Google account? Existing classes keep their Meet links, but new classes cannot be scheduled until you reconnect.')) return
     setBusy(true)
+    setError(null)
     try {
       await disconnect()
     } catch (e) {
-      console.error(e)
+      setError(e instanceof Error ? e.message : 'Could not disconnect the Google account.')
     } finally {
       setBusy(false)
     }
@@ -271,30 +283,35 @@ function GoogleAccountPanel() {
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-zinc-200 bg-white">
-      <span
-        className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : 'bg-zinc-300'}`}
-      />
-      <div className="min-w-0">
-        <p className="text-sm text-zinc-900">
-          {status?.connected ? 'Google account connected' : 'Google account not connected'}
-        </p>
-        {status?.connected && status.email && (
-          <p className="text-xs text-zinc-500 truncate">{status.email}</p>
-        )}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-zinc-200 bg-white">
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+        />
+        <div className="min-w-0">
+          <p className="text-sm text-zinc-900">
+            {status?.connected ? 'Google account connected' : 'Google account not connected'}
+          </p>
+          {status?.connected && status.email && (
+            <p className="text-xs text-zinc-500 truncate">{status.email}</p>
+          )}
+        </div>
+        <button
+          onClick={status?.connected ? handleDisconnect : handleConnect}
+          disabled={busy}
+          className={`ml-2 shrink-0 text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-50 ${
+            status?.connected
+              ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-100'
+              : 'text-white border-transparent'
+          }`}
+          style={!status?.connected ? { backgroundColor: ACCENT } : undefined}
+        >
+          {busy ? 'Working…' : status?.connected ? 'Disconnect' : 'Connect Google Account'}
+        </button>
       </div>
-      <button
-        onClick={status?.connected ? handleDisconnect : handleConnect}
-        disabled={busy}
-        className={`ml-2 shrink-0 text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-50 ${
-          status?.connected
-            ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-100'
-            : 'text-white border-transparent'
-        }`}
-        style={!status?.connected ? { backgroundColor: ACCENT } : undefined}
-      >
-        {busy ? 'Working…' : status?.connected ? 'Disconnect' : 'Connect Google Account'}
-      </button>
+      {error && (
+        <p className="text-xs text-rose-600 px-1" role="alert">{error}</p>
+      )}
     </div>
   )
 }
@@ -983,11 +1000,21 @@ export default function OnlineClassesPage() {
                       <LinkIcon className="w-3.5 h-3.5" />
                       {copiedId === cls.id ? 'Copied' : 'Copy link'}
                     </button>
-                    <a href={cls.meetUrl} target="_blank" rel="noopener noreferrer"
-                      className="text-sm px-3.5 py-1.5 rounded-md text-white transition-colors ml-auto"
-                      style={{ backgroundColor: ACCENT }}>
-                      Join
-                    </a>
+                    {/* Disabled once the scheduled time has passed, for everyone — the
+                        meeting itself is untouched and only ends when the host ends it
+                        in Google Meet; this just stops the LMS from offering a dead-time join. */}
+                    {new Date(cls.scheduledEnd).getTime() > Date.now() ? (
+                      <a href={cls.meetUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-sm px-3.5 py-1.5 rounded-md text-white transition-colors ml-auto"
+                        style={{ backgroundColor: ACCENT }}>
+                        Join
+                      </a>
+                    ) : (
+                      <button type="button" disabled title="This class's scheduled time has ended"
+                        className="text-sm px-3.5 py-1.5 rounded-md bg-zinc-200 text-zinc-400 cursor-not-allowed ml-auto">
+                        Join
+                      </button>
+                    )}
                   </>
                 )}
               </div>

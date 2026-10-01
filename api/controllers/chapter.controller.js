@@ -43,6 +43,16 @@ const getChapterById = async (req, res) => {
     }
 }
 
+/** GET /api/chapters — every chapter, across every subject (flat list, for pickers like the test creator's Chapter dropdown). */
+const getAllChapters = async (req, res) => {
+  try {
+    const chapters = await chapterService.getAllChapters();
+    res.status(200).json(chapters);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 /**
  * GET /api/chapters/:subjectId
  *
@@ -85,4 +95,4 @@ const deleteChapter = async (req, res) => {
   }
 };
 
-module.exports = { createChapter, getChapterById, getChaptersBySubject, updateChapter, deleteChapter };
+module.exports = { createChapter, getChapterById, getAllChapters, getChaptersBySubject, updateChapter, deleteChapter };

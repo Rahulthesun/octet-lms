@@ -52,6 +52,25 @@ const getChapterById = async (id) => {
   return data;
 }
 
+// ─── Read all, across every subject ─────────────────────────────
+// Used by the test creator's Chapter picker — it needs every chapter in one
+// flat list, not one subject at a time.
+
+const getAllChapters = async () => {
+  const { data, error } = await supabase
+    .from("chapters")
+    .select("id, name, subject_id, order_index, subjects(name)")
+    .order("order_index", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    subjectId: c.subject_id,
+    subjectName: c.subjects?.name || null,
+  }));
+};
+
 // ─── Read all by subject ───────────────────────────────────────
 
 const getChaptersBySubject = async (subjectId) => {
@@ -113,6 +132,7 @@ const deleteChapter = async (id) => {
 module.exports = {
   createChapter,
   getChapterById,
+  getAllChapters,
   getChaptersBySubject,
   updateChapter,
   deleteChapter,

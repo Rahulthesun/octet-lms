@@ -68,6 +68,18 @@ router.get("/:id/attempts/:attemptId", verifyToken, adminOnly, attemptsCtrl.admi
 // POST /api/tests/:id/attempts/:attemptId/grade → grade a descriptive attempt
 router.post("/:id/attempts/:attemptId/grade", verifyToken, adminOnly, attemptsCtrl.gradeAttempt);
 
+// GET  /api/tests/analytics/overall              → analytics across EVERY test (must come before "/:id/analytics" below)
+router.get("/analytics/overall", verifyToken, adminOnly, testsCtrl.getOverallAnalytics);
+
+// GET  /api/tests/analytics/overall/pdf           → the same, as a downloadable PDF
+router.get("/analytics/overall/pdf", verifyToken, adminOnly, testsCtrl.downloadOverallAnalyticsPdf);
+
+// GET  /api/tests/:id/analytics                 → result analytics (summary, distribution, per-question, batch-wise, per-student)
+router.get("/:id/analytics", verifyToken, adminOnly, testsCtrl.getTestAnalytics);
+
+// GET  /api/tests/:id/analytics/pdf              → the same analytics as a downloadable PDF report
+router.get("/:id/analytics/pdf", verifyToken, adminOnly, testsCtrl.downloadTestAnalyticsPdf);
+
 // ─── Admin: test authoring ─────────────────────────────────────
 
 // POST /api/tests/question-images/upload-url   → presigned R2 PUT URL for a pasted question/option image

@@ -60,7 +60,9 @@ function mapTestRow(t) {
     title: t.title,
     type: t.type,
     subjectId: t.subject_id,
-    subjectName: t.subjects?.name || null,
+    subjectName: t.chapters?.subjects?.name || t.subjects?.name || null,
+    chapterId: t.chapter_id || null,
+    chapterName: t.chapters?.name || null,
     batchId: t.batch_id,
     audience: t.audience || "BATCH",
     allStudents: t.audience === "ALL",
@@ -78,7 +80,16 @@ function mapTestRow(t) {
   };
 }
 
-const TEST_SELECT = "*, subjects(name), batches(name)";
+const TEST_SELECT = "*, subjects(name), batches(name), chapters(name, subjects(name))";
+
+/** Looks up a chapter's own subject_id, so tests.subject_id stays populated (and existing subject-based display/filtering keeps working) even though the picker now assigns a chapter, not a subject directly. */
+async function subjectIdForChapter(chapterId) {
+  if (!chapterId) return null;
+  const { data, error } = await supabase.from("chapters").select("subject_id").eq("id", chapterId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw badRequest("Chapter not found");
+  return data.subject_id;
+}
 
 // ─── Questions (MCQ) ────────────────────────────────────────────────────────
 
@@ -154,7 +165,7 @@ async function getQuestionsForAdmin(testId) {
 // ─── Create / list / get / update / delete ─────────────────────────────────
 
 async function createTest({
-  title, type, subjectId, batchId, allStudents, audience, scheduledStart, scheduledEnd,
+  title, type, chapterId, subjectId, batchId, allStudents, audience, scheduledStart, scheduledEnd,
   instructions, maxMarks, questionText, createdBy, questions,
 }) {
   if (!title?.trim()) throw badRequest("Title is required");
@@ -169,12 +180,17 @@ async function createTest({
 
   if (type === "mcq") validateQuestions(questions);
 
+  // The picker assigns a chapter, not a subject directly — subject_id is
+  // still derived and stored from it so existing subject-based display stays correct.
+  const resolvedSubjectId = chapterId ? await subjectIdForChapter(chapterId) : (subjectId || null);
+
   const { data: test, error } = await supabase
     .from("tests")
     .insert({
       title: title.trim(),
       type,
-      subject_id: subjectId || null,
+      chapter_id: chapterId || null,
+      subject_id: resolvedSubjectId,
       batch_id: batchId,
       audience: isAllStudents ? "ALL" : "BATCH",
       scheduled_start: scheduledStart,
@@ -218,7 +234,12 @@ async function _notifyTestScheduled(test) {
 async function updateTest(testId, updates) {
   const allowed = {};
   if (updates.title !== undefined) allowed.title = updates.title.trim();
-  if (updates.subjectId !== undefined) allowed.subject_id = updates.subjectId || null;
+  if (updates.chapterId !== undefined) {
+    allowed.chapter_id = updates.chapterId || null;
+    allowed.subject_id = await subjectIdForChapter(updates.chapterId);
+  } else if (updates.subjectId !== undefined) {
+    allowed.subject_id = updates.subjectId || null;
+  }
   if (updates.batchId !== undefined || updates.allStudents !== undefined || updates.audience !== undefined) {
     const target = audienceService.normalizeAudience({ audience: updates.audience, allStudents: updates.allStudents, batchId: updates.batchId });
     if (target.audience === audienceService.AUDIENCE_ALL) {
