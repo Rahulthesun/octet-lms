@@ -89,3 +89,75 @@ function classifyAttendance(pct, presentThreshold, partialThreshold) {
 }
 
 module.exports = { mergeIntervals, calculateAttendedMinutes, calculatePercentage, classifyAttendance };
+
+// ─── Effective class window + late-join grace ───────────────────────────────
+//
+// A class is only "held" while the host is actually in the room. Measuring
+// students against the SCHEDULED window alone punishes them for the host
+// starting late or ending early: in a 5-minute class where the host arrived
+// two minutes in, a student who stayed for the whole time the class really
+// ran would still score under 50% and be marked absent. So attendance is
+// measured against the EFFECTIVE window — the part of the scheduled window
+// the host was present for — and a student who is a little late is forgiven
+// that lateness, up to a small grace.
+
+const MIN_EFFECTIVE_WINDOW_MS = 60 * 1000; // below this, fall back to the scheduled window
+const MAX_GRACE_MS = 5 * 60 * 1000; // late-join grace never exceeds 5 minutes
+const GRACE_FRACTION = 0.1; // ...or 10% of the effective class, whichever is smaller
+
+/**
+ * @param hostSessions [{ start, end|null }] the organizer's own join/leave sessions (may be empty)
+ * @param conferenceStartIso the conference record's start time (fallback anchor when the host can't be identified)
+ * @returns { start: ms, end: ms, usedHost: boolean }
+ */
+function computeEffectiveWindow(classStart, classEnd, hostSessions, conferenceStartIso) {
+  const schedStart = new Date(classStart).getTime();
+  const schedEnd = new Date(classEnd).getTime();
+  const now = Date.now();
+
+  let start = schedStart;
+  let end = schedEnd;
+  let usedHost = false;
+
+  const hostIntervals = (hostSessions || [])
+    .map((s) => {
+      const st = new Date(s.start).getTime();
+      const en = s.end ? new Date(s.end).getTime() : now;
+      return Number.isFinite(st) && Number.isFinite(en) ? { st, en } : null;
+    })
+    .filter(Boolean)
+    .map((iv) => ({ st: Math.max(iv.st, schedStart), en: Math.min(iv.en, schedEnd) }))
+    .filter((iv) => iv.en > iv.st);
+
+  if (hostIntervals.length > 0) {
+    start = Math.min(...hostIntervals.map((iv) => iv.st));
+    end = Math.max(...hostIntervals.map((iv) => iv.en));
+    usedHost = true;
+  } else if (conferenceStartIso) {
+    const confStart = new Date(conferenceStartIso).getTime();
+    if (Number.isFinite(confStart)) start = Math.min(Math.max(confStart, schedStart), schedEnd);
+  }
+
+  if (end - start < MIN_EFFECTIVE_WINDOW_MS) {
+    return { start: schedStart, end: schedEnd, usedHost: false };
+  }
+  return { start, end, usedHost };
+}
+
+/**
+ * Minutes a student is forgiven for arriving a little late and/or leaving a
+ * little early: each of those gaps is credited, capped at the grace.
+ */
+function lateJoinCreditMinutes(mergedIntervals, windowStartMs, windowEndMs) {
+  if (!mergedIntervals || mergedIntervals.length === 0) return 0;
+  const graceMs = Math.min(MAX_GRACE_MS, (windowEndMs - windowStartMs) * GRACE_FRACTION);
+  const firstJoin = mergedIntervals[0].start;
+  const lastLeave = mergedIntervals[mergedIntervals.length - 1].end;
+  const lateBy = Math.max(0, firstJoin - windowStartMs);
+  const earlyBy = Math.max(0, windowEndMs - lastLeave);
+  const creditMs = Math.min(lateBy, graceMs) + Math.min(earlyBy, graceMs);
+  return Math.round((creditMs / 60000) * 100) / 100;
+}
+
+module.exports.computeEffectiveWindow = computeEffectiveWindow;
+module.exports.lateJoinCreditMinutes = lateJoinCreditMinutes;

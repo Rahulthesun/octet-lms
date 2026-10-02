@@ -92,6 +92,8 @@ export interface TestSummary {
   type: TestType
   subjectId: string | null
   subjectName: string | null
+  chapterId: string | null
+  chapterName: string | null
   // null (and audience 'ALL') for an All Students test
   batchId: string | null
   audience?: 'BATCH' | 'ALL'
@@ -118,6 +120,7 @@ export interface TestAdminDetail extends TestSummary {
 export interface CreateTestInput {
   title: string
   type: TestType
+  chapterId?: string | null
   subjectId?: string | null
   // A batch id, or the sentinel 'ALL' for All Students (resolved to every active student)
   batchId: string
@@ -160,6 +163,10 @@ export interface MyAttemptDetail {
     marksAwarded: number | null
     maxMarks: number | null
     evaluatorFeedback: string | null
+    // Marks/answers stay hidden until the test's own scheduled end time —
+    // resultsReady is the single source of truth the exam page checks.
+    resultsAvailableAt: string
+    resultsReady: boolean
   }
   serverNow: string
   questions?: AttemptQuestion[]
@@ -319,6 +326,217 @@ export function useAdminAttempts(testId: string | null) {
 
 export async function fetchAdminAttemptDetail(testId: string, attemptId: string): Promise<AdminAttemptDetail> {
   return authedFetch(`/api/tests/${testId}/attempts/${attemptId}`)
+}
+
+// ─── Admin: result analytics ────────────────────────────────────────────────
+
+export interface AnalyticsPoint {
+  label: string
+  value: number
+}
+
+export interface TestAnalyticsSummary {
+  totalTargeted: number
+  attemptedCount: number
+  notAttemptedCount: number
+  evaluatedCount: number
+  pendingEvaluationCount: number
+  maxMarks: number
+  avgMarks: number | null
+  avgPct: number | null
+  highest: number | null
+  lowest: number | null
+  passPct: number
+  passCount: number
+  failCount: number
+}
+
+export interface PerQuestionStat {
+  questionId: string
+  orderIndex: number
+  label: string
+  questionLabel: string
+  marks: number
+  correctCount: number
+  incorrectCount: number
+  unansweredCount: number
+  correctPct: number
+}
+
+export interface BatchWiseStat {
+  batchId: string
+  batchName: string
+  targetedCount: number
+  evaluatedCount: number
+  avgMarks: number | null
+  avgPct: number | null
+}
+
+export interface PerStudentResult {
+  studentId: string
+  name: string
+  admissionNumber: string | null
+  batchId: string | null
+  batchName: string | null
+  status: 'not_started' | 'in_progress' | 'submitted' | 'evaluated'
+  marksAwarded: number | null
+  maxMarks: number
+  pct: number | null
+  submittedAt: string | null
+  autoSubmitted: boolean
+  pass: boolean | null
+}
+
+export interface TestAnalytics {
+  test: {
+    id: string
+    title: string
+    type: TestType
+    subjectName: string | null
+    chapterName: string | null
+    batchName: string | null
+    audience: 'BATCH' | 'ALL'
+    scheduledStart: string
+    scheduledEnd: string
+    maxMarks: number
+  }
+  summary: TestAnalyticsSummary
+  scoreDistribution: AnalyticsPoint[]
+  perQuestion: PerQuestionStat[]
+  batchWise: BatchWiseStat[]
+  perStudent: PerStudentResult[]
+}
+
+export function useTestAnalytics(testId: string | null, passPct = 40) {
+  const [analytics, setAnalytics] = useState<TestAnalytics | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(() => {
+    if (!testId) { setAnalytics(null); return }
+    setLoading(true)
+    setError(null)
+    authedFetch(`/api/tests/${testId}/analytics?passPct=${passPct}`)
+      .then((d) => setAnalytics(d))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [testId, passPct])
+
+  useEffect(() => { refetch() }, [refetch])
+
+  return { analytics, loading, error, refetch }
+}
+
+/** Downloads the analytics PDF report (same auth-header-then-blob pattern as attendance/parent report downloads). */
+export async function downloadTestAnalyticsPdf(testId: string, filename: string, passPct = 40) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/tests/${testId}/analytics/pdf?passPct=${passPct}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Admin: analytics across EVERY test ─────────────────────────────────────
+
+export interface OverallSummary {
+  totalTests: number
+  mcqCount: number
+  descriptiveCount: number
+  totalAttempts: number
+  evaluatedCount: number
+  pendingEvaluationCount: number
+  avgPct: number | null
+  passPct: number
+  passCount: number
+  failCount: number
+}
+
+export interface PerTestSummary {
+  testId: string
+  title: string
+  type: TestType
+  status: TestStatus
+  batchName: string | null
+  scheduledStart: string
+  scheduledEnd: string
+  attemptedCount: number
+  evaluatedCount: number
+  avgPct: number | null
+  passCount: number
+  failCount: number
+}
+
+export interface OverallBatchStat {
+  batchId: string
+  batchName: string
+  evaluatedCount: number
+  avgPct: number
+}
+
+export interface OverallStudentStat {
+  studentId: string
+  name: string
+  testsEvaluated: number
+  avgPct: number
+}
+
+export interface OverallTestAnalytics {
+  summary: OverallSummary
+  scoreDistribution: AnalyticsPoint[]
+  perTest: PerTestSummary[]
+  batchWise: OverallBatchStat[]
+  perStudent: OverallStudentStat[]
+}
+
+export function useOverallTestAnalytics(passPct = 40) {
+  const [analytics, setAnalytics] = useState<OverallTestAnalytics | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    authedFetch(`/api/tests/analytics/overall?passPct=${passPct}`)
+      .then((d) => setAnalytics(d))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [passPct])
+
+  useEffect(() => { refetch() }, [refetch])
+
+  return { analytics, loading, error, refetch }
+}
+
+export async function downloadOverallAnalyticsPdf(filename: string, passPct = 40) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/tests/analytics/overall/pdf?passPct=${passPct}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export async function gradeDescriptiveAttempt(testId: string, attemptId: string, marksAwarded: number, feedback: string) {

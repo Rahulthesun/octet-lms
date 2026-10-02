@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMyOnlineClasses, type OnlineClass } from '@/hooks/useOnlineClasses'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
+import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -115,6 +116,11 @@ function ClassCalendar({ classes, selectedDate, onSelectDate }: {
 
 function ClassCard({ cls }: { cls: OnlineClass }) {
   const isCancelled = cls.status === 'cancelled'
+  // The Join button is only enabled while the class can still be joined —
+  // once the scheduled end passes it is disabled here, but the meeting
+  // itself keeps running until the host ends it (Google Meet links never
+  // close automatically; this app never touches the live meeting).
+  const hasEnded = new Date(cls.scheduledEnd).getTime() <= Date.now()
   return (
     <div className={`bg-white rounded-lg border shadow-[0_2px_12px_rgba(15,23,42,0.06)] p-5 ${isCancelled ? 'border-rose-100 opacity-70' : 'border-[#e2e5ec]'}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -139,6 +145,15 @@ function ClassCard({ cls }: { cls: OnlineClass }) {
 
       {isCancelled ? (
         <p className="text-rose-600 text-sm">This class has been cancelled.</p>
+      ) : hasEnded ? (
+        <button
+          type="button"
+          disabled
+          title="This class's scheduled time has ended"
+          className="inline-flex items-center justify-center w-full sm:w-auto px-5 py-2.5 rounded-full bg-zinc-200 text-zinc-400 text-sm font-medium cursor-not-allowed"
+        >
+          Join Google Meet
+        </button>
       ) : cls.meetUrl ? (
         <a
           href={cls.meetUrl}
@@ -177,6 +192,8 @@ export default function StudentClassesPage() {
         <h1 className="text-3xl text-primary mb-1">Online Classes</h1>
         <p className="text-muted text-base">Join your scheduled Google Meet classes, or browse the calendar below</p>
       </motion.div>
+
+      <GoogleLinkBanner />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 order-2 lg:order-1 space-y-4">

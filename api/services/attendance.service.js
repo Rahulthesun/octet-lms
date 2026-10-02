@@ -146,6 +146,17 @@ async function createBatch({ id, name, mode, days, start_time, end_time, meet_li
 
   const batchId = id || name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
+  // "All Students" is a virtual target (see ALL_ID above), never a real
+  // batch — a batch actually named/id'd that way would show up as a
+  // duplicate, confusing entry alongside the real sentinel in every batch
+  // picker. Block it here so it can't happen again.
+  if (isAll(batchId) || /^all\s*students?$/i.test(name.trim())) {
+    throw Object.assign(
+      new Error('"All Students" is a built-in option, not a batch — choose a different name'),
+      { status: 400 }
+    );
+  }
+
   const payload = {
     id: batchId,
     name: name,

@@ -155,3 +155,25 @@ html.lenis body {
   background-size: 22px 22px;
   background-position: 0 0;
 }
+
+/* ── Exam protection ─────────────────────────────────────────────────────── */
+/* Used on the live exam screen and the post-exam question/answer review —
+   see components/shared/ExamSecurity.tsx for what this can and can't do. */
+.exam-protected {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* iOS: disables the press-and-hold "Save Image" menu */
+}
+.exam-protected img {
+  pointer-events: none; /* blocks the right-click/long-press "Save image as" on question/option images */
+}
+.exam-blurred {
+  filter: blur(18px);
+  transition: filter 120ms ease-out;
+}
+@media print {
+  .exam-protected {
+    display: none !important;
+  }
+}

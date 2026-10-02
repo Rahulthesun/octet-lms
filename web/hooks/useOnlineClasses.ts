@@ -207,6 +207,29 @@ export function useSubjects() {
   return { subjects, loading }
 }
 
+// ─── Chapters (flat, across every subject — for the test creator's "Chapter" picker) ─
+
+export interface ChapterOption {
+  id: string
+  name: string
+  subjectId: string | null
+  subjectName: string | null
+}
+
+export function useChapters() {
+  const [chapters, setChapters] = useState<ChapterOption[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    authedFetch('/api/chapters')
+      .then((d) => setChapters(Array.isArray(d) ? d : d.chapters ?? d.data ?? []))
+      .catch(() => setChapters([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return { chapters, loading }
+}
+
 // ─── Google account connection (admin-only) ───────────────────────────────────
 
 export function useGoogleAccountStatus() {

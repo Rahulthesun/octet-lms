@@ -71,6 +71,7 @@ async function buildReportData(attemptId) {
       id: test.id,
       title: test.title,
       type: test.type,
+      scheduledEnd: test.scheduled_end,
     },
     student: {
       id: student.id,
@@ -111,6 +112,13 @@ async function generatePdfBuffer(report) {
  * Generates + emails the result PDF to student, father, and mother
  * (whichever have an email on file). Idempotent per attempt — safe to call
  * more than once (e.g. if grading is corrected and re-saved, pass force).
+ *
+ * Withheld until the test's own scheduled_end has passed — sending it the
+ * moment one student's MCQ auto-grades would hand the correct answers to
+ * that family by email while the test is still open for everyone else.
+ * When called too early it does nothing and leaves no log row, so
+ * runDueResultReports() (the scheduler) picks it up the moment the window
+ * closes.
  */
 async function sendResultReport(attemptId, { force = false } = {}) {
   if (!force && (await alreadySent(attemptId))) {
@@ -119,6 +127,10 @@ async function sendResultReport(attemptId, { force = false } = {}) {
 
   const report = await buildReportData(attemptId);
   const { student, test } = report;
+
+  if (!force && new Date(report.test.scheduledEnd).getTime() > Date.now()) {
+    return { attemptId, status: "deferred_until_test_ends" };
+  }
 
   const recipients = [
     student.fatherEmail ? { type: "father", email: student.fatherEmail } : null,
@@ -178,4 +190,32 @@ async function sendResultReport(attemptId, { force = false } = {}) {
   return { attemptId, status, recipients: results };
 }
 
-module.exports = { sendResultReport, buildReportData, generatePdfBuffer };
+/**
+ * Finds every evaluated attempt whose test window has now closed and whose
+ * report hasn't been sent yet, and sends it. This is what actually delivers
+ * a report deferred by sendResultReport() above — called from the
+ * schedulers below and safe to call as often as needed (each attempt is
+ * skipped once test_result_report_log has a row for it).
+ */
+async function runDueResultReports() {
+  const nowIso = new Date().toISOString();
+  const { data: attempts, error } = await supabase
+    .from("test_attempts")
+    .select("id, tests!inner(scheduled_end)")
+    .eq("status", "evaluated")
+    .lte("tests.scheduled_end", nowIso);
+  if (error) throw error;
+
+  const results = [];
+  for (const a of attempts || []) {
+    if (await alreadySent(a.id)) continue;
+    try {
+      results.push(await sendResultReport(a.id));
+    } catch (err) {
+      results.push({ attemptId: a.id, status: "failed", error: err.message });
+    }
+  }
+  return results;
+}
+
+module.exports = { sendResultReport, runDueResultReports, buildReportData, generatePdfBuffer };

@@ -263,6 +263,15 @@ async function getMyAttemptDetail(testId, authUserId) {
   const { test, attempt } = await getTestAndAttempt(testId, student.id);
   if (!attempt) throw notFound("You have not started this test");
 
+  // Marks, correct answers and the question/answer review are withheld until
+  // the test's own scheduled end time has passed — even for a student who
+  // submitted early, so nobody who is still sitting the test can find out
+  // the correct answers from someone who already finished. Being graded
+  // (MCQ auto-grades instantly) is a separate thing from being ALLOWED to
+  // see the grade.
+  const resultsAvailableAt = test.scheduled_end;
+  const resultsReady = Date.now() >= new Date(resultsAvailableAt).getTime();
+
   const base = {
     test: testsService.mapTestRow(test),
     attempt: {
@@ -270,9 +279,11 @@ async function getMyAttemptDetail(testId, authUserId) {
       status: attempt.status,
       startedAt: attempt.started_at,
       submittedAt: attempt.submitted_at,
-      marksAwarded: attempt.status === "evaluated" ? attempt.marks_awarded : null,
+      marksAwarded: attempt.status === "evaluated" && resultsReady ? attempt.marks_awarded : null,
       maxMarks: attempt.max_marks,
-      evaluatorFeedback: attempt.status === "evaluated" ? attempt.evaluator_feedback : null,
+      evaluatorFeedback: attempt.status === "evaluated" && resultsReady ? attempt.evaluator_feedback : null,
+      resultsAvailableAt,
+      resultsReady,
     },
     serverNow: new Date().toISOString(),
   };
@@ -283,30 +294,40 @@ async function getMyAttemptDetail(testId, authUserId) {
     if (error) throw error;
     const byId = Object.fromEntries((questions || []).map((q) => [q.id, q]));
 
+    const revealAnswers = attempt.status === "evaluated" && resultsReady;
     let myAnswers = {};
-    if (attempt.status === "evaluated") {
+    if (revealAnswers) {
       const { data: answers } = await supabase.from("test_answers").select("*").eq("attempt_id", attempt.id);
       myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
-    } else {
+    } else if (attempt.status !== "evaluated") {
+      // Still in progress: the student's own picks are needed to resume, but
+      // never the correct answers.
       const { data: answers } = await supabase.from("test_answers").select("question_id, selected_option").eq("attempt_id", attempt.id);
       myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
     }
+    // Evaluated but not yet resultsReady: myAnswers stays empty — the
+    // question/answer review is withheld entirely until the test ends.
 
-    // Each question/option is text or an image; images are delivered as
-    // short-lived signed URLs (raw storage keys are never sent to students).
-    base.questions = [];
-    for (const q of ids.map((id) => byId[id]).filter(Boolean)) {
-      base.questions.push({
-        id: q.id,
-        ...(await serializeQuestion(q, signKey)),
-        marks: q.marks,
-        selectedOption: myAnswers[q.id]?.selected_option || null,
-        // Only revealed once the attempt is fully evaluated:
-        correctOption: attempt.status === "evaluated" ? q.correct_option : undefined,
-        isCorrect: attempt.status === "evaluated" ? myAnswers[q.id]?.is_correct ?? false : undefined,
-      });
+    if (attempt.status !== "evaluated" || resultsReady) {
+      // Each question/option is text or an image; images are delivered as
+      // short-lived signed URLs (raw storage keys are never sent to students).
+      base.questions = [];
+      for (const q of ids.map((id) => byId[id]).filter(Boolean)) {
+        base.questions.push({
+          id: q.id,
+          ...(await serializeQuestion(q, signKey)),
+          marks: q.marks,
+          selectedOption: myAnswers[q.id]?.selected_option || null,
+          // Only revealed once the attempt is evaluated AND the test's window has closed:
+          correctOption: revealAnswers ? q.correct_option : undefined,
+          isCorrect: revealAnswers ? myAnswers[q.id]?.is_correct ?? false : undefined,
+        });
+      }
     }
-  } else {
+    // else: submitted/evaluated but the test is still open for other
+    // students — base.questions is left undefined, so nothing about the
+    // paper leaks before everyone is done.
+  } else if (resultsReady) {
     base.descriptive = {
       questionText: test.question_text,
       questionFileUrl: await testsService.getSignedFileUrl(test.question_file_key),

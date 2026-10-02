@@ -7,6 +7,9 @@
  */
 
 const testsService = require("../services/tests.service");
+const testAnalyticsService = require("../services/testAnalytics.service");
+const PDFDocument = require("pdfkit");
+const { buildTestAnalyticsPdf, buildOverallAnalyticsPdf } = require("../utils/testAnalyticsPdf");
 
 const createTest = async (req, res) => {
   try {
@@ -75,6 +78,63 @@ const uploadAnswerKeyFile = async (req, res) => {
   }
 };
 
+/** GET /api/tests/:id/analytics?passPct= */
+const getTestAnalytics = async (req, res) => {
+  try {
+    const passPct = req.query.passPct ? Number(req.query.passPct) : undefined;
+    const analytics = await testAnalyticsService.getTestAnalytics(req.params.id, { passPct });
+    res.status(200).json(analytics);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/** GET /api/tests/:id/analytics/pdf?passPct= */
+const downloadTestAnalyticsPdf = async (req, res) => {
+  try {
+    const passPct = req.query.passPct ? Number(req.query.passPct) : undefined;
+    const analytics = await testAnalyticsService.getTestAnalytics(req.params.id, { passPct });
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    const filename = `${analytics.test.title.replace(/[^a-zA-Z0-9]+/g, "_")}_analytics.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    doc.pipe(res);
+    buildTestAnalyticsPdf(doc, analytics);
+    doc.end();
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/** GET /api/tests/analytics/overall?passPct= — analytics across every test. */
+const getOverallAnalytics = async (req, res) => {
+  try {
+    const passPct = req.query.passPct ? Number(req.query.passPct) : undefined;
+    const analytics = await testAnalyticsService.getOverallAnalytics({ passPct });
+    res.status(200).json(analytics);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/** GET /api/tests/analytics/overall/pdf?passPct= — the same, as a downloadable PDF. */
+const downloadOverallAnalyticsPdf = async (req, res) => {
+  try {
+    const passPct = req.query.passPct ? Number(req.query.passPct) : undefined;
+    const analytics = await testAnalyticsService.getOverallAnalytics({ passPct });
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="all_tests_analytics.pdf"`);
+    doc.pipe(res);
+    buildOverallAnalyticsPdf(doc, analytics);
+    doc.end();
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   createTest,
   listTests,
@@ -83,4 +143,8 @@ module.exports = {
   deleteTest,
   uploadQuestionFile,
   uploadAnswerKeyFile,
+  getTestAnalytics,
+  downloadTestAnalyticsPdf,
+  getOverallAnalytics,
+  downloadOverallAnalyticsPdf,
 };

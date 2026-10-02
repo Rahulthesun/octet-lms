@@ -7,6 +7,7 @@ import {
   type MyAttemptDetail, type OptionKey, type StudentTestListItem,
 } from '@/hooks/useTests'
 import QuestionContent from '@/components/shared/QuestionContent'
+import { useExamGuard, Watermark } from '@/components/shared/ExamSecurity'
 
 function formatClock(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -27,13 +28,19 @@ export default function ExamRunnerPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [phase, setPhase] = useState<'intro' | 'exam' | 'result'>('intro')
+  const [phase, setPhase] = useState<'intro' | 'exam' | 'submitted' | 'result'>('intro')
   const [currentIdx, setCurrentIdx] = useState(0)
   const [serverOffsetMs, setServerOffsetMs] = useState(0)
   const [remainingMs, setRemainingMs] = useState(0)
   const [fullscreenWarning, setFullscreenWarning] = useState(false)
   const [exitCount, setExitCount] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [studentLabel, setStudentLabel] = useState<string | null>(null)
+
+  // Anti-copy/screenshot deterrents (see components/shared/ExamSecurity.tsx)
+  // apply for the whole time sensitive content is on screen: the live exam
+  // AND the post-exam question/answer review.
+  const { blurred } = useExamGuard(phase === 'exam' || phase === 'result')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const autoSubmittedRef = useRef(false)
@@ -58,10 +65,13 @@ export default function ExamRunnerPage() {
       }
       setListItem(found)
 
-      if (found.myAttempt?.status === 'evaluated') {
+      const status = found.myAttempt?.status
+      if (status === 'evaluated' || status === 'submitted') {
         const d = await fetchMyAttempt(testId)
         setDetail(d)
-        setPhase('result')
+        // Marks and the question/answer review are withheld until the
+        // test's own scheduled end time — resultsReady is decided server-side.
+        setPhase(status === 'evaluated' && d.attempt.resultsReady ? 'result' : 'submitted')
       } else {
         setPhase('intro')
       }
@@ -73,6 +83,22 @@ export default function ExamRunnerPage() {
   }, [testId])
 
   useEffect(() => { loadInitial() }, [loadInitial])
+
+  // Watermark identity — first name + admission number, so a leaked
+  // screenshot of the review screen can be traced. Fetched once, best-effort.
+  useEffect(() => {
+    authedFetch('/api/students/profile')
+      .then((p) => setStudentLabel([p.name, p.rollNumber].filter(Boolean).join(' - ')))
+      .catch(() => {})
+  }, [])
+
+  // While waiting for the results window to open, re-check periodically so
+  // the student doesn't have to manually refresh the page.
+  useEffect(() => {
+    if (phase !== 'submitted') return
+    const id = setInterval(loadInitial, 60 * 1000)
+    return () => clearInterval(id)
+  }, [phase, loadInitial])
 
   // ─── Countdown to the shared scheduled_end, corrected for client clock skew ──
   useEffect(() => {
@@ -161,7 +187,7 @@ export default function ExamRunnerPage() {
       await submitMyAttempt(testId, { autoSubmitted: auto })
       const d = await fetchMyAttempt(testId)
       setDetail(d)
-      setPhase('result')
+      setPhase(d.attempt.resultsReady ? 'result' : 'submitted')
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to submit the test')
@@ -229,13 +255,47 @@ export default function ExamRunnerPage() {
 
   if (!detail) return null
 
+  // ─── Submitted, waiting for the results window ──────────────────────────────
+  // Marks and the answer review are withheld until the test's own scheduled
+  // end time passes, even for a student who submitted early, so nobody still
+  // sitting the test can find out the correct answers from someone who
+  // already finished.
+  if (phase === 'submitted') {
+    const availableAt = new Date(detail.attempt.resultsAvailableAt)
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+        <div className="max-w-lg w-full text-center">
+          <h1 className="text-2xl text-primary mb-2">{detail.test.title}</h1>
+          <p className="text-muted text-[15px] mb-1">
+            Submitted {detail.attempt.submittedAt ? new Date(detail.attempt.submittedAt).toLocaleString('en-IN') : ''}
+          </p>
+          <p className="text-primary text-[15px] mb-8">
+            Your marks and the question/answer review will be available after{' '}
+            {availableAt.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })},
+            once the test window closes for everyone.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={loadInitial} className="px-5 py-2.5 rounded-md border border-[#e2e5ec] text-primary text-[15px] hover:bg-[#FAF9FB] transition-colors">
+              Check now
+            </button>
+            <button onClick={() => router.push('/student/tests')} className="px-5 py-2.5 rounded-md bg-brand text-white text-[15px] hover:opacity-90 transition-opacity">
+              Back to Tests
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ─── Result screen ──────────────────────────────────────────────────────────
   if (phase === 'result') {
     const pct = detail.attempt.marksAwarded !== null && detail.attempt.maxMarks
       ? Math.round((detail.attempt.marksAwarded / detail.attempt.maxMarks) * 100) : null
+    const watermarkLines = ['OCTET', ...(studentLabel ? [studentLabel] : [])]
     return (
-      <div className="min-h-screen bg-white px-6 py-10">
-        <div className="max-w-2xl mx-auto">
+      <div className={`min-h-screen bg-white px-6 py-10 exam-protected ${blurred ? 'exam-blurred' : ''}`}>
+        <div className="relative max-w-2xl mx-auto">
+          <Watermark lines={watermarkLines} />
           <h1 className="text-2xl text-primary mb-1">{detail.test.title} — Result</h1>
           <p className="text-muted text-[15px] mb-6">Submitted {detail.attempt.submittedAt ? new Date(detail.attempt.submittedAt).toLocaleString('en-IN') : ''}</p>
 
@@ -292,7 +352,7 @@ export default function ExamRunnerPage() {
   const urgent = remainingMs < 5 * 60 * 1000
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-white flex flex-col">
+    <div ref={containerRef} className={`min-h-screen bg-white flex flex-col exam-protected ${blurred ? 'exam-blurred' : ''}`}>
       {fullscreenWarning && (
         <div className="bg-rose-600 text-white text-center text-[14px] py-2">
           Full screen was exited — please stay in full screen for the rest of the test. ({exitCount} exit{exitCount === 1 ? '' : 's'} recorded)

@@ -86,6 +86,7 @@ const testsRouter = require("./routes/tests.routes");
 const videoAnalyticsRouter = require("./routes/videoAnalytics.routes");
 const notificationsRouter = require("./routes/notifications.routes");
 const alumniRouter = require("./routes/alumni.routes");
+const passwordResetRouter = require("./routes/passwordReset.routes");
 const questionBankRouter = require("./routes/questionBank.routes");
 const examDocumentsRouter = require("./routes/examDocuments.routes");
 const { startAlumniScheduler } = require("./services/alumniScheduler.service");
@@ -93,6 +94,7 @@ const { startScheduler: startAttendanceSyncScheduler } = require("./services/onl
 const { startMonthlyReportScheduler } = require("./services/parentReportScheduler.service");
 const { startAbsenceNotifyScheduler } = require("./services/absenceNotifyScheduler.service");
 const { startTestAutoSubmitScheduler } = require("./services/testAutoSubmitScheduler.service");
+const { startTestResultReportScheduler } = require("./services/testResultReportScheduler.service");
 const { startNotificationRemindersScheduler } = require("./services/notificationReminders.service");
 
 app.use("/api/content/pdf",  pdfRouter);
@@ -126,6 +128,7 @@ app.use("/api/tests", testsRouter);
 app.use("/api/video-analytics", videoAnalyticsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/alumni", alumniRouter);
+app.use("/api/auth", passwordResetRouter);
 app.use("/api/question-bank", questionBankRouter);
 app.use("/api/exam-documents", examDocumentsRouter);
 
@@ -181,6 +184,11 @@ app.listen(PORT, "0.0.0.0", () => {
   // (closed tab, lost connection) — auto-grades them once their test's
   // scheduled end has passed. See services/testAutoSubmitScheduler.service.js.
   startTestAutoSubmitScheduler();
+
+  // Sends result-report emails deferred while a test was still open for
+  // other students, the moment its window closes. See
+  // services/testResultReportScheduler.service.js.
+  startTestResultReportScheduler();
 
   // Test-starting-soon and task-due-soon in-app/email reminders. See
   // services/notificationReminders.service.js.

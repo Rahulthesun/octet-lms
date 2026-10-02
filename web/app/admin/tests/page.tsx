@@ -6,7 +6,9 @@ import { useAdminTests, useAdminAttempts, type TestSummary } from '@/hooks/useTe
 import { useBatches } from '@/hooks/useAttendanceData'
 import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
-import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon } from '@/components/admin/tests/icons'
+import TestAnalyticsModal from '@/components/admin/tests/TestAnalyticsModal'
+import OverallAnalyticsModal from '@/components/admin/tests/OverallAnalyticsModal'
+import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon } from '@/components/admin/tests/icons'
 
 const ACCENT = '#5B21B6'
 
@@ -47,6 +49,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
   const badge = WINDOW_BADGE[w]
   const { attempts, loading: attemptsLoading, refetch } = useAdminAttempts(isOpen ? test.id : null)
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const qRef = useRef<HTMLInputElement>(null)
   const keyRef = useRef<HTMLInputElement>(null)
 
@@ -112,14 +115,22 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                   <input ref={keyRef} type="file" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadKey(test.id, f); e.target.value = '' }} />
 
+                  <button onClick={() => setShowAnalytics(true)}
+                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
+                    <ReportIcon className="w-4 h-4" /> Report
+                  </button>
                   <button onClick={() => onDelete(test.id)}
-                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-500 hover:border-rose-300 hover:text-rose-600 transition-colors">
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-500 hover:border-rose-300 hover:text-rose-600 transition-colors">
                     <TrashIcon className="w-4 h-4" /> Delete test
                   </button>
                 </div>
               )}
               {test.type === 'mcq' && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setShowAnalytics(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
+                    <ReportIcon className="w-4 h-4" /> Report
+                  </button>
                   <button onClick={() => onDelete(test.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-500 hover:border-rose-300 hover:text-rose-600 transition-colors">
                     <TrashIcon className="w-4 h-4" /> Delete test
@@ -167,6 +178,9 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
           onClose={() => setSelectedAttemptId(null)}
           onGraded={refetch} />
       )}
+      {showAnalytics && (
+        <TestAnalyticsModal test={test} onClose={() => setShowAnalytics(false)} />
+      )}
     </div>
   )
 }
@@ -178,6 +192,7 @@ export default function AdminTestsPage() {
     useAdminTests(batchFilter ? { batchId: batchFilter } : undefined)
 
   const [openTestId, setOpenTestId] = useState<string | null>(null)
+  const [showOverallAnalytics, setShowOverallAnalytics] = useState(false)
 
   const withWindow = useMemo(() => tests.map((t) => ({ test: t, window: windowOf(t) })), [tests])
   const live = withWindow.filter((x) => x.window === 'live')
@@ -203,13 +218,24 @@ export default function AdminTestsPage() {
           <h1 className="text-2xl font-semibold text-zinc-900">Tests</h1>
           <p className="text-[15px] text-zinc-500 mt-1">Schedule MCQ and descriptive tests, and grade student answers.</p>
         </div>
-        <Link href="/admin/tests/new"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-[15px] transition-colors w-fit"
-          style={{ backgroundColor: ACCENT }}>
-          <ClockIcon className="w-4 h-4" />
-          Schedule New Test
-        </Link>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowOverallAnalytics(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
+            <ReportIcon className="w-4 h-4" />
+            Tests Report
+          </button>
+          <Link href="/admin/tests/new"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-[15px] transition-colors w-fit"
+            style={{ backgroundColor: ACCENT }}>
+            <ClockIcon className="w-4 h-4" />
+            Schedule New Test
+          </Link>
+        </div>
       </div>
+
+      {showOverallAnalytics && (
+        <OverallAnalyticsModal onClose={() => setShowOverallAnalytics(false)} />
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {stats.map((s) => (

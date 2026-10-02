@@ -8,6 +8,7 @@ import { formatTimeInZone } from '@/lib/helpers'
 import { useStudentName } from '@/hooks/useStudentName'
 import PersonalTasksWidget from '@/components/shared/PersonalTasksWidget'
 import ExamDocumentsBanner from '@/components/student/ExamDocumentsBanner'
+import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
 
 // ─── Backend shape (api/services/dashboard.service.js → getStudentOverview) ──
 
@@ -195,6 +196,7 @@ export default function StudentDashboard() {
 
       {/* Reminder until every requested hall ticket / marksheet is uploaded */}
       <ExamDocumentsBanner />
+      <GoogleLinkBanner />
 
       {loading ? (
         <div className="py-24 text-center text-muted text-base">Loading dashboard…</div>

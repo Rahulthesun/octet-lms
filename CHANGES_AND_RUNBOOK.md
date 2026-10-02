@@ -187,3 +187,125 @@ Verify on production: log in as Mr. Raju, toggle guest mode on and off several t
 - Deleting a test never deletes bank rows (`source_test_id` is deliberately not a foreign key) and does not delete
   question images. The same question is never stored twice (unique content hash, matched between JS and SQL).
 - Old text-only tests are untouched: all new type columns default to `text`.
+
+---
+
+# Change set 3: Exam security, chapters, test analytics, batch cleanup
+
+## Setup
+1. Run `api/sql/test_chapter_link.sql` in the Supabase SQL editor (adds `tests.chapter_id`).
+2. Run `api/sql/remove_stray_all_students_batch.sql` — it first SHOWS what it would remove, then only deletes the
+   stray "All Students Batch" row from `public.batches` if no student is enrolled in or assigned to it. Read its
+   output before re-running the delete step.
+3. Restart the API so the new schedulers start (`services/testResultReportScheduler.service.js`).
+
+## What was built
+
+### 1. Results withheld until the test ends, plus exam/review screenshot deterrents
+- Marks, the correct answers and the question/answer review are now withheld from a student until the test's own
+  `scheduled_end` has passed — even if that student submitted early and their MCQ was auto-graded instantly.
+  A student who finishes early sees "Submitted — results available after <time>" with no questions shown.
+- The result-report email/PDF (previously sent the instant an MCQ auto-graded) is deferred the same way, by a new
+  scheduler (`testResultReportScheduler.service.js`, every 2 minutes) that sends it once the test's window closes.
+- The live exam screen and the post-exam review screen both apply best-effort anti-copy protection
+  (`components/shared/ExamSecurity.tsx`): right-click, text selection, copy/cut, image drag, Ctrl+S/P/C/U, devtools
+  shortcuts and the PrintScreen key are blocked where a browser allows blocking them; the page blurs the instant
+  the tab loses focus or is hidden. No browser can make OS-level screenshotting or screen recording impossible —
+  this is stated plainly in the code comments, not oversold.
+- The review screen additionally shows a translucent "OCTET" + student name/roll tiled watermark, so a leaked
+  screenshot can be traced. The watermark only appears there — never during the live exam, and never in the admin
+  question bank or test authoring screens.
+
+### 2. Google account connect + admin access for ralinraju107@gmail.com
+- That account's role is now `both` (full access) — done directly against the database for this session.
+- No Google token was ever stored for that account (confirmed against `google_admin_tokens`), so the failure is
+  the Google Cloud OAuth consent screen: it is in Testing mode and this Gmail is not on the Test users list —
+  the same cause diagnosed earlier for this same account. This can only be fixed in Google Cloud Console, not in
+  this codebase: APIs & Services > OAuth consent screen > Test users > add ralinraju107@gmail.com, then have them
+  reconnect from Admin > Online Classes. `GET /api/google/config-check` (admin-only) reports the server's own
+  redirect URIs/origins to compare against the Console.
+
+### 3. Chapter dropdown replaces the Subject dropdown in the test creator
+- New `GET /api/chapters` (flat list, every chapter across every subject) backs a new "Chapter" field in the test
+  creator, replacing the old "Subject" dropdown.
+- `tests.chapter_id` is the new, specific reference; `tests.subject_id` is still auto-filled from the chosen
+  chapter's own subject, so nothing that reads subject stops working.
+
+### 4. Test result analytics ("Report" button)
+- Every test card in Admin > Tests now has a Report button. It opens a modal with: a summary (targeted/attempted/
+  evaluated/pass-fail), a score-distribution graph, per-question correctness (MCQ), a batch-wise breakdown (only
+  shown when relevant — an All Students test spans several batches), and the full per-student table.
+- Each graph can be switched between bar, pie and line (the same chart component already used for attendance).
+- "Download as PDF" (`GET /api/tests/:id/analytics/pdf`) exports the same analytics as a formatted report.
+- Everything is computed from `test_attempts`/`test_answers`/`test_questions` — no placeholder numbers.
+
+### 5. Removed the stray "All Students Batch" duplicate
+- "All Students" is a virtual, database-free option (see the earlier All Students change set) — a real batch row
+  with that name was a leftover duplicate. `createBatch` now rejects creating a batch named/id'd "All Students"
+  again, and `sql/remove_stray_all_students_batch.sql` removes the existing stray row (guarded — see Setup above).
+
+---
+
+# Change set 4: Online class auto-close and attendance fix
+
+- Root causes found on live data (class "Test 1", 8:20-8:25 PM IST): (1) the Meet conference had no end time and was
+  still live hours later - a Calendar-created Meet link never closes while anyone stays connected; (2) both students
+  who attended were "unmatched" because they had never linked a Google account, so they were marked absent; (3)
+  attendance was measured against the scheduled window even though the host only joined 2 minutes in.
+- Auto-close: `services/meetAutoClose.service.js` ends any still-live Meet once the class's scheduled end has passed
+  (checked every minute). It needs two extra Google permissions (meetings.space.created / .settings). Reconnect the
+  Google account ONCE (Admin > Online Classes shows a warning until you do). Optional grace for overruns:
+  env MEET_AUTO_CLOSE_GRACE_MINUTES. Students also no longer see the Join link after the end time.
+- Attendance: participants are matched by linked Google account first, then by the student's REGISTERED email/name
+  (`utils/participantMatch.js`, conservative: strong unique matches only, then linked permanently). The host is never
+  listed as unmatched. Students are measured against the time the host was actually present, with a small grace for
+  arriving late or leaving early. Classes with unmatched participants are re-checked automatically for 48 hours, and
+  linking a Google account re-runs the class immediately. Students get a "Link Google account" banner.
+
+---
+
+# Change set 5: Auto-close removed, attendance matching hardened, thresholds corrected
+
+- Removed the automatic Meet-closing feature entirely, per instruction: the meeting now only ends when the host
+  ends it. Deleted `services/meetAutoClose.service.js`, its scheduler call in `server.js`, the manual
+  `/end-meeting` route, and the extra Google scopes (`meetings.space.created`/`.settings`) that were only needed
+  for it — no reconnect is required for this.
+- Student-facing "Join Google Meet" is now a disabled button once the class's scheduled end time has passed
+  (previously it just showed text) — the live meeting itself is left alone.
+- Found and fixed a real matching bug: the host's own numeric Google account id was looked up once and cached in
+  memory; if that lookup failed for any reason (e.g. right after a server restart) the failure was cached as "no
+  organizer", and the host's own join then fell through to student-matching and could show up as an "unmatched
+  participant". The lookup no longer swallows errors or caches a failure — a lookup failure now fails that sync
+  attempt loudly (and is retried automatically), never silently mis-identifies the host.
+- Attendance thresholds corrected in the live database to match exactly what was asked: present at 75% and above,
+  partial from 50% up to 75%, absent below 50% (`attendance_settings.partial_threshold` was 40, now 50). These
+  values were already read live from the database everywhere (roster, reports, PDFs) — only the stored numbers
+  were wrong, not the code path.
+- Re-ran attendance sync on the affected class after these fixes and confirmed the host no longer appears in
+  "unmatched participants". Checked Google's own Meet API data directly for the specific class the user reported:
+  Google itself never recorded a join from that student's account for that particular meeting — see the reply for
+  what to check (right Google account, actually admitted into the room, and allowing a few minutes after the class
+  for Google to finalize the record) before re-testing.
+
+---
+
+# Change set 6: Forgot password
+
+## Setup (required before this works)
+Run `api/sql/password_reset.sql` in the Supabase SQL editor (staging first). It adds one new table,
+`password_reset_tokens`. Nothing else needs to run or restart beyond the normal API restart.
+
+## What was built
+- Login's "Forgot password?" link went nowhere (`href="#"`) and nothing in the codebase sent a reset email —
+  built the whole flow from scratch.
+- `/forgot-password`: asks for the registered email, calls `POST /api/auth/forgot-password`. The response is
+  identical whether or not the email has an account, so the page can never be used to discover who is registered.
+- If the email matches an account (student or staff — both are in Supabase Auth), a one-time link valid for 30
+  minutes is emailed through the existing Brevo sender (`sendPasswordResetEmail` in `utils/email.js` — already
+  written, just never wired up).
+- `/reset-password?token=...`: validates the token up front, then lets the user set a new password.
+  `POST /api/auth/reset-password` writes it straight into Supabase Auth via the Admin API
+  (`auth.admin.updateUserById`) — it becomes the account's real login credential immediately, the same table every
+  login checks. The token is single-use (and every other outstanding token for that account is invalidated at the
+  same time), and the account's existing sessions are revoked so a reset also forces a fresh login everywhere.
+- Only the token's sha256 hash is ever stored in the database; the raw token exists only in the emailed link.

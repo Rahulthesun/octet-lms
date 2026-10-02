@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useSubjects } from '@/hooks/useOnlineClasses'
+import { useChapters } from '@/hooks/useOnlineClasses'
 import { useBatches } from '@/hooks/useAttendanceData'
 import { useAdminTests } from '@/hooks/useTests'
 import type { CreateTestInput, TestQuestionInput, TestType, OptionKey, QuestionField } from '@/hooks/useTests'
@@ -83,13 +83,13 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 export default function ScheduleTestForm() {
   const router = useRouter()
-  const { subjects } = useSubjects()
+  const { chapters } = useChapters()
   const { batches } = useBatches('all')
   const { createTest } = useAdminTests()
 
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TestType>('mcq')
-  const [subjectId, setSubjectId] = useState('')
+  const [chapterId, setChapterId] = useState('')
   const [batchId, setBatchId] = useState('')
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -145,7 +145,7 @@ export default function ScheduleTestForm() {
       const input: CreateTestInput = {
         title: title.trim(),
         type,
-        subjectId: subjectId || undefined,
+        chapterId: chapterId || undefined,
         batchId,
         scheduledStart,
         scheduledEnd,
@@ -201,10 +201,10 @@ export default function ScheduleTestForm() {
               </select>
             </div>
             <div>
-              <label className={labelCls} htmlFor="t-subject">Subject</label>
-              <select id="t-subject" value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={inputCls}>
-                <option value="">No subject</option>
-                {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <label className={labelCls} htmlFor="t-chapter">Chapter</label>
+              <select id="t-chapter" value={chapterId} onChange={(e) => setChapterId(e.target.value)} className={inputCls}>
+                <option value="">No chapter</option>
+                {chapters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>

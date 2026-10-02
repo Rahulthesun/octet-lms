@@ -66,6 +66,15 @@ export function CheckCircleIcon({ className = 'w-4 h-4' }: { className?: string 
   )
 }
 
+export function ReportIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none">
+      <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6.5 13.5v-3M10 13.5v-6M13.5 13.5v-4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function XIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none">
