@@ -43,6 +43,8 @@ export interface ChartDatum {
   label: string
   value: number
   color?: string
+  /** Overrides the tooltip's value line, e.g. "3/5 — 60%" instead of the plain value+suffix. */
+  tooltipLabel?: string
 }
 
 interface AxisLabels {
@@ -156,8 +158,7 @@ function CustomTooltip({ active, payload, valueSuffix }: any) {
         <span className="text-zinc-700 font-medium">{entry.payload?.label ?? entry.name}</span>
       </div>
       <p className="text-zinc-500 mt-0.5 tabular-nums">
-        {entry.value}
-        {valueSuffix ?? ''}
+        {entry.payload?.tooltipLabel ?? `${entry.value}${valueSuffix ?? ''}`}
       </p>
     </div>
   )

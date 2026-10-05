@@ -26,8 +26,8 @@ function formatRange(startIso: string, endIso: string) {
   const start = new Date(startIso)
   const end = new Date(endIso)
   const dateStr = start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-  const startStr = start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-  const endStr = end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  const startStr = start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+  const endStr = end.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
   return `${dateStr} · ${startStr} – ${endStr}`
 }
 
@@ -50,6 +50,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
   const { attempts, loading: attemptsLoading, refetch } = useAdminAttempts(isOpen ? test.id : null)
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [sortMode, setSortMode] = useState<'default' | 'fastest' | 'marksHigh' | 'marksLow'>('default')
   const qRef = useRef<HTMLInputElement>(null)
   const keyRef = useRef<HTMLInputElement>(null)
 
@@ -60,6 +61,36 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
     const avgPct = scored.reduce((s, a) => s + (a.marksAwarded! / a.maxMarks!) * 100, 0) / scored.length
     return Math.round(avgPct)
   }, [attempts])
+
+  const sortedAttempts = useMemo(() => {
+    if (sortMode === 'default') return attempts
+    const list = [...attempts]
+    if (sortMode === 'fastest') {
+      list.sort((a, b) => {
+        const timeOf = (x: typeof a) => {
+          if (!x.startedAt || !x.submittedAt) return null
+          const t = new Date(x.submittedAt).getTime() - new Date(x.startedAt).getTime()
+          return Number.isFinite(t) ? t : null
+        }
+        const ta = timeOf(a)
+        const tb = timeOf(b)
+        if (ta === null && tb === null) return 0
+        if (ta === null) return 1
+        if (tb === null) return -1
+        return ta - tb
+      })
+    } else if (sortMode === 'marksHigh' || sortMode === 'marksLow') {
+      list.sort((a, b) => {
+        const pa = a.marksAwarded !== null && a.maxMarks ? a.marksAwarded / a.maxMarks : null
+        const pb = b.marksAwarded !== null && b.maxMarks ? b.marksAwarded / b.maxMarks : null
+        if (pa === null && pb === null) return 0
+        if (pa === null) return 1
+        if (pb === null) return -1
+        return sortMode === 'marksHigh' ? pb - pa : pa - pb
+      })
+    }
+    return list
+  }, [attempts, sortMode])
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
@@ -144,25 +175,52 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 {classAvg !== null && <span>Class average: <span className="font-inter text-zinc-700">{classAvg}%</span></span>}
               </div>
 
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-zinc-400 uppercase tracking-wide">Sort</span>
+                {([
+                  { key: 'default', label: 'Default' },
+                  { key: 'fastest', label: 'Fastest submission' },
+                  { key: 'marksHigh', label: 'Marks: High to Low' },
+                  { key: 'marksLow', label: 'Marks: Low to High' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setSortMode(opt.key)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                      sortMode === opt.key
+                        ? 'text-white border-transparent'
+                        : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'
+                    }`}
+                    style={sortMode === opt.key ? { backgroundColor: ACCENT } : undefined}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-                <div className="grid grid-cols-[1fr_100px_100px_90px] gap-2 px-4 py-2.5 bg-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
-                  <span>Student</span><span>Status</span><span>Marks</span><span className="text-right">%</span>
+                <div className="grid grid-cols-[1fr_100px_90px_90px_90px] gap-2 px-4 py-2.5 bg-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
+                  <span>Student</span><span>Status</span><span>Marks</span><span>Time taken</span><span className="text-right">%</span>
                 </div>
                 {attemptsLoading && <div className="px-4 py-4 text-sm text-zinc-400">Loading attempts…</div>}
                 {!attemptsLoading && attempts.length === 0 && (
                   <div className="px-4 py-4 text-sm text-zinc-400">No student has attempted this test yet.</div>
                 )}
-                {attempts.map((a) => {
+                {sortedAttempts.map((a) => {
                   const pct = a.marksAwarded !== null && a.maxMarks ? Math.round((a.marksAwarded / a.maxMarks) * 100) : null
                   const clickable = a.status === 'submitted' || a.status === 'evaluated'
+                  const timeTaken = a.startedAt && a.submittedAt
+                    ? Math.max(0, Math.round((new Date(a.submittedAt).getTime() - new Date(a.startedAt).getTime()) / 60000))
+                    : null
                   return (
                     <button key={a.id} disabled={!clickable} onClick={() => setSelectedAttemptId(a.id)}
-                      className={`w-full grid grid-cols-[1fr_100px_100px_90px] gap-2 px-4 py-2.5 border-b border-zinc-50 last:border-0 text-left ${
+                      className={`w-full grid grid-cols-[1fr_100px_90px_90px_90px] gap-2 px-4 py-2.5 border-b border-zinc-50 last:border-0 text-left ${
                         clickable ? 'hover:bg-zinc-50 cursor-pointer' : 'cursor-default opacity-70'
                       }`}>
                       <span className="text-[15px] text-zinc-800 truncate">{a.studentName}</span>
                       <span className="text-sm text-zinc-500 capitalize">{a.status.replace('_', ' ')}</span>
                       <span className="text-sm font-inter text-zinc-700">{a.marksAwarded !== null ? `${a.marksAwarded}/${a.maxMarks}` : '—'}</span>
+                      <span className="text-sm font-inter text-zinc-500">{timeTaken !== null ? `${timeTaken} min` : '—'}</span>
                       <span className="text-sm font-inter text-zinc-500 text-right">{pct !== null ? `${pct}%` : '—'}</span>
                     </button>
                   )
@@ -219,6 +277,10 @@ export default function AdminTestsPage() {
           <p className="text-[15px] text-zinc-500 mt-1">Schedule MCQ and descriptive tests, and grade student answers.</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/admin/question-bank"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
+            Question Bank
+          </Link>
           <button onClick={() => setShowOverallAnalytics(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
             <ReportIcon className="w-4 h-4" />

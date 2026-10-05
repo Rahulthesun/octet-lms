@@ -92,6 +92,15 @@ const gradeAttempt = async (req, res) => {
   }
 };
 
+const adminGetStudentMonthlyReport = async (req, res) => {
+  try {
+    const report = await testAttemptsService.getStudentMonthlyReport(req.params.studentId, req.query.month);
+    res.status(200).json(report);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   listMyTests,
   startAttempt,
@@ -101,4 +110,5 @@ module.exports = {
   adminListAttempts,
   adminGetAttempt,
   gradeAttempt,
+  adminGetStudentMonthlyReport,
 };

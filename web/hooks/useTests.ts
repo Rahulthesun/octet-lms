@@ -539,6 +539,43 @@ export async function downloadOverallAnalyticsPdf(filename: string, passPct = 40
   URL.revokeObjectURL(url)
 }
 
+// ─── Admin: one student's consolidated monthly test report ─────────────────
+
+export interface StudentTestReportPoint {
+  date: string // YYYY-MM-DD
+  day: number
+  marksAwarded: number
+  maxMarks: number
+  testTitle: string
+}
+
+export interface StudentTestReport {
+  student: { id: string; name: string }
+  month: string // YYYY-MM
+  points: StudentTestReportPoint[]
+  absentDates: number[]
+}
+
+export function useStudentTestReport(studentId: string | null, month: string) {
+  const [report, setReport] = useState<StudentTestReport | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(() => {
+    if (!studentId || !month) { setReport(null); return }
+    setLoading(true)
+    setError(null)
+    authedFetch(`/api/tests/students/${studentId}/report?month=${month}`)
+      .then((d) => setReport(d))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [studentId, month])
+
+  useEffect(() => { refetch() }, [refetch])
+
+  return { report, loading, error, refetch }
+}
+
 export async function gradeDescriptiveAttempt(testId: string, attemptId: string, marksAwarded: number, feedback: string) {
   return authedFetch(`/api/tests/${testId}/attempts/${attemptId}/grade`, {
     method: 'POST',

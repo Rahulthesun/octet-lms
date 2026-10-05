@@ -162,6 +162,34 @@ const navItems = [
     ),
   },
   {
+    href: "/admin/question-bank",
+    label: "Question Bank",
+    status: "testing",
+    icon: (
+      <svg
+        className="w-5.5 h-5.5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+      >
+        <rect
+          x="3"
+          y="3"
+          width="14"
+          height="14"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M 6.5,7.5 H 13.5 M 6.5,10 H 13.5 M 6.5,12.5 H 10.5"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/students",
     label: "Students",
     status: "testing",

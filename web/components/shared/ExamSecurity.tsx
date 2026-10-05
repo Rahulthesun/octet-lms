@@ -15,8 +15,9 @@
 //     blurred frame, and restores it the instant focus returns
 //   - a translucent, tiled watermark identifying the student, so a leaked
 //     screenshot can always be traced back to whoever took it
-// Used by the exam runner page for both the live test and the post-test
-// review — never anywhere else (e.g. never in the admin question bank).
+// Used by the exam runner page for the live test, and the tiled Watermark
+// below is also reused in the admin question-bank views so an admin's own
+// screenshot of a question paper can be traced.
 
 import { useEffect, useState } from 'react'
 
@@ -78,8 +79,8 @@ export function useExamGuard(active: boolean) {
 
 /**
  * Translucent tiled watermark over its parent (which must be `position:
- * relative` or similar). Only meant for the post-exam question/answer
- * review — never during authoring, and never in the admin question bank.
+ * relative` or similar). Generic/reusable: used during the live exam, and
+ * also over admin question-bank/question-paper views.
  */
 export function Watermark({ lines }: { lines: string[] }) {
   const cells = Array.from({ length: 24 })

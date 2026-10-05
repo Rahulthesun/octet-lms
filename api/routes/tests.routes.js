@@ -68,6 +68,9 @@ router.get("/:id/attempts/:attemptId", verifyToken, adminOnly, attemptsCtrl.admi
 // POST /api/tests/:id/attempts/:attemptId/grade → grade a descriptive attempt
 router.post("/:id/attempts/:attemptId/grade", verifyToken, adminOnly, attemptsCtrl.gradeAttempt);
 
+// GET  /api/tests/students/:studentId/report      → one student's consolidated monthly test report (?month=YYYY-MM)
+router.get("/students/:studentId/report", verifyToken, adminOnly, attemptsCtrl.adminGetStudentMonthlyReport);
+
 // GET  /api/tests/analytics/overall              → analytics across EVERY test (must come before "/:id/analytics" below)
 router.get("/analytics/overall", verifyToken, adminOnly, testsCtrl.getOverallAnalytics);
 

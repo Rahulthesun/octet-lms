@@ -15,7 +15,7 @@
  */
 
 const supabase = require("../config/supabase");
-const { contentHash, serializeQuestion } = require("../utils/mcqQuestion");
+const { contentHash, serializeQuestion, toDbColumns } = require("../utils/mcqQuestion");
 const { signKey } = require("./questionImages.service");
 
 const COPY_COLUMNS = [
@@ -56,6 +56,39 @@ async function syncFromTest(test, questionRows) {
     .select("id");
   if (error) throw error;
   return { added: (data || []).length };
+}
+
+/**
+ * Manually adds one or more questions straight to the bank, independent of
+ * any test (source_test_id stays null; source_test_title is the admin's own
+ * free-text label). Reuses the same validation (toDbColumns) and hashing
+ * (contentHash) as a normal test save, and the same upsert+ignoreDuplicates
+ * so re-submitting the same content never double-stores it.
+ */
+async function createManual({ questions, label, createdBy }) {
+  const list = Array.isArray(questions) ? questions : [];
+  if (list.length === 0) throw badRequest("At least one question is required");
+  const title = typeof label === "string" ? label.trim() : "";
+  if (!title) throw badRequest("A label is required");
+
+  const rows = list.map((q, i) => {
+    const cols = toDbColumns(q, i + 1);
+    return {
+      ...cols,
+      content_hash: contentHash(cols),
+      source_test_id: null,
+      source_test_title: title,
+      source_question_id: null,
+      created_by: createdBy || null,
+    };
+  });
+  const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
+  const { data, error } = await supabase
+    .from("question_bank")
+    .upsert(unique, { onConflict: "content_hash", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw error;
+  return { added: (data || []).length, submitted: list.length };
 }
 
 /** Re-runs the back-fill for every existing MCQ test. Idempotent. */
@@ -146,4 +179,4 @@ async function existingIds(ids) {
   return new Set((data || []).map((r) => r.id));
 }
 
-module.exports = { syncFromTest, backfillAll, listGroups, listQuestions, existingIds };
+module.exports = { syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds };

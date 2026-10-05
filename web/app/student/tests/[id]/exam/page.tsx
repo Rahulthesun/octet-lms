@@ -7,7 +7,7 @@ import {
   type MyAttemptDetail, type OptionKey, type StudentTestListItem,
 } from '@/hooks/useTests'
 import QuestionContent from '@/components/shared/QuestionContent'
-import { useExamGuard, Watermark } from '@/components/shared/ExamSecurity'
+import { useExamGuard } from '@/components/shared/ExamSecurity'
 
 function formatClock(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -35,12 +35,12 @@ export default function ExamRunnerPage() {
   const [fullscreenWarning, setFullscreenWarning] = useState(false)
   const [exitCount, setExitCount] = useState(0)
   const [submitting, setSubmitting] = useState(false)
-  const [studentLabel, setStudentLabel] = useState<string | null>(null)
 
   // Anti-copy/screenshot deterrents (see components/shared/ExamSecurity.tsx)
-  // apply for the whole time sensitive content is on screen: the live exam
-  // AND the post-exam question/answer review.
-  const { blurred } = useExamGuard(phase === 'exam' || phase === 'result')
+  // apply only during the live exam — students never see questions/answers
+  // after submitting, so there is nothing sensitive left to protect on the
+  // result screen.
+  const { blurred } = useExamGuard(phase === 'exam')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const autoSubmittedRef = useRef(false)
@@ -83,14 +83,6 @@ export default function ExamRunnerPage() {
   }, [testId])
 
   useEffect(() => { loadInitial() }, [loadInitial])
-
-  // Watermark identity — first name + admission number, so a leaked
-  // screenshot of the review screen can be traced. Fetched once, best-effort.
-  useEffect(() => {
-    authedFetch('/api/students/profile')
-      .then((p) => setStudentLabel([p.name, p.rollNumber].filter(Boolean).join(' - ')))
-      .catch(() => {})
-  }, [])
 
   // While waiting for the results window to open, re-check periodically so
   // the student doesn't have to manually refresh the page.
@@ -225,7 +217,7 @@ export default function ExamRunnerPage() {
         <div className="max-w-lg w-full">
           <h1 className="text-2xl text-primary mb-2">{listItem.title}</h1>
           <p className="text-muted text-[15px] mb-6">
-            {listItem.maxMarks} marks · Ends at {new Date(listItem.scheduledEnd).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            {listItem.maxMarks} marks · Ends at {new Date(listItem.scheduledEnd).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
           </p>
           {listItem.instructions && (
             <div className="rounded-lg border border-[#e2e5ec] p-4 mb-6 bg-[#FAF9FB]">
@@ -291,11 +283,9 @@ export default function ExamRunnerPage() {
   if (phase === 'result') {
     const pct = detail.attempt.marksAwarded !== null && detail.attempt.maxMarks
       ? Math.round((detail.attempt.marksAwarded / detail.attempt.maxMarks) * 100) : null
-    const watermarkLines = ['OCTET', ...(studentLabel ? [studentLabel] : [])]
     return (
-      <div className={`min-h-screen bg-white px-6 py-10 exam-protected ${blurred ? 'exam-blurred' : ''}`}>
+      <div className="min-h-screen bg-white px-6 py-10">
         <div className="relative max-w-2xl mx-auto">
-          <Watermark lines={watermarkLines} />
           <h1 className="text-2xl text-primary mb-1">{detail.test.title} — Result</h1>
           <p className="text-muted text-[15px] mb-6">Submitted {detail.attempt.submittedAt ? new Date(detail.attempt.submittedAt).toLocaleString('en-IN') : ''}</p>
 
@@ -308,35 +298,9 @@ export default function ExamRunnerPage() {
             <p className="text-sky-600 text-[15px] mb-8">Submitted — your answer is awaiting evaluation.</p>
           )}
 
-          {detail.questions && (
-            <div className="space-y-3">
-              {detail.questions.map((q, i) => (
-                <div key={q.id} className={`rounded-lg border p-4 ${q.isCorrect ? 'border-emerald-200 bg-emerald-50/40' : 'border-rose-200 bg-rose-50/40'}`}>
-                  <div className="text-primary text-[15px] mb-3">
-                    <span className="text-muted mr-1">Q{i + 1}.</span>
-                    <QuestionContent q={q} field="question" alt={`Question ${i + 1}`} />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[14px]">
-                    {(['a', 'b', 'c', 'd'] as const).map((key) => {
-                      const field = `option${key.toUpperCase()}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'
-                      const isCorrect = q.correctOption === key
-                      const isSelected = q.selectedOption === key
-                      return (
-                        <div key={key} className={`flex items-start gap-1.5 px-3 py-1.5 rounded-md border ${
-                          isCorrect ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
-                          : isSelected ? 'border-rose-300 bg-rose-100 text-rose-800'
-                          : 'border-[#e2e5ec] text-muted'
-                        }`}>
-                          <span className="font-semibold shrink-0">{key.toUpperCase()}.</span>
-                          <QuestionContent q={q} field={field} alt={`Option ${key.toUpperCase()} of question ${i + 1}`} />
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <p className="text-muted text-[14px] mb-8">
+            Questions and answers are not shown after the test. Only your score is available here.
+          </p>
 
           <button onClick={() => router.push('/student/tests')} className="mt-8 px-6 py-3 rounded-md bg-brand text-white text-[15px] hover:opacity-90 transition-opacity">
             Back to Tests

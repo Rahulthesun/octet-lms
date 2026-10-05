@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { authedFetch } from '@/lib/apiClient'
 import QuestionContent from '@/components/shared/QuestionContent'
+import { Watermark } from '@/components/shared/ExamSecurity'
 import type { OptionKey, QuestionContentFields, TestQuestionInput } from '@/hooks/useTests'
 
 const ACCENT = '#5B21B6'
@@ -235,7 +236,8 @@ export default function QuestionBankModal({ onClose, onImport }: {
               ) : questions.length === 0 ? (
                 <p className="text-sm text-zinc-500 py-6 text-center">No questions found.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="relative space-y-3">
+                  <Watermark lines={['OCTET']} />
                   {questions.map((q, i) => (
                     <label key={q.bankQuestionId}
                       className={`block rounded-xl border p-4 cursor-pointer transition-colors ${
