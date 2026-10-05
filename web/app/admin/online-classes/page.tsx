@@ -15,6 +15,7 @@ import {
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
+import TimeInput12h from '@/components/shared/TimeInput12h'
 
 const ACCENT = '#5B21B6'
 
@@ -473,17 +474,11 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Start time</label>
-              <input
-                type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <TimeInput12h value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">End time</label>
-              <input
-                type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <TimeInput12h value={endTime} onChange={setEndTime} />
             </div>
           </div>
 
@@ -741,13 +736,13 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Start</label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  <TimeInput12h value={startTime} onChange={setStartTime}
+                    className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">End</label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  <TimeInput12h value={endTime} onChange={setEndTime}
+                    className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
               </div>
             </>

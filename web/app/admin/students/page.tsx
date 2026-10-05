@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { IconCheckCircle, IconXCircle, IconDocument } from '@/components/ui/SvgIcons'
 import { useStudents, type StudentRecord } from '@/hooks/admin/useStudents'
 import AttendanceReportsTab from '@/components/admin/AttendanceReportsTab'
+import TestReportsTab from '@/components/admin/TestReportsTab'
 import VideoReportsTab from '@/components/admin/VideoReportsTab'
 import { authedFetch } from '@/lib/apiClient'
 
@@ -207,7 +208,7 @@ export default function StudentsPage() {
     }
   }
 
-  const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected' | 'attendance' | 'videoReport'>('applications')
+  const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected' | 'attendance' | 'testReport' | 'videoReport'>('applications')
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState<string>('All')
   const [statusFilter, setStatusFilter] = useState<typeof STATUSES[number]>('All')
@@ -324,6 +325,14 @@ export default function StudentsPage() {
           }`}
         >
           Attendance
+        </button>
+        <button
+          onClick={() => { setActiveTab('testReport'); setSearch('') }}
+          className={`flex items-center gap-2 px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
+            activeTab === 'testReport' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Test Report
         </button>
         <button
           onClick={() => { setActiveTab('videoReport'); setSearch('') }}
@@ -684,6 +693,18 @@ export default function StudentsPage() {
             transition={{ duration: 0.22 }}
           >
             <AttendanceReportsTab />
+          </motion.div>
+        )}
+
+        {activeTab === 'testReport' && (
+          <motion.div
+            key="testReport"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+          >
+            <TestReportsTab />
           </motion.div>
         )}
 

@@ -15,6 +15,8 @@ import type { CreateTestInput, TestQuestionInput, TestType, OptionKey, QuestionF
 import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
 import QuestionBankModal from './QuestionBankModal'
+import { Watermark } from '@/components/shared/ExamSecurity'
+import TimeInput12h from '@/components/shared/TimeInput12h'
 
 const ACCENT = '#5B21B6'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
@@ -226,11 +228,11 @@ export default function ScheduleTestForm() {
             </div>
             <div>
               <label className={labelCls} htmlFor="t-start">Start time</label>
-              <input id="t-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
+              <TimeInput12h id="t-start" value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className={labelCls} htmlFor="t-end">End time</label>
-              <input id="t-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
+              <TimeInput12h id="t-end" value={endTime} onChange={setEndTime} />
             </div>
           </div>
           {date && startTime && endTime && scheduledEnd <= scheduledStart && (
@@ -283,6 +285,8 @@ export default function ScheduleTestForm() {
               </div>
             )}
 
+            <div className="relative space-y-6">
+            <Watermark lines={['OCTET']} />
             {questions.map((q, i) => (
               <div key={i} className="bg-white rounded-2xl border border-zinc-200 p-6 sm:p-8 space-y-6">
                 <div className="flex items-center justify-between gap-3">
@@ -339,6 +343,7 @@ export default function ScheduleTestForm() {
                 </div>
               </div>
             ))}
+            </div>
 
             {questions.length > 0 && (
               <button onClick={addQuestion} type="button"

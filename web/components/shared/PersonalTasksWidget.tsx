@@ -67,9 +67,9 @@ function formatDue(iso: string): { text: string; overdue: boolean } {
   const overdue = due.getTime() < now.getTime()
   const sameDay = due.toDateString() === now.toDateString()
   const text = sameDay
-    ? due.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    ? due.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
     : due.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) +
-      ', ' + due.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+      ', ' + due.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
   return { text, overdue }
 }
 

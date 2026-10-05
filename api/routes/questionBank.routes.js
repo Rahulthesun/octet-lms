@@ -35,6 +35,20 @@ router.get(
   handle((req) => bank.listQuestions({ sourceTestId: req.query.sourceTestId, title: req.query.title }))
 );
 
+// POST /api/question-bank/manual              — add question(s) straight to the bank, independent of any test
+router.post(
+  "/manual",
+  verifyToken,
+  adminOnly,
+  handle((req) =>
+    bank.createManual({
+      questions: req.body?.questions,
+      label: req.body?.label,
+      createdBy: req.user.id,
+    })
+  )
+);
+
 // POST /api/question-bank/backfill            — (re)store questions of every existing test; idempotent
 router.post("/backfill", verifyToken, adminOnly, handle(() => bank.backfillAll()));
 
