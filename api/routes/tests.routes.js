@@ -100,6 +100,12 @@ router.post("/:id/question-file", verifyToken, adminOnly, upload.single("file"),
 // POST /api/tests/:id/answer-key-file          → upload/replace the descriptive answer key
 router.post("/:id/answer-key-file", verifyToken, adminOnly, upload.single("file"), handleUploadError, testsCtrl.uploadAnswerKeyFile);
 
+// POST /api/tests/draft                        → silent autosave: create an in-progress draft test
+router.post("/draft", verifyToken, adminOnly, testsCtrl.createDraftTest);
+
+// PATCH /api/tests/:id/draft                    → silent autosave: persist current draft state
+router.patch("/:id/draft", verifyToken, adminOnly, testsCtrl.updateDraftTest);
+
 // POST /api/tests                              → create a test (MCQ with questions[], or descriptive)
 router.post("/", verifyToken, adminOnly, testsCtrl.createTest);
 
@@ -111,6 +117,12 @@ router.get("/:id", verifyToken, adminOnly, testsCtrl.getTest);
 
 // PATCH /api/tests/:id                         → update a test (and optionally replace its questions[])
 router.patch("/:id", verifyToken, adminOnly, testsCtrl.updateTest);
+
+// PATCH /api/tests/:testId/questions/:questionId → in-place edit of ONE existing question's
+// correct_option/marks/content, with retroactive re-grading of already-submitted test_answers/
+// test_attempts. Use this instead of the PATCH /api/tests/:id questions[] full-replace path
+// whenever the test may already have attempts (see services/tests.service.js for why).
+router.patch("/:testId/questions/:questionId", verifyToken, adminOnly, testsCtrl.updateTestQuestion);
 
 // DELETE /api/tests/:id                        → delete a test (cascades questions/attempts/answers)
 router.delete("/:id", verifyToken, adminOnly, testsCtrl.deleteTest);

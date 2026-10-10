@@ -40,6 +40,15 @@ async function assertBatchExists(batchId) {
   return data;
 }
 
+/** Looks up a chapter's own subject_id, so online_classes.subject_id stays populated (and existing subject-based display/filtering keeps working) even though the picker assigns a chapter, not a subject directly. Mirrors tests.service.js's subjectIdForChapter. */
+async function subjectIdForChapter(chapterId) {
+  if (!chapterId) return null;
+  const { data, error } = await supabase.from("chapters").select("subject_id").eq("id", chapterId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw Object.assign(new Error("Chapter not found"), { status: 400 });
+  return data.subject_id;
+}
+
 /**
  * Who a class is for, resolved live: the enrolled students of a batch, or —
  * for an All Students class (batchId null) — every active student, plus any
@@ -96,7 +105,9 @@ function mapClassRow(row, sessionInfo) {
     allStudents: row.audience === "ALL",
     batchName: row.audience === "ALL" ? "All Students" : (row.batches?.name ?? null),
     subjectId: row.subject_id,
-    subjectName: row.subjects?.name ?? null,
+    subjectName: row.chapters?.subjects?.name ?? row.subjects?.name ?? null,
+    chapterId: row.chapter_id ?? null,
+    chapterName: row.chapters?.name ?? null,
     title: row.title,
     description: row.description,
     scheduledStart: row.scheduled_start,
@@ -118,7 +129,7 @@ function mapClassRow(row, sessionInfo) {
   };
 }
 
-const SELECT_WITH_JOINS = "*, batches(name), subjects(name)";
+const SELECT_WITH_JOINS = "*, batches(name), subjects(name), chapters(name, subjects(name))";
 
 /** Attaches each class's linked attendance_sessions row (sync status etc.), fetched separately to avoid relying on PostgREST's reverse-relationship auto-detection for a partial-unique FK. */
 async function attachSessionInfo(classRows) {
@@ -172,6 +183,7 @@ async function scheduleOnlineClass(adminUserId, {
   allStudents,
   audience: requestedAudience,
   subjectId,
+  chapterId,
   title,
   description,
   date,
@@ -205,6 +217,10 @@ async function scheduleOnlineClass(adminUserId, {
 
   if (batchId) await assertBatchExists(batchId);
 
+  // The picker assigns a chapter, not a subject directly — subject_id is
+  // still derived and stored from it so existing subject-based display/filtering stays correct.
+  const resolvedSubjectId = chapterId ? await subjectIdForChapter(chapterId) : (subjectId || null);
+
   const key = idempotencyKey || crypto.randomUUID();
 
   const { data: existing, error: existingErr } = await supabase
@@ -230,7 +246,8 @@ async function scheduleOnlineClass(adminUserId, {
     .insert({
       batch_id: batchId,
       audience: isAllStudents ? "ALL" : "BATCH",
-      subject_id: subjectId || null,
+      subject_id: resolvedSubjectId,
+      chapter_id: chapterId || null,
       title,
       description: description || null,
       scheduled_start: startIso,
@@ -318,7 +335,11 @@ async function scheduleOnlineClass(adminUserId, {
 
 // ─── Reschedule ─────────────────────────────────────────────────────────────
 
-async function rescheduleOnlineClass(adminUserId, classId, { title, description, date, startTime, endTime, timezone }) {
+async function rescheduleOnlineClass(adminUserId, classId, {
+  title, description, date, startTime, endTime, timezone,
+  batchId, allStudents, audience: requestedAudience,
+  subjectId, chapterId,
+}) {
   const { data: row, error } = await supabase.from("online_classes").select(SELECT_WITH_JOINS).eq("id", classId).maybeSingle();
   if (error) throw error;
   if (!row) throw Object.assign(new Error("Online class not found"), { status: 404 });
@@ -333,11 +354,50 @@ async function rescheduleOnlineClass(adminUserId, classId, { title, description,
     throw Object.assign(new Error("End time must be after start time"), { status: 400 });
   }
 
-  if (timeChanged && (await hasTimeConflict(row.batch_id, startIso, endIso, row.id))) {
+  // Audience/batch change is optional — if none of these were sent, keep the
+  // class's current batch/audience exactly as-is.
+  const audienceChanged = batchId !== undefined || allStudents !== undefined || requestedAudience !== undefined;
+  let newBatchId = row.batch_id;
+  let newAudience = row.audience || "BATCH";
+  if (audienceChanged) {
+    const currentAudience = row.audience === "ALL" ? audienceService.AUDIENCE_ALL : audienceService.AUDIENCE_BATCH;
+    const currentBatchId = row.audience === "ALL" ? null : row.batch_id;
+    const target = audienceService.normalizeAudience({
+      audience: requestedAudience !== undefined ? requestedAudience : currentAudience,
+      allStudents,
+      batchId: batchId !== undefined ? batchId : currentBatchId,
+    });
+    const isAllStudents = target.audience === audienceService.AUDIENCE_ALL;
+    if (!isAllStudents && target.batchIds.length !== 1) {
+      throw Object.assign(new Error("Choose a batch or All Students"), { status: 400 });
+    }
+    newBatchId = isAllStudents ? null : target.batchIds[0];
+    newAudience = isAllStudents ? "ALL" : "BATCH";
+    if (newBatchId) await assertBatchExists(newBatchId);
+  }
+
+  if (timeChanged && (await hasTimeConflict(newBatchId, startIso, endIso, row.id))) {
     throw Object.assign(new Error("This batch already has a class scheduled in that time window"), { status: 409 });
   }
 
-  const attendees = await resolveAttendees(row.batch_id);
+  // Subject/chapter change is also optional. The picker assigns a chapter,
+  // not a subject directly — subject_id is derived and stored from it so
+  // existing subject-based display/filtering stays correct (same pattern as
+  // tests.service.js's subjectIdForChapter).
+  const chapterChanged = chapterId !== undefined;
+  const subjectChanged = subjectId !== undefined;
+  let newChapterId = row.chapter_id ?? null;
+  let newSubjectId = row.subject_id;
+  if (chapterChanged) {
+    newChapterId = chapterId || null;
+    newSubjectId = await subjectIdForChapter(newChapterId);
+  } else if (subjectChanged) {
+    newSubjectId = subjectId || null;
+  }
+
+  // Attendees are resolved against the NEW audience/batch, since that is who
+  // should be notified and see the class as theirs going forward.
+  const attendees = await resolveAttendees(newBatchId);
 
   let meetUrl = row.google_meet_url;
   if (row.google_event_id) {
@@ -365,6 +425,10 @@ async function rescheduleOnlineClass(adminUserId, classId, { title, description,
       timezone: tz,
       google_meet_url: meetUrl,
       status: "rescheduled",
+      batch_id: newBatchId,
+      audience: newAudience,
+      subject_id: newSubjectId,
+      chapter_id: newChapterId,
       updated_at: new Date().toISOString(),
     })
     .eq("id", classId)
@@ -380,10 +444,10 @@ async function rescheduleOnlineClass(adminUserId, classId, { title, description,
   if (meetUrl) {
     const newDate = date || row.scheduled_start.slice(0, 10);
     const previousSession = await attendanceService.getSessionByOnlineClassId(classId);
-    if (previousSession && previousSession.date !== newDate) {
+    if (previousSession && (previousSession.date !== newDate || audienceChanged)) {
       await attendanceService.detachSessionFromOnlineClass(classId);
     }
-    const session = await attendanceService.getOrCreateSessionForOnlineClass(row.batch_id || audienceService.ALL_STUDENTS_TOKEN, newDate, classId);
+    const session = await attendanceService.getOrCreateSessionForOnlineClass(newBatchId || audienceService.ALL_STUDENTS_TOKEN, newDate, classId);
     await attendanceService.updateSessionSyncStatus(session.id, {
       sync_status: "NOT_STARTED",
       sync_error: null,

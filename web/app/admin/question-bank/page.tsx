@@ -8,7 +8,7 @@
 // (QuestionBankModal.tsx, used from ScheduleTestForm.tsx) — that flow is left
 // completely untouched by this page.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { authedFetch } from '@/lib/apiClient'
 import { uploadQuestionImage } from '@/lib/questionImages'
 import QuestionContent from '@/components/shared/QuestionContent'
@@ -29,6 +29,11 @@ interface BankQuestion extends QuestionContentFields {
   bankQuestionId: string
   correctOption: OptionKey
   marks: number
+  questionImageKey?: string | null
+  optionAImageKey?: string | null
+  optionBImageKey?: string | null
+  optionCImageKey?: string | null
+  optionDImageKey?: string | null
 }
 
 function groupQuery(g: BankGroup) {
@@ -58,6 +63,8 @@ interface DraftQuestion {
   optionD: FieldValue
   correctOption: OptionKey
   marks: number
+  /** Set once this question has been autosaved to the bank — further edits PATCH it instead of creating a duplicate. */
+  savedId?: string
 }
 
 function emptyField(): FieldValue {
@@ -78,6 +85,58 @@ function emptyDraft(): DraftQuestion {
 
 function fieldHasContent(v: FieldValue) {
   return v.type === 'image' ? !!v.imageKey : v.text.trim().length > 0
+}
+
+/** Builds the API payload (questionType/questionText/... correctOption/marks) from one draft. Shared by add + edit. */
+function draftToPayload(d: DraftQuestion) {
+  return {
+    questionType: d.question.type,
+    questionText: d.question.type === 'text' ? d.question.text.trim() : null,
+    questionImageKey: d.question.type === 'image' ? d.question.imageKey : null,
+    optionAType: d.optionA.type,
+    optionA: d.optionA.type === 'text' ? d.optionA.text.trim() : null,
+    optionAImageKey: d.optionA.type === 'image' ? d.optionA.imageKey : null,
+    optionBType: d.optionB.type,
+    optionB: d.optionB.type === 'text' ? d.optionB.text.trim() : null,
+    optionBImageKey: d.optionB.type === 'image' ? d.optionB.imageKey : null,
+    optionCType: d.optionC.type,
+    optionC: d.optionC.type === 'text' ? d.optionC.text.trim() : null,
+    optionCImageKey: d.optionC.type === 'image' ? d.optionC.imageKey : null,
+    optionDType: d.optionD.type,
+    optionD: d.optionD.type === 'text' ? d.optionD.text.trim() : null,
+    optionDImageKey: d.optionD.type === 'image' ? d.optionD.imageKey : null,
+    correctOption: d.correctOption,
+    marks: d.marks,
+  }
+}
+
+/** The reverse: a bank question (as returned by the API) -> an editable draft. */
+function bankQuestionToDraft(q: BankQuestion): DraftQuestion {
+  function field(type: ContentType, text: string | null, imageUrl: string | null | undefined, imageKey: string | null | undefined): FieldValue {
+    return {
+      type,
+      text: text ?? '',
+      imageKey: imageKey ?? null,
+      previewUrl: imageUrl ?? null,
+    }
+  }
+  return {
+    question: field(q.questionType, q.questionText, q.questionImageUrl, q.questionImageKey),
+    optionA: field(q.optionAType, q.optionA, q.optionAImageUrl, q.optionAImageKey),
+    optionB: field(q.optionBType, q.optionB, q.optionBImageUrl, q.optionBImageKey),
+    optionC: field(q.optionCType, q.optionC, q.optionCImageUrl, q.optionCImageKey),
+    optionD: field(q.optionDType, q.optionD, q.optionDImageUrl, q.optionDImageKey),
+    correctOption: q.correctOption,
+    marks: q.marks,
+  }
+}
+
+function validateDraft(draft: DraftQuestion): string | null {
+  const fields: FieldKey[] = ['question', 'optionA', 'optionB', 'optionC', 'optionD']
+  for (const f of fields) {
+    if (!fieldHasContent(draft[f])) return `${FIELD_LABELS[f]} needs text or an image`
+  }
+  return null
 }
 
 const FIELD_LABELS: Record<FieldKey, string> = {
@@ -197,13 +256,32 @@ function QuestionForm({ draft, index, onChange, onRemove, removable }: {
   )
 }
 
-function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [label, setLabel] = useState('')
+/**
+ * Add questions to the bank — with per-question autosave. Each question
+ * that becomes complete (all 5 fields + a label present) is silently saved
+ * to the bank ~1.2s after the last edit, so closing the tab, losing the
+ * connection, or navigating away never loses a finished question — only an
+ * incomplete field goes unsaved, the same guarantee as test-creation
+ * autosave. Once a question has been saved once, further edits PATCH that
+ * same bank row instead of creating a duplicate.
+ */
+function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
+  initialLabel?: string
+  sourceTestId?: string | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const labelLocked = !!initialLabel
+  const [label, setLabel] = useState(initialLabel ?? '')
   const [drafts, setDrafts] = useState<DraftQuestion[]>([emptyDraft()])
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const savingRef = useRef(false)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function updateDraft(i: number, d: DraftQuestion) {
+    // Editing an already-saved question clears its savedId's "up to date"
+    // state implicitly — the next autosave tick will PATCH it with the new content.
     setDrafts((prev) => prev.map((p, idx) => (idx === i ? d : p)))
   }
 
@@ -212,8 +290,54 @@ function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
   }
 
   function removeDraft(i: number) {
+    // An already-autosaved question stays safely in the bank even if removed
+    // from this form — there is no "undo the save" here, only "stop editing it here".
     setDrafts((prev) => prev.filter((_, idx) => idx !== i))
   }
+
+  // ─── Per-question autosave ───
+  useEffect(() => {
+    const trimmedLabel = label.trim()
+    if (!trimmedLabel) return
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(async () => {
+      if (savingRef.current) return
+      const toSave = drafts
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => validateDraft(d) === null)
+      if (toSave.length === 0) return
+
+      savingRef.current = true
+      setSaveState('saving')
+      try {
+        for (const { d, i } of toSave) {
+          if (!d.savedId) {
+            const result: { ids?: string[] } = await authedFetch('/api/question-bank/manual', {
+              method: 'POST',
+              body: JSON.stringify({ label: trimmedLabel, questions: [draftToPayload(d)], sourceTestId: sourceTestId || undefined }),
+            })
+            const newId = result.ids?.[0]
+            if (newId) setDrafts((prev) => prev.map((p, idx) => (idx === i ? { ...p, savedId: newId } : p)))
+          } else {
+            await authedFetch(`/api/question-bank/${d.savedId}`, {
+              method: 'PATCH',
+              body: JSON.stringify(draftToPayload(d)),
+            })
+          }
+        }
+        setSaveState('saved')
+        onSaved()
+      } catch {
+        setSaveState('error')
+      } finally {
+        savingRef.current = false
+      }
+    }, 1200)
+
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [label, drafts])
 
   function validate(): string | null {
     if (!label.trim()) return 'A label for this group is required'
@@ -227,44 +351,37 @@ function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
     return null
   }
 
-  async function handleSave() {
+  async function handleDone() {
     const err = validate()
     if (err) {
       setError(err)
       return
     }
-    setSaving(true)
+    // Everything complete is already autosaved by this point — this just
+    // confirms and closes. Flush any not-yet-saved/edited question first.
     setError(null)
+    setSaveState('saving')
     try {
-      const questions = drafts.map((d) => ({
-        questionType: d.question.type,
-        questionText: d.question.type === 'text' ? d.question.text.trim() : null,
-        questionImageKey: d.question.type === 'image' ? d.question.imageKey : null,
-        optionAType: d.optionA.type,
-        optionA: d.optionA.type === 'text' ? d.optionA.text.trim() : null,
-        optionAImageKey: d.optionA.type === 'image' ? d.optionA.imageKey : null,
-        optionBType: d.optionB.type,
-        optionB: d.optionB.type === 'text' ? d.optionB.text.trim() : null,
-        optionBImageKey: d.optionB.type === 'image' ? d.optionB.imageKey : null,
-        optionCType: d.optionC.type,
-        optionC: d.optionC.type === 'text' ? d.optionC.text.trim() : null,
-        optionCImageKey: d.optionC.type === 'image' ? d.optionC.imageKey : null,
-        optionDType: d.optionD.type,
-        optionD: d.optionD.type === 'text' ? d.optionD.text.trim() : null,
-        optionDImageKey: d.optionD.type === 'image' ? d.optionD.imageKey : null,
-        correctOption: d.correctOption,
-        marks: d.marks,
-      }))
-      await authedFetch('/api/question-bank/manual', {
-        method: 'POST',
-        body: JSON.stringify({ label: label.trim(), questions }),
-      })
+      for (let i = 0; i < drafts.length; i++) {
+        const d = drafts[i]
+        if (!d.savedId) {
+          const result: { ids?: string[] } = await authedFetch('/api/question-bank/manual', {
+            method: 'POST',
+            body: JSON.stringify({ label: label.trim(), questions: [draftToPayload(d)], sourceTestId: sourceTestId || undefined }),
+          })
+          void result
+        } else {
+          await authedFetch(`/api/question-bank/${d.savedId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(draftToPayload(d)),
+          })
+        }
+      }
       onSaved()
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
-    } finally {
-      setSaving(false)
+      setSaveState('error')
     }
   }
 
@@ -275,8 +392,19 @@ function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
         onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="text-lg font-semibold text-zinc-900">Add questions to the bank</h3>
-            <p className="text-sm text-zinc-500 mt-0.5">Not tied to any test. Give this group a label.</p>
+            <h3 className="text-lg font-semibold text-zinc-900">
+              {labelLocked ? `Add questions to "${initialLabel}"` : 'Add questions to the bank'}
+            </h3>
+            <p className="text-sm text-zinc-500 mt-0.5 flex items-center gap-2">
+              {labelLocked ? 'Appended to this existing group.' : 'Not tied to any test. Give this group a label.'}
+              <span className={
+                saveState === 'saving' ? 'text-amber-600' :
+                saveState === 'saved' ? 'text-emerald-600' :
+                saveState === 'error' ? 'text-rose-600' : 'text-zinc-400'
+              }>
+                {saveState === 'saving' ? '• Saving…' : saveState === 'saved' ? '• Saved' : saveState === 'error' ? '• Save failed, retrying…' : ''}
+              </span>
+            </p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-2xl leading-none" aria-label="Close">&times;</button>
         </div>
@@ -289,18 +417,26 @@ function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
+              disabled={labelLocked}
               placeholder="e.g. Organic Chemistry — Chapter 4"
-              className="w-full text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+              className="w-full text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 disabled:bg-zinc-50 disabled:text-zinc-500"
             />
           </div>
 
           <div className="space-y-4">
             {drafts.map((d, i) => (
-              <QuestionForm key={i} draft={d} index={i}
-                onChange={(nd) => updateDraft(i, nd)}
-                onRemove={() => removeDraft(i)}
-                removable={drafts.length > 1}
-              />
+              <div key={i} className="relative">
+                {d.savedId && (
+                  <span className="absolute -top-2 right-3 z-10 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Saved
+                  </span>
+                )}
+                <QuestionForm draft={d} index={i}
+                  onChange={(nd) => updateDraft(i, nd)}
+                  onRemove={() => removeDraft(i)}
+                  removable={drafts.length > 1}
+                />
+              </div>
             ))}
           </div>
 
@@ -311,11 +447,143 @@ function AddQuestionsModal({ onClose, onSaved }: { onClose: () => void; onSaved:
 
         <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3 shrink-0">
           <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-zinc-300 text-zinc-600 text-[15px] hover:bg-zinc-50">
+            Close
+          </button>
+          <button onClick={handleDone}
+            className="px-5 py-2.5 rounded-lg text-white text-[15px] disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Renames a manually-added group's label across every question in it. */
+function RenameGroupModal({ group, onClose, onRenamed }: {
+  group: BankGroup
+  onClose: () => void
+  onRenamed: () => void
+}) {
+  const [title, setTitle] = useState(group.title)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave() {
+    const trimmed = title.trim()
+    if (!trimmed) { setError('A label is required'); return }
+    setSaving(true)
+    setError(null)
+    try {
+      await authedFetch('/api/question-bank/groups/rename', {
+        method: 'PATCH',
+        body: JSON.stringify({ oldTitle: group.title, newTitle: trimmed }),
+      })
+      onRenamed()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to rename')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => { e.stopPropagation(); onClose() }}>
+      <div className="bg-white w-full sm:max-w-md shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-zinc-200">
+          <h3 className="text-lg font-semibold text-zinc-900">Rename group</h3>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">{error}</div>}
+          <label className="text-sm font-medium text-zinc-700 block mb-1.5">Label</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            className="w-full text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+          />
+        </div>
+        <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-zinc-300 text-zinc-600 text-[15px] hover:bg-zinc-50">
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving}
             className="px-5 py-2.5 rounded-lg text-white text-[15px] disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-            {saving ? 'Saving...' : 'Save to bank'}
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Edits a single existing bank question's content in place. This is a
+ * separate copy-store — saving here only changes the question_bank row
+ * itself and never touches any test that previously imported a copy of it.
+ */
+function EditQuestionModal({ question, onClose, onSaved }: {
+  question: BankQuestion
+  onClose: () => void
+  onSaved: (updated: BankQuestion) => void
+}) {
+  const [draft, setDraft] = useState<DraftQuestion>(() => bankQuestionToDraft(question))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave() {
+    const err = validateDraft(draft)
+    if (err) {
+      setError(err)
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const updated: BankQuestion = await authedFetch(`/api/question-bank/${question.bankQuestionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(draftToPayload(draft)),
+      })
+      onSaved(updated)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => { e.stopPropagation(); onClose() }}>
+      <div className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="text-lg font-semibold text-zinc-900">Edit question</h3>
+            <p className="text-sm text-zinc-500 mt-0.5">
+              Changes only affect this bank question — any test that imported a copy of it keeps its own, unchanged version.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-2xl leading-none" aria-label="Close">&times;</button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+          {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">{error}</div>}
+          <QuestionForm draft={draft} index={0} onChange={setDraft} onRemove={() => {}} removable={false} />
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-zinc-300 text-zinc-600 text-[15px] hover:bg-zinc-50">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2.5 rounded-lg text-white text-[15px] disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+            {saving ? 'Saving...' : 'Save changes'}
           </button>
         </div>
       </div>
@@ -332,10 +600,17 @@ export default function QuestionBankPage() {
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [addMoreTo, setAddMoreTo] = useState<BankGroup | null>(null)
+  const [renaming, setRenaming] = useState<BankGroup | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<BankGroup | null>(null)
+  const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [openGroup, setOpenGroup] = useState<BankGroup | null>(null)
   const [questions, setQuestions] = useState<BankQuestion[]>([])
   const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [editingQuestion, setEditingQuestion] = useState<BankQuestion | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 250)
@@ -364,9 +639,11 @@ export default function QuestionBankPage() {
     const key = groupKey(g)
     if (openKey === key) {
       setOpenKey(null)
+      setOpenGroup(null)
       return
     }
     setOpenKey(key)
+    setOpenGroup(g)
     setQuestions([])
     setLoadingQuestions(true)
     try {
@@ -375,6 +652,49 @@ export default function QuestionBankPage() {
       setError(e instanceof Error ? e.message : 'Failed to load questions')
     } finally {
       setLoadingQuestions(false)
+    }
+  }
+
+  async function reloadOpenGroup() {
+    if (!openGroup) return
+    try {
+      setQuestions(await authedFetch(`/api/question-bank/questions?${groupQuery(openGroup)}`))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load questions')
+    }
+  }
+
+  async function confirmDeleteGroup() {
+    if (!deletingGroup) return
+    setBusy(true)
+    try {
+      await authedFetch(`/api/question-bank/groups?${groupQuery(deletingGroup)}`, { method: 'DELETE' })
+      if (openGroup && groupKey(openGroup) === groupKey(deletingGroup)) {
+        setOpenKey(null)
+        setOpenGroup(null)
+        setQuestions([])
+      }
+      setDeletingGroup(null)
+      loadGroups()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete group')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDeleteQuestion() {
+    if (!deletingQuestionId) return
+    setBusy(true)
+    try {
+      await authedFetch(`/api/question-bank/${deletingQuestionId}`, { method: 'DELETE' })
+      setQuestions((prev) => prev.filter((q) => q.bankQuestionId !== deletingQuestionId))
+      setDeletingQuestionId(null)
+      loadGroups()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete question')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -429,10 +749,26 @@ export default function QuestionBankPage() {
                       {g.sourceTestId ? (g.testExists ? 'From an active test' : 'Test since deleted') : 'Added directly'}
                     </p>
                   </div>
-                  <button onClick={() => toggleGroup(g)}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-zinc-300 text-zinc-700 hover:bg-zinc-50 shrink-0">
-                    {isOpen ? 'Hide' : 'View questions'}
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!g.sourceTestId && (
+                      <button onClick={() => setRenaming(g)}
+                        className="text-sm px-3 py-1.5 rounded-lg border border-zinc-300 text-zinc-700 hover:bg-zinc-50">
+                        Rename
+                      </button>
+                    )}
+                    <button onClick={() => setAddMoreTo(g)}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-zinc-300 text-zinc-700 hover:bg-zinc-50">
+                      + Add questions
+                    </button>
+                    <button onClick={() => setDeletingGroup(g)}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50">
+                      Delete
+                    </button>
+                    <button onClick={() => toggleGroup(g)}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-zinc-300 text-zinc-700 hover:bg-zinc-50">
+                      {isOpen ? 'Hide' : 'View questions'}
+                    </button>
+                  </div>
                 </div>
                 {isOpen && (
                   <div className="relative px-5 pb-5 space-y-3">
@@ -444,9 +780,27 @@ export default function QuestionBankPage() {
                     ) : (
                       questions.map((q, i) => (
                         <div key={q.bankQuestionId} className="rounded-xl border border-zinc-200 p-4">
-                          <div className="text-[15px] text-zinc-900 mb-2">
-                            <span className="text-zinc-400 mr-1">{i + 1}.</span>
-                            <QuestionContent q={q} field="question" alt={`Question ${i + 1}`} />
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="text-[15px] text-zinc-900 flex-1">
+                              <span className="text-zinc-400 mr-1">{i + 1}.</span>
+                              <QuestionContent q={q} field="question" alt={`Question ${i + 1}`} />
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setEditingQuestion(q)}
+                                className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingQuestionId(q.bankQuestionId)}
+                                className="text-xs px-2.5 py-1 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
                             {(['a', 'b', 'c', 'd'] as const).map((k) => {
@@ -475,6 +829,83 @@ export default function QuestionBankPage() {
 
       {showAdd && (
         <AddQuestionsModal onClose={() => setShowAdd(false)} onSaved={loadGroups} />
+      )}
+
+      {addMoreTo && (
+        <AddQuestionsModal
+          initialLabel={addMoreTo.title}
+          sourceTestId={addMoreTo.sourceTestId}
+          onClose={() => setAddMoreTo(null)}
+          onSaved={() => { loadGroups(); if (openGroup && groupKey(openGroup) === groupKey(addMoreTo)) reloadOpenGroup() }}
+        />
+      )}
+
+      {renaming && (
+        <RenameGroupModal group={renaming} onClose={() => setRenaming(null)} onRenamed={loadGroups} />
+      )}
+
+      {deletingGroup && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setDeletingGroup(null)}>
+          <div className="bg-white w-full sm:max-w-md shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-zinc-200">
+              <h3 className="text-lg font-semibold text-zinc-900">Delete this group?</h3>
+            </div>
+            <div className="px-6 py-5 text-sm text-zinc-600 space-y-2">
+              <p>
+                This deletes all {deletingGroup.questionCount} question{deletingGroup.questionCount === 1 ? '' : 's'} in
+                {' '}&quot;{deletingGroup.title}&quot; from the bank. This cannot be undone.
+              </p>
+              {deletingGroup.sourceTestId && (
+                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  This only removes the bank copies — the live test and its own questions are not affected.
+                </p>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3">
+              <button onClick={() => setDeletingGroup(null)} className="px-5 py-2.5 rounded-lg border border-zinc-300 text-zinc-600 text-[15px] hover:bg-zinc-50">
+                Cancel
+              </button>
+              <button onClick={confirmDeleteGroup} disabled={busy}
+                className="px-5 py-2.5 rounded-lg bg-rose-600 text-white text-[15px] disabled:opacity-50 hover:bg-rose-700">
+                {busy ? 'Deleting...' : 'Delete group'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingQuestionId && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setDeletingQuestionId(null)}>
+          <div className="bg-white w-full sm:max-w-sm shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-zinc-200">
+              <h3 className="text-lg font-semibold text-zinc-900">Delete this question?</h3>
+            </div>
+            <div className="px-6 py-5 text-sm text-zinc-600">This cannot be undone.</div>
+            <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-3">
+              <button onClick={() => setDeletingQuestionId(null)} className="px-5 py-2.5 rounded-lg border border-zinc-300 text-zinc-600 text-[15px] hover:bg-zinc-50">
+                Cancel
+              </button>
+              <button onClick={confirmDeleteQuestion} disabled={busy}
+                className="px-5 py-2.5 rounded-lg bg-rose-600 text-white text-[15px] disabled:opacity-50 hover:bg-rose-700">
+                {busy ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingQuestion && (
+        <EditQuestionModal
+          question={editingQuestion}
+          onClose={() => setEditingQuestion(null)}
+          onSaved={(updated) => {
+            setQuestions((prev) => prev.map((q) => (q.bankQuestionId === updated.bankQuestionId ? updated : q)))
+          }}
+        />
       )}
     </div>
   )

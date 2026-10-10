@@ -1,3 +1,17 @@
+// Several chapters can share the same name across different subjects (e.g.
+// "Electrochemistry" under both "Physical Chemistry" and a revision subject
+// like "Exam Eve Study Material") — append the subject name only for the
+// chapters whose name collides, so the dropdown stays clean everywhere else.
+export function chapterLabel<T extends { name: string; subjectName?: string | null }>(
+  allChapters: T[],
+  chapter: T
+): string {
+  const nameCount = allChapters.filter((c) => c.name === chapter.name).length
+  return nameCount > 1 && chapter.subjectName
+    ? `${chapter.name} (${chapter.subjectName})`
+    : chapter.name
+}
+
 export const toTitleCase = (str?: string | null) =>
   str
     ? str

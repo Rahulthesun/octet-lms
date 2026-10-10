@@ -282,6 +282,26 @@ export function useAdminTests(params?: { batchId?: string; status?: string }) {
   return { tests, loading, error, refetch, createTest, updateTest, deleteTest, uploadQuestionFile, uploadAnswerKeyFile }
 }
 
+// ─── Admin: draft autosave (test creation in progress) ─────────────────────
+//
+// Lenient counterparts to createTest/updateTest above, used only by
+// ScheduleTestForm's silent autosave while the admin is still filling the
+// form in. They never go through useAdminTests' refetch (the draft must
+// stay invisible in the main tests list until it's actually scheduled).
+
+export async function createDraftTest(input: Partial<CreateTestInput>): Promise<TestAdminDetail> {
+  return authedFetch('/api/tests/draft', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function autosaveDraftTest(id: string, patch: Partial<CreateTestInput>): Promise<TestAdminDetail> {
+  return authedFetch(`/api/tests/${id}/draft`, { method: 'PATCH', body: JSON.stringify(patch) })
+}
+
+/** Fetches one test (draft or real) for pre-populating the edit/resume-draft form. Shared by both flows. */
+export async function fetchTestForForm(id: string): Promise<TestAdminDetail> {
+  return authedFetch(`/api/tests/${id}`)
+}
+
 export function useAdminTestDetail(testId: string | null) {
   const [test, setTest] = useState<TestAdminDetail | null>(null)
   const [loading, setLoading] = useState(false)

@@ -155,6 +155,7 @@ async function listTestsForStudent(authUserId) {
     .select(testsService.TEST_SELECT)
     .or(["audience.eq.ALL", batchIds.length > 0 ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
     .neq("status", "cancelled")
+    .neq("status", "draft") // drafts are admin-only in-progress authoring — never visible to students
     .order("scheduled_start", { ascending: false });
   if (error) throw error;
 
