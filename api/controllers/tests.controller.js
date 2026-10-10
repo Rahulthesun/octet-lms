@@ -20,6 +20,26 @@ const createTest = async (req, res) => {
   }
 };
 
+// POST /api/tests/draft — silent autosave create (lenient validation, status='draft')
+const createDraftTest = async (req, res) => {
+  try {
+    const test = await testsService.createDraftTest({ ...req.body, createdBy: req.user.id });
+    res.status(201).json(test);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+// PATCH /api/tests/:id/draft — silent autosave update of an existing draft
+const updateDraftTest = async (req, res) => {
+  try {
+    const test = await testsService.updateDraftTest(req.params.id, req.body);
+    res.status(200).json(test);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 const listTests = async (req, res) => {
   try {
     const { batchId, status } = req.query;
@@ -43,6 +63,22 @@ const updateTest = async (req, res) => {
   try {
     const test = await testsService.updateTest(req.params.id, req.body);
     res.status(200).json(test);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/**
+ * PATCH /api/tests/:testId/questions/:questionId — in-place answer-key/marks/
+ * content fix for ONE existing question, with retroactive re-grading of
+ * already-submitted attempts. Use this (not PATCH /api/tests/:id with a
+ * questions[] array) whenever the test may already have attempts — see
+ * services/tests.service.js for why the full-replace path is unsafe there.
+ */
+const updateTestQuestion = async (req, res) => {
+  try {
+    const result = await testsService.updateTestQuestionAnswerKey(req.params.testId, req.params.questionId, req.body, req.user.id);
+    res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
@@ -137,9 +173,12 @@ const downloadOverallAnalyticsPdf = async (req, res) => {
 
 module.exports = {
   createTest,
+  createDraftTest,
+  updateDraftTest,
   listTests,
   getTest,
   updateTest,
+  updateTestQuestion,
   deleteTest,
   uploadQuestionFile,
   uploadAnswerKeyFile,

@@ -52,8 +52,12 @@ export interface OnlineClass {
   id: string
   batchId: string
   batchName: string | null
+  audience?: 'ALL' | 'BATCH'
+  allStudents?: boolean
   subjectId: string | null
   subjectName: string | null
+  chapterId?: string | null
+  chapterName?: string | null
   title: string
   description: string | null
   scheduledStart: string // ISO
@@ -69,6 +73,7 @@ export interface OnlineClass {
 export interface ScheduleClassInput {
   batchId: string
   subjectId?: string
+  chapterId?: string
   title: string
   description?: string
   date: string // "YYYY-MM-DD"
@@ -88,6 +93,9 @@ export interface RescheduleClassInput {
   startTime?: string
   endTime?: string
   timezone?: string
+  batchId?: string
+  subjectId?: string
+  chapterId?: string
 }
 
 export interface Subject {

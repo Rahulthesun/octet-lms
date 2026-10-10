@@ -6,14 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   useAdminOnlineClasses,
   useGoogleAccountStatus,
-  useSubjects,
+  useChapters,
   useAttendanceSettings,
   type OnlineClass,
   type OnlineClassStatus,
   type SyncStatus,
 } from '@/hooks/useOnlineClasses'
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
-import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
+import { formatDateInZone, formatTimeInZone, isoToZonedParts, chapterLabel } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
 
@@ -325,10 +325,10 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
   googleConnected: boolean
 }) {
   const { schedule } = useAdminOnlineClasses()
-  const { subjects } = useSubjects()
+  const { chapters } = useChapters()
   const { batches } = useBatches('all')
 
-  const [subjectId, setSubjectId] = useState('')
+  const [chapterId, setChapterId] = useState('')
   const [batchId, setBatchId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -384,7 +384,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
     try {
       await schedule({
         batchId,
-        subjectId: subjectId || undefined,
+        chapterId: chapterId || undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         date,
@@ -432,15 +432,15 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">Course / Subject</label>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Chapter</label>
               <select
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                value={chapterId}
+                onChange={(e) => setChapterId(e.target.value)}
                 className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               >
-                <option value="">Select subject (optional)…</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                <option value="">Select chapter (optional)…</option>
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
                 ))}
               </select>
             </div>
@@ -622,18 +622,23 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
   cls: OnlineClass
   onClose: () => void
-  onReschedule: (id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string }) => Promise<void>
+  onReschedule: (id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) => Promise<void>
   onCancel: (id: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const startParts = isoToZonedParts(cls.scheduledStart, cls.timezone)
   const endParts = isoToZonedParts(cls.scheduledEnd, cls.timezone)
 
+  const { batches } = useBatches('all')
+  const { chapters } = useChapters()
+
   const [title, setTitle] = useState(cls.title)
   const [description, setDescription] = useState(cls.description ?? '')
   const [date, setDate] = useState(startParts.date)
   const [startTime, setStartTime] = useState(startParts.time)
   const [endTime, setEndTime] = useState(endParts.time)
+  const [batchId, setBatchId] = useState(cls.allStudents ? 'ALL' : (cls.batchId || ''))
+  const [chapterId, setChapterId] = useState(cls.chapterId || '')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -644,7 +649,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
     setBusy(true)
     setError(null)
     try {
-      await onReschedule(cls.id, { title, description, date, startTime, endTime })
+      await onReschedule(cls.id, { title, description, date, startTime, endTime, batchId, chapterId })
       setEditing(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to reschedule')
@@ -682,7 +687,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
           <div>
             <h3 className="text-sm font-semibold text-zinc-900">{editing ? 'Reschedule class' : cls.title}</h3>
             <p className="text-xs text-zinc-500 mt-0.5">
-              {cls.batchName}{cls.subjectName ? ` · ${cls.subjectName}` : ''}
+              {cls.batchName}{cls.chapterName ? ` · ${cls.chapterName}` : (cls.subjectName ? ` · ${cls.subjectName}` : '')}
             </p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
@@ -743,6 +748,29 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">End</label>
                   <TimeInput12h value={endTime} onChange={setEndTime}
                     className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Students (batch)</label>
+                  <select value={batchId} onChange={(e) => setBatchId(e.target.value)}
+                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400">
+                    <option value="">Select a batch…</option>
+                    <option value="ALL">All Students</option>
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Chapter</label>
+                  <select value={chapterId} onChange={(e) => setChapterId(e.target.value)}
+                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400">
+                    <option value="">Select chapter (optional)…</option>
+                    {chapters.map((c) => (
+                      <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </>
@@ -842,8 +870,13 @@ export default function OnlineClassesPage() {
     return sorted.filter((c) => classDayBucket(c) === 'past')
   }, [sorted, viewFilter])
 
-  async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string }) {
-    const updated = await reschedule(id, input)
+  async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) {
+    const { batchId, chapterId, ...rest } = input
+    const updated = await reschedule(id, {
+      ...rest,
+      batchId: batchId || undefined,
+      chapterId: chapterId || undefined,
+    })
     setSelectedClass(updated)
   }
 
@@ -947,7 +980,7 @@ export default function OnlineClassesPage() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-semibold text-zinc-900 truncate">{cls.title}</h3>
                   <p className="text-sm text-zinc-500 truncate mt-0.5">
-                    {cls.batchName}{cls.subjectName ? ` · ${cls.subjectName}` : ''}
+                    {cls.batchName}{cls.chapterName ? ` · ${cls.chapterName}` : (cls.subjectName ? ` · ${cls.subjectName}` : '')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

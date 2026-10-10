@@ -5,18 +5,20 @@
 // (paste a screenshot per question and per option) with a text fallback, and
 // can be imported from the question bank.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useChapters } from '@/hooks/useOnlineClasses'
 import { useBatches } from '@/hooks/useAttendanceData'
-import { useAdminTests } from '@/hooks/useTests'
-import type { CreateTestInput, TestQuestionInput, TestType, OptionKey, QuestionField } from '@/hooks/useTests'
+import { useAdminTests, createDraftTest, autosaveDraftTest, fetchTestForForm } from '@/hooks/useTests'
+import type { CreateTestInput, TestAdminDetail, TestQuestionInput, TestType, OptionKey, QuestionField, TestSummary } from '@/hooks/useTests'
+import { authedFetch } from '@/lib/apiClient'
 import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
 import QuestionBankModal from './QuestionBankModal'
 import { Watermark } from '@/components/shared/ExamSecurity'
 import TimeInput12h from '@/components/shared/TimeInput12h'
+import { chapterLabel } from '@/lib/helpers'
 
 const ACCENT = '#5B21B6'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
@@ -73,6 +75,29 @@ function fieldFilled(q: TestQuestionInput, f: QuestionField) {
 
 const isBlankQuestion = (q: TestQuestionInput) => QUESTION_FIELDS.every(({ field }) => !fieldFilled(q, field))
 
+// ISO -> local "YYYY-MM-DD" / "HH:mm", the inverse of how this form builds
+// scheduledStart/scheduledEnd (new Date(`${date}T${startTime}`).toISOString()).
+function isoToLocalDate(iso: string | null | undefined) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+function isoToLocalTime(iso: string | null | undefined) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Does the form have enough content yet to be worth silently saving as a draft?
+function hasDraftableContent(title: string, chapterId: string, batchId: string, questions: TestQuestionInput[]) {
+  if (title.trim() || chapterId || batchId) return true
+  return questions.some((q) => QUESTION_FIELDS.some(({ field }) => fieldFilled(q, field)))
+}
+
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-2xl border border-zinc-200 p-6 sm:p-8">
@@ -83,11 +108,13 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   )
 }
 
-export default function ScheduleTestForm() {
+export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { chapters } = useChapters()
   const { batches } = useBatches('all')
-  const { createTest } = useAdminTests()
+  const { createTest, updateTest, deleteTest } = useAdminTests()
+  const isEditMode = !!testId
 
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TestType>('mcq')
@@ -104,6 +131,84 @@ export default function ScheduleTestForm() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // ─── Pre-populate from an existing test (edit mode) or a resumed draft ───
+
+  const [loadingExisting, setLoadingExisting] = useState(isEditMode || !!searchParams.get('draft'))
+  const [draftId, setDraftId] = useState<string | null>(testId ? null : searchParams.get('draft'))
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const hydratedRef = useRef(false)
+
+  // ─── Unfinished drafts from a previous visit (closed tab, crash, etc.) ───
+  // Only relevant on a fresh "create" page load — not mid-edit, and not when
+  // a specific ?draft= is already being resumed.
+  const [otherDrafts, setOtherDrafts] = useState<TestSummary[]>([])
+  const [resuming, setResuming] = useState(false)
+
+  useEffect(() => {
+    if (isEditMode || searchParams.get('draft')) return
+    authedFetch('/api/tests?status=draft')
+      .then((list: TestSummary[]) => setOtherDrafts(list))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function resumeDraft(id: string) {
+    setResuming(true)
+    try {
+      const test = await fetchTestForForm(id)
+      populateFromTest(test)
+      setDraftId(id)
+      const qs = new URLSearchParams(Array.from(searchParams.entries()))
+      qs.set('draft', id)
+      router.replace(`/admin/tests/new?${qs.toString()}`, { scroll: false })
+      setOtherDrafts([])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to resume the draft')
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  async function discardDrafts() {
+    setResuming(true)
+    try {
+      await Promise.all(otherDrafts.map((d) => deleteTest(d.id).catch(() => {})))
+      setOtherDrafts([])
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  function populateFromTest(test: TestAdminDetail) {
+    setTitle(test.title || '')
+    setType(test.type)
+    setChapterId(test.chapterId || '')
+    setBatchId(test.audience === 'ALL' ? 'ALL' : (test.batchId || ''))
+    setDate(isoToLocalDate(test.scheduledStart))
+    setStartTime(isoToLocalTime(test.scheduledStart))
+    setEndTime(isoToLocalTime(test.scheduledEnd))
+    setInstructions(test.instructions || '')
+    setMaxMarks(String(test.maxMarks ?? 100))
+    setQuestionText(test.questionText || '')
+    if (test.type === 'mcq' && test.questions && test.questions.length > 0) {
+      setQuestions(test.questions.map((q) => ({ ...q, marks: q.marks ?? 1 })))
+    }
+  }
+
+  useEffect(() => {
+    const resumeId = testId || draftId
+    if (!resumeId) { hydratedRef.current = true; return }
+    let cancelled = false
+    setLoadingExisting(true)
+    fetchTestForForm(resumeId)
+      .then((test) => { if (!cancelled) populateFromTest(test) })
+      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load the test') })
+      .finally(() => { if (!cancelled) { setLoadingExisting(false); hydratedRef.current = true } })
+    return () => { cancelled = true }
+    // Only ever runs once on mount for whichever id we were handed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateQuestion = (i: number, patch: Partial<TestQuestionInput>) =>
     setQuestions((prev) => prev.map((q, idx) => (idx === i ? { ...q, ...patch } : q)))
@@ -139,38 +244,92 @@ export default function ScheduleTestForm() {
     return p
   }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, type, questions])
 
+  // Builds the same shape createTest/updateTest/draft endpoints all take, from current form state.
+  function buildInput(): CreateTestInput {
+    const input: CreateTestInput = {
+      title: title.trim(),
+      type,
+      chapterId: chapterId || undefined,
+      batchId,
+      scheduledStart,
+      scheduledEnd,
+      instructions: instructions.trim() || undefined,
+    }
+    if (type === 'mcq') {
+      // Local/signed preview URLs are display-only; the server stores the image keys.
+      input.questions = questions.map((q) => {
+        const {
+          questionImageUrl, optionAImageUrl, optionBImageUrl, optionCImageUrl, optionDImageUrl,
+          ...rest
+        } = q
+        void questionImageUrl; void optionAImageUrl; void optionBImageUrl; void optionCImageUrl; void optionDImageUrl
+        return { ...rest, marks: Number(q.marks) || 1 }
+      })
+    } else {
+      input.maxMarks = Number(maxMarks) || 0
+      input.questionText = questionText.trim() || undefined
+    }
+    return input
+  }
+
+  // ─── Autosave (create-mode only — an edit of an already-scheduled test is never silently drafted) ───
+
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftIdRef = useRef<string | null>(draftId)
+  draftIdRef.current = draftId
+  const savingRef = useRef(false)
+
+  useEffect(() => {
+    if (isEditMode) return // editing a real test never creates/updates a draft
+    if (!hydratedRef.current || loadingExisting) return // don't autosave the values we just loaded in
+    if (!hasDraftableContent(title, chapterId, batchId, questions)) return
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(async () => {
+      if (savingRef.current) return
+      savingRef.current = true
+      setSaveState('saving')
+      try {
+        const input = buildInput()
+        if (!draftIdRef.current) {
+          const created = await createDraftTest(input)
+          setDraftId(created.id)
+          draftIdRef.current = created.id
+          const qs = new URLSearchParams(Array.from(searchParams.entries()))
+          qs.set('draft', created.id)
+          router.replace(`/admin/tests/new?${qs.toString()}`, { scroll: false })
+        } else {
+          await autosaveDraftTest(draftIdRef.current, input)
+        }
+        setSaveState('saved')
+      } catch {
+        setSaveState('error')
+      } finally {
+        savingRef.current = false
+      }
+    }, 1500)
+
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, chapterId, batchId, date, startTime, endTime, instructions, maxMarks, questionText, questions, type, loadingExisting])
+
   async function handleSubmit() {
     if (problems.length > 0) return
     setSubmitting(true)
     setError(null)
     try {
-      const input: CreateTestInput = {
-        title: title.trim(),
-        type,
-        chapterId: chapterId || undefined,
-        batchId,
-        scheduledStart,
-        scheduledEnd,
-        instructions: instructions.trim() || undefined,
-      }
-      if (type === 'mcq') {
-        // Local/signed preview URLs are display-only; the server stores the image keys.
-        input.questions = questions.map((q) => {
-          const {
-            questionImageUrl, optionAImageUrl, optionBImageUrl, optionCImageUrl, optionDImageUrl,
-            ...rest
-          } = q
-          void questionImageUrl; void optionAImageUrl; void optionBImageUrl; void optionCImageUrl; void optionDImageUrl
-          return { ...rest, marks: Number(q.marks) || 1 }
-        })
+      const input = buildInput()
+      if (isEditMode && testId) {
+        await updateTest(testId, input)
+      } else if (draftId) {
+        // Promote the autosaved draft into a real, fully-scheduled test — no duplicate row.
+        await updateTest(draftId, { ...input, status: 'scheduled' })
       } else {
-        input.maxMarks = Number(maxMarks) || 0
-        input.questionText = questionText.trim() || undefined
+        await createTest(input)
       }
-      await createTest(input)
       router.push('/admin/tests')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create the test')
+      setError(e instanceof Error ? e.message : 'Failed to save the test')
       document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSubmitting(false)
@@ -180,13 +339,42 @@ export default function ScheduleTestForm() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-6">
-        <div>
-          <Link href="/admin/tests" className="text-sm text-zinc-500 hover:text-violet-700">Back to tests</Link>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 mt-2">Schedule New Test</h1>
-          <p className="text-[15px] text-zinc-500 mt-1">MCQ tests auto-grade instantly; descriptive tests are graded manually.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link href="/admin/tests" className="text-sm text-zinc-500 hover:text-violet-700">Back to tests</Link>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 mt-2">{isEditMode ? 'Edit Test' : 'Schedule New Test'}</h1>
+            <p className="text-[15px] text-zinc-500 mt-1">MCQ tests auto-grade instantly; descriptive tests are graded manually.</p>
+          </div>
+          {!isEditMode && saveState !== 'idle' && (
+            <span className={`shrink-0 mt-1 text-xs px-2.5 py-1 rounded-full ${
+              saveState === 'saving' ? 'bg-zinc-100 text-zinc-500' : saveState === 'saved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            }`}>
+              {saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Draft saved' : 'Draft save failed'}
+            </span>
+          )}
         </div>
 
+        {loadingExisting && <div className="text-sm px-4 py-3 rounded-lg bg-zinc-50 text-zinc-500 border border-zinc-200">Loading...</div>}
         {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">{error}</div>}
+
+        {otherDrafts.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm px-4 py-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+            <span>
+              You have an unfinished test{otherDrafts.length > 1 ? 's' : ''} from before
+              {otherDrafts[0].title ? ` ("${otherDrafts[0].title}")` : ''} — pick up where you left off?
+            </span>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => resumeDraft(otherDrafts[0].id)} disabled={resuming}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm disabled:opacity-50">
+                Resume draft
+              </button>
+              <button onClick={discardDrafts} disabled={resuming}
+                className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 text-sm hover:bg-amber-100 disabled:opacity-50">
+                Discard & start new
+              </button>
+            </div>
+          </div>
+        )}
 
         <Section title="Test details">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -206,7 +394,7 @@ export default function ScheduleTestForm() {
               <label className={labelCls} htmlFor="t-chapter">Chapter</label>
               <select id="t-chapter" value={chapterId} onChange={(e) => setChapterId(e.target.value)} className={inputCls}>
                 <option value="">No chapter</option>
-                {chapters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {chapters.map((c) => <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>)}
               </select>
             </div>
             <div>
@@ -378,7 +566,7 @@ export default function ScheduleTestForm() {
             <button onClick={handleSubmit} disabled={problems.length > 0 || submitting}
               className="px-6 py-2.5 rounded-lg text-white text-[15px] transition-colors disabled:opacity-40"
               style={{ backgroundColor: ACCENT }}>
-              {submitting ? 'Scheduling...' : 'Schedule test'}
+              {submitting ? (isEditMode ? 'Saving...' : 'Scheduling...') : (isEditMode ? 'Save changes' : 'Schedule test')}
             </button>
           </div>
         </div>

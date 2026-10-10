@@ -35,7 +35,7 @@ router.get(
   handle((req) => bank.listQuestions({ sourceTestId: req.query.sourceTestId, title: req.query.title }))
 );
 
-// POST /api/question-bank/manual              — add question(s) straight to the bank, independent of any test
+// POST /api/question-bank/manual              — add question(s) straight to the bank (optionally appended to an existing test-derived group via sourceTestId)
 router.post(
   "/manual",
   verifyToken,
@@ -45,11 +45,46 @@ router.post(
       questions: req.body?.questions,
       label: req.body?.label,
       createdBy: req.user.id,
+      sourceTestId: req.body?.sourceTestId,
     })
   )
 );
 
+// DELETE /api/question-bank/groups?sourceTestId=|title=   — delete an entire group's bank copies
+router.delete(
+  "/groups",
+  verifyToken,
+  adminOnly,
+  handle((req) => bank.deleteGroup({ sourceTestId: req.query.sourceTestId, title: req.query.title }))
+);
+
+// PATCH /api/question-bank/groups/rename       — rename a manually-added group's label (bulk, all its questions)
+router.patch(
+  "/groups/rename",
+  verifyToken,
+  adminOnly,
+  handle((req) => bank.renameManualGroup(req.body?.oldTitle, req.body?.newTitle, req.user.id))
+);
+
 // POST /api/question-bank/backfill            — (re)store questions of every existing test; idempotent
 router.post("/backfill", verifyToken, adminOnly, handle(() => bank.backfillAll()));
+
+// PATCH /api/question-bank/:id                — edit an existing bank question's content in place
+// (text/images/options/correct answer/marks). This is a separate copy-store —
+// editing a bank row never touches any test that previously imported a copy of it.
+router.patch(
+  "/:id",
+  verifyToken,
+  adminOnly,
+  handle((req) => bank.updateQuestion(req.params.id, req.body || {}, req.user.id))
+);
+
+// DELETE /api/question-bank/:id                — delete one bank question
+router.delete(
+  "/:id",
+  verifyToken,
+  adminOnly,
+  handle((req) => bank.deleteQuestion(req.params.id))
+);
 
 module.exports = router;

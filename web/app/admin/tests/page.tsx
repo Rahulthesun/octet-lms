@@ -8,7 +8,7 @@ import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
 import TestAnalyticsModal from '@/components/admin/tests/TestAnalyticsModal'
 import OverallAnalyticsModal from '@/components/admin/tests/OverallAnalyticsModal'
-import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon } from '@/components/admin/tests/icons'
+import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon, EditIcon } from '@/components/admin/tests/icons'
 
 const ACCENT = '#5B21B6'
 
@@ -146,8 +146,12 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                   <input ref={keyRef} type="file" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadKey(test.id, f); e.target.value = '' }} />
 
+                  <Link href={`/admin/tests/${test.id}/edit`}
+                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-600 hover:bg-white transition-colors">
+                    <EditIcon className="w-4 h-4" /> Edit
+                  </Link>
                   <button onClick={() => setShowAnalytics(true)}
-                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
                     <ReportIcon className="w-4 h-4" /> Report
                   </button>
                   <button onClick={() => onDelete(test.id)}
@@ -158,6 +162,10 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
               )}
               {test.type === 'mcq' && (
                 <div className="flex justify-end gap-2">
+                  <Link href={`/admin/tests/${test.id}/edit`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-600 hover:bg-white transition-colors">
+                    <EditIcon className="w-4 h-4" /> Edit
+                  </Link>
                   <button onClick={() => setShowAnalytics(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
                     <ReportIcon className="w-4 h-4" /> Report
@@ -209,8 +217,15 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 {sortedAttempts.map((a) => {
                   const pct = a.marksAwarded !== null && a.maxMarks ? Math.round((a.marksAwarded / a.maxMarks) * 100) : null
                   const clickable = a.status === 'submitted' || a.status === 'evaluated'
-                  const timeTaken = a.startedAt && a.submittedAt
-                    ? Math.max(0, Math.round((new Date(a.submittedAt).getTime() - new Date(a.startedAt).getTime()) / 60000))
+                  const timeTakenSeconds = a.startedAt && a.submittedAt
+                    ? Math.max(0, Math.round((new Date(a.submittedAt).getTime() - new Date(a.startedAt).getTime()) / 1000))
+                    : null
+                  const timeTakenLabel = timeTakenSeconds !== null
+                    ? (() => {
+                        const mins = Math.floor(timeTakenSeconds / 60)
+                        const secs = timeTakenSeconds % 60
+                        return mins > 0 ? `${mins} min ${secs} sec` : `${secs} sec`
+                      })()
                     : null
                   return (
                     <button key={a.id} disabled={!clickable} onClick={() => setSelectedAttemptId(a.id)}
@@ -220,7 +235,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                       <span className="text-[15px] text-zinc-800 truncate">{a.studentName}</span>
                       <span className="text-sm text-zinc-500 capitalize">{a.status.replace('_', ' ')}</span>
                       <span className="text-sm font-inter text-zinc-700">{a.marksAwarded !== null ? `${a.marksAwarded}/${a.maxMarks}` : '—'}</span>
-                      <span className="text-sm font-inter text-zinc-500">{timeTaken !== null ? `${timeTaken} min` : '—'}</span>
+                      <span className="text-sm font-inter text-zinc-500">{timeTakenLabel !== null ? timeTakenLabel : '—'}</span>
                       <span className="text-sm font-inter text-zinc-500 text-right">{pct !== null ? `${pct}%` : '—'}</span>
                     </button>
                   )
