@@ -10,9 +10,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authedFetch } from '@/lib/apiClient'
-import { uploadQuestionImage } from '@/lib/questionImages'
+import { imageFromClipboard, imageFromFiles, uploadQuestionImage } from '@/lib/questionImages'
 import QuestionContent from '@/components/shared/QuestionContent'
-import { Watermark } from '@/components/shared/ExamSecurity'
+import { Watermark, useExamGuard } from '@/components/shared/ExamSecurity'
 import type { ContentType, OptionKey, QuestionContentFields } from '@/hooks/useTests'
 
 const ACCENT = '#5B21B6'
@@ -23,6 +23,12 @@ interface BankGroup {
   questionCount: number
   lastAdded: string
   testExists: boolean
+  /** Chapter of the source test, when known — shown alongside the title so two
+   *  different tests that happen to share the same title can be told apart. */
+  chapter?: string | null
+  /** True when another group (a different test) has the exact same displayed
+   *  title — surfaced in the UI instead of silently merging them. */
+  titleSharedWithOtherGroup?: boolean
 }
 
 interface BankQuestion extends QuestionContentFields {
@@ -34,6 +40,16 @@ interface BankQuestion extends QuestionContentFields {
   optionBImageKey?: string | null
   optionCImageKey?: string | null
   optionDImageKey?: string | null
+  questionImageContentHash?: string | null
+  optionAImageContentHash?: string | null
+  optionBImageContentHash?: string | null
+  optionCImageContentHash?: string | null
+  optionDImageContentHash?: string | null
+  questionImagePerceptualHash?: string | null
+  optionAImagePerceptualHash?: string | null
+  optionBImagePerceptualHash?: string | null
+  optionCImagePerceptualHash?: string | null
+  optionDImagePerceptualHash?: string | null
 }
 
 function groupQuery(g: BankGroup) {
@@ -53,6 +69,10 @@ interface FieldValue {
   text: string
   imageKey: string | null
   previewUrl: string | null
+  /** SHA-256 of the image bytes (for true duplicate detection server-side). */
+  imageContentHash: string | null
+  /** dHash perceptual hash of the image (for near-duplicate detection server-side). */
+  imagePerceptualHash: string | null
 }
 
 interface DraftQuestion {
@@ -65,10 +85,12 @@ interface DraftQuestion {
   marks: number
   /** Set once this question has been autosaved to the bank — further edits PATCH it instead of creating a duplicate. */
   savedId?: string
+  /** True when the last save attempt found this exact question already existed in the bank (byte-identical content) and skipped it. */
+  isDuplicate?: boolean
 }
 
 function emptyField(): FieldValue {
-  return { type: 'text', text: '', imageKey: null, previewUrl: null }
+  return { type: 'text', text: '', imageKey: null, previewUrl: null, imageContentHash: null, imagePerceptualHash: null }
 }
 
 function emptyDraft(): DraftQuestion {
@@ -93,18 +115,28 @@ function draftToPayload(d: DraftQuestion) {
     questionType: d.question.type,
     questionText: d.question.type === 'text' ? d.question.text.trim() : null,
     questionImageKey: d.question.type === 'image' ? d.question.imageKey : null,
+    questionImageContentHash: d.question.type === 'image' ? d.question.imageContentHash : null,
+    questionImagePerceptualHash: d.question.type === 'image' ? d.question.imagePerceptualHash : null,
     optionAType: d.optionA.type,
     optionA: d.optionA.type === 'text' ? d.optionA.text.trim() : null,
     optionAImageKey: d.optionA.type === 'image' ? d.optionA.imageKey : null,
+    optionAImageContentHash: d.optionA.type === 'image' ? d.optionA.imageContentHash : null,
+    optionAImagePerceptualHash: d.optionA.type === 'image' ? d.optionA.imagePerceptualHash : null,
     optionBType: d.optionB.type,
     optionB: d.optionB.type === 'text' ? d.optionB.text.trim() : null,
     optionBImageKey: d.optionB.type === 'image' ? d.optionB.imageKey : null,
+    optionBImageContentHash: d.optionB.type === 'image' ? d.optionB.imageContentHash : null,
+    optionBImagePerceptualHash: d.optionB.type === 'image' ? d.optionB.imagePerceptualHash : null,
     optionCType: d.optionC.type,
     optionC: d.optionC.type === 'text' ? d.optionC.text.trim() : null,
     optionCImageKey: d.optionC.type === 'image' ? d.optionC.imageKey : null,
+    optionCImageContentHash: d.optionC.type === 'image' ? d.optionC.imageContentHash : null,
+    optionCImagePerceptualHash: d.optionC.type === 'image' ? d.optionC.imagePerceptualHash : null,
     optionDType: d.optionD.type,
     optionD: d.optionD.type === 'text' ? d.optionD.text.trim() : null,
     optionDImageKey: d.optionD.type === 'image' ? d.optionD.imageKey : null,
+    optionDImageContentHash: d.optionD.type === 'image' ? d.optionD.imageContentHash : null,
+    optionDImagePerceptualHash: d.optionD.type === 'image' ? d.optionD.imagePerceptualHash : null,
     correctOption: d.correctOption,
     marks: d.marks,
   }
@@ -112,20 +144,29 @@ function draftToPayload(d: DraftQuestion) {
 
 /** The reverse: a bank question (as returned by the API) -> an editable draft. */
 function bankQuestionToDraft(q: BankQuestion): DraftQuestion {
-  function field(type: ContentType, text: string | null, imageUrl: string | null | undefined, imageKey: string | null | undefined): FieldValue {
+  function field(
+    type: ContentType,
+    text: string | null,
+    imageUrl: string | null | undefined,
+    imageKey: string | null | undefined,
+    imageContentHash: string | null | undefined,
+    imagePerceptualHash: string | null | undefined
+  ): FieldValue {
     return {
       type,
       text: text ?? '',
       imageKey: imageKey ?? null,
       previewUrl: imageUrl ?? null,
+      imageContentHash: imageContentHash ?? null,
+      imagePerceptualHash: imagePerceptualHash ?? null,
     }
   }
   return {
-    question: field(q.questionType, q.questionText, q.questionImageUrl, q.questionImageKey),
-    optionA: field(q.optionAType, q.optionA, q.optionAImageUrl, q.optionAImageKey),
-    optionB: field(q.optionBType, q.optionB, q.optionBImageUrl, q.optionBImageKey),
-    optionC: field(q.optionCType, q.optionC, q.optionCImageUrl, q.optionCImageKey),
-    optionD: field(q.optionDType, q.optionD, q.optionDImageUrl, q.optionDImageKey),
+    question: field(q.questionType, q.questionText, q.questionImageUrl, q.questionImageKey, q.questionImageContentHash, q.questionImagePerceptualHash),
+    optionA: field(q.optionAType, q.optionA, q.optionAImageUrl, q.optionAImageKey, q.optionAImageContentHash, q.optionAImagePerceptualHash),
+    optionB: field(q.optionBType, q.optionB, q.optionBImageUrl, q.optionBImageKey, q.optionBImageContentHash, q.optionBImagePerceptualHash),
+    optionC: field(q.optionCType, q.optionC, q.optionCImageUrl, q.optionCImageKey, q.optionCImageContentHash, q.optionCImagePerceptualHash),
+    optionD: field(q.optionDType, q.optionD, q.optionDImageUrl, q.optionDImageKey, q.optionDImageContentHash, q.optionDImagePerceptualHash),
     correctOption: q.correctOption,
     marks: q.marks,
   }
@@ -150,6 +191,30 @@ const FIELD_LABELS: Record<FieldKey, string> = {
 function FieldEditor({ label, value, onChange }: { label: string; value: FieldValue; onChange: (v: FieldValue) => void }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const zoneRef = useRef<HTMLDivElement>(null)
+  const hoveredRef = useRef(false)
+  const takeImageRef = useRef<(file: File | null) => void>(() => {})
+
+  // Same Ctrl+V-to-upload pattern as QuestionFieldInput.tsx (test creation):
+  // paste works while the pointer hovers the image zone OR it has focus, so
+  // a screenshot can be pasted without clicking first. Only handles a
+  // clipboard that actually holds an image.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const zone = zoneRef.current
+      if (!zone) return
+      const focused = zone.contains(document.activeElement)
+      if (!hoveredRef.current && !focused) return
+      const file = imageFromClipboard(e)
+      if (!file) return
+      e.preventDefault()
+      takeImageRef.current(file)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
 
   async function handleFile(file: File | null) {
     if (!file) return
@@ -157,13 +222,15 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
     setError(null)
     try {
       const uploaded = await uploadQuestionImage(file)
-      onChange({ ...value, imageKey: uploaded.key, previewUrl: uploaded.previewUrl })
+      onChange({ ...value, imageKey: uploaded.key, previewUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image upload failed')
     } finally {
       setUploading(false)
     }
   }
+
+  takeImageRef.current = handleFile
 
   return (
     <div>
@@ -191,15 +258,34 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
           placeholder={`${label} text`}
         />
       ) : (
-        <div className="space-y-2">
+        <div
+          ref={zoneRef}
+          onMouseEnter={() => { hoveredRef.current = true }}
+          onMouseLeave={() => { hoveredRef.current = false }}
+          tabIndex={0}
+          role="group"
+          aria-label={`${label} image. Focus here and press Control V to paste a screenshot`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragOver(false)
+            handleFile(imageFromFiles(e.dataTransfer.files))
+          }}
+          className={`space-y-2 rounded-lg border-2 border-dashed p-2 outline-none transition-colors focus:border-violet-400 focus:ring-2 focus:ring-violet-200 ${
+            dragOver ? 'border-violet-500 bg-violet-50' : 'border-zinc-300'
+          }`}
+        >
           {value.previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value.previewUrl} alt={label} className="max-h-32 rounded-lg border border-zinc-200" />
           )}
+          <p className="text-xs text-zinc-500">Hover and press Ctrl+V to paste a screenshot, drag and drop an image, or choose a file below</p>
           <input
+            ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => { handleFile(e.target.files?.[0] ?? null); e.target.value = '' }}
             className="block w-full text-sm text-zinc-600"
           />
           {uploading && <p className="text-xs text-zinc-500">Uploading...</p>}
@@ -313,12 +399,13 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
       try {
         for (const { d, i } of toSave) {
           if (!d.savedId) {
-            const result: { ids?: string[] } = await authedFetch('/api/question-bank/manual', {
+            const result: { ids?: string[]; added?: number } = await authedFetch('/api/question-bank/manual', {
               method: 'POST',
               body: JSON.stringify({ label: trimmedLabel, questions: [draftToPayload(d)], sourceTestId: sourceTestId || undefined }),
             })
             const newId = result.ids?.[0]
-            if (newId) setDrafts((prev) => prev.map((p, idx) => (idx === i ? { ...p, savedId: newId } : p)))
+            const duplicate = (result.added ?? 0) === 0
+            setDrafts((prev) => prev.map((p, idx) => (idx === i ? { ...p, savedId: newId ?? p.savedId, isDuplicate: duplicate } : p)))
           } else {
             await authedFetch(`/api/question-bank/${d.savedId}`, {
               method: 'PATCH',
@@ -426,7 +513,12 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
           <div className="space-y-4">
             {drafts.map((d, i) => (
               <div key={i} className="relative">
-                {d.savedId && (
+                {d.savedId && d.isDuplicate && (
+                  <span className="absolute -top-2 right-3 z-10 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    Already in the bank — not added again
+                  </span>
+                )}
+                {d.savedId && !d.isDuplicate && (
                   <span className="absolute -top-2 right-3 z-10 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Saved
                   </span>
@@ -594,6 +686,10 @@ function EditQuestionModal({ question, onClose, onSaved }: {
 // ── Main page ────────────────────────────────────────────────────────────
 
 export default function QuestionBankPage() {
+  // Same anti-copy/anti-screenshot deterrents used during a live exam:
+  // right-click/copy/print/devtools shortcuts blocked, content blurred the
+  // instant the tab loses focus (e.g. a screen-recorder switching away).
+  const { blurred } = useExamGuard(true)
   const [groups, setGroups] = useState<BankGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -699,7 +795,7 @@ export default function QuestionBankPage() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className={`p-8 max-w-6xl mx-auto transition-[filter] duration-150 ${blurred ? 'blur-xl select-none' : ''}`}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Question Bank</h1>
@@ -740,13 +836,22 @@ export default function QuestionBankPage() {
               <div key={key}>
                 <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 cursor-pointer" onClick={() => toggleGroup(g)}>
-                    <p className="text-[15px] text-zinc-900 truncate">{g.title}</p>
+                    <p className="text-[15px] text-zinc-900 truncate flex items-center gap-2">
+                      {g.title}
+                      {g.titleSharedWithOtherGroup && (
+                        <span title="Another group has this exact same title — these are different tests, told apart by chapter/date below."
+                          className="text-xs font-normal px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          same title, different test
+                        </span>
+                      )}
+                    </p>
                     <p className="text-sm text-zinc-500 mt-0.5">
                       {g.questionCount} question{g.questionCount === 1 ? '' : 's'}
                       {' · '}
                       {new Date(g.lastAdded).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                       {' · '}
                       {g.sourceTestId ? (g.testExists ? 'From an active test' : 'Test since deleted') : 'Added directly'}
+                      {g.chapter && <> · {g.chapter}</>}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -771,15 +876,15 @@ export default function QuestionBankPage() {
                   </div>
                 </div>
                 {isOpen && (
-                  <div className="relative px-5 pb-5 space-y-3">
-                    {questions.length > 0 && !loadingQuestions && <Watermark lines={['OCTET']} />}
+                  <div className="px-5 pb-5 space-y-3">
                     {loadingQuestions ? (
                       <p className="text-sm text-zinc-500 py-4 text-center">Loading questions...</p>
                     ) : questions.length === 0 ? (
                       <p className="text-sm text-zinc-500 py-4 text-center">No questions found.</p>
                     ) : (
                       questions.map((q, i) => (
-                        <div key={q.bankQuestionId} className="rounded-xl border border-zinc-200 p-4">
+                        <div key={q.bankQuestionId} className="relative overflow-hidden rounded-xl border border-zinc-200 p-4">
+                          <Watermark lines={['OCTET']} />
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="text-[15px] text-zinc-900 flex-1">
                               <span className="text-zinc-400 mr-1">{i + 1}.</span>

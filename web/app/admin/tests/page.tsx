@@ -8,7 +8,8 @@ import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
 import TestAnalyticsModal from '@/components/admin/tests/TestAnalyticsModal'
 import OverallAnalyticsModal from '@/components/admin/tests/OverallAnalyticsModal'
-import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon, EditIcon } from '@/components/admin/tests/icons'
+import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon, EditIcon, EyeIcon } from '@/components/admin/tests/icons'
+import ViewQuestionsModal from '@/components/admin/tests/ViewQuestionsModal'
 
 const ACCENT = '#5B21B6'
 
@@ -50,6 +51,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
   const { attempts, loading: attemptsLoading, refetch } = useAdminAttempts(isOpen ? test.id : null)
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [showQuestions, setShowQuestions] = useState(false)
   const [sortMode, setSortMode] = useState<'default' | 'fastest' | 'marksHigh' | 'marksLow'>('default')
   const qRef = useRef<HTMLInputElement>(null)
   const keyRef = useRef<HTMLInputElement>(null)
@@ -162,6 +164,10 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
               )}
               {test.type === 'mcq' && (
                 <div className="flex justify-end gap-2">
+                  <button onClick={() => setShowQuestions(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-600 hover:bg-white transition-colors">
+                    <EyeIcon className="w-4 h-4" /> View
+                  </button>
                   <Link href={`/admin/tests/${test.id}/edit`}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-600 hover:bg-white transition-colors">
                     <EditIcon className="w-4 h-4" /> Edit
@@ -206,7 +212,8 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 ))}
               </div>
 
-              <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="bg-white rounded-xl border border-zinc-200 overflow-x-auto">
+                <div className="min-w-[520px]">
                 <div className="grid grid-cols-[1fr_100px_90px_90px_90px] gap-2 px-4 py-2.5 bg-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
                   <span>Student</span><span>Status</span><span>Marks</span><span>Time taken</span><span className="text-right">%</span>
                 </div>
@@ -240,6 +247,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                     </button>
                   )
                 })}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -253,6 +261,9 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
       )}
       {showAnalytics && (
         <TestAnalyticsModal test={test} onClose={() => setShowAnalytics(false)} />
+      )}
+      {showQuestions && (
+        <ViewQuestionsModal testId={test.id} title={test.title} onClose={() => setShowQuestions(false)} />
       )}
     </div>
   )

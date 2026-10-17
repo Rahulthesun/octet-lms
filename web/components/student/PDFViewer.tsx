@@ -508,6 +508,15 @@ ctx.restore()
         .pdf-scroll-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         .pdf-scroll-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
         .pdf-scroll-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        /* Blocks in-page text selection and the mobile long-press "save
+           image / copy" callout. Does not and cannot block an OS-level
+           screenshot, screen recording, or a camera pointed at the screen —
+           see usePdfViewerLockDown.ts for what IS intercepted. */
+        .cato-pdf-viewer, .cato-pdf-viewer canvas {
+          -webkit-user-select: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+        }
       `}</style>
 
       <div

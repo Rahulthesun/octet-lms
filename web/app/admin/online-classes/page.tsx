@@ -182,7 +182,7 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <div>
                 <p className="text-xs text-zinc-500 mb-2">Minimum % of class time to count as Present or Partial</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <SettingField label="Present threshold (%)">
                     <input type="number" min={0} max={100} value={presentThreshold}
                       onChange={(e) => setPresentThreshold(Number(e.target.value))}
@@ -733,7 +733,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
                   className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 resize-none" />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Date</label>
                   <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
@@ -750,7 +750,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
                     className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Students (batch)</label>
                   <select value={batchId} onChange={(e) => setBatchId(e.target.value)}
@@ -915,14 +915,14 @@ export default function OnlineClassesPage() {
           <button
             onClick={() => setShowSettings(true)}
             title="Online Attendance Settings"
-            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-md border border-zinc-300 hover:bg-zinc-100 transition-colors text-xl leading-none"
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-300 hover:bg-zinc-100 transition-colors text-xl leading-none"
           >
             <span aria-hidden="true">⚙️</span>
           </button>
           <GoogleAccountPanel />
           <button
             onClick={() => setShowSchedule(true)}
-            className="text-sm px-4 py-2.5 text-white rounded-md transition-colors whitespace-nowrap"
+            className="flex items-center justify-center gap-2 text-[15px] px-5 py-2.5 text-white rounded-lg transition-colors whitespace-nowrap"
             style={{ backgroundColor: ACCENT }}
           >
             Schedule Online Class

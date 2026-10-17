@@ -31,6 +31,16 @@ interface BankQuestion extends QuestionContentFields {
   optionBImageKey: string | null
   optionCImageKey: string | null
   optionDImageKey: string | null
+  questionImageContentHash?: string | null
+  optionAImageContentHash?: string | null
+  optionBImageContentHash?: string | null
+  optionCImageContentHash?: string | null
+  optionDImageContentHash?: string | null
+  questionImagePerceptualHash?: string | null
+  optionAImagePerceptualHash?: string | null
+  optionBImagePerceptualHash?: string | null
+  optionCImagePerceptualHash?: string | null
+  optionDImagePerceptualHash?: string | null
 }
 
 /** A bank question becomes a fresh copy for the new test; the bank id is kept only as a tracking reference. */
@@ -40,22 +50,32 @@ export function copyForNewTest(b: BankQuestion): TestQuestionInput {
     questionText: b.questionText ?? '',
     questionImageKey: b.questionImageKey,
     questionImageUrl: b.questionImageUrl ?? null,
+    questionImageContentHash: b.questionImageContentHash ?? null,
+    questionImagePerceptualHash: b.questionImagePerceptualHash ?? null,
     optionAType: b.optionAType,
     optionA: b.optionA ?? '',
     optionAImageKey: b.optionAImageKey,
     optionAImageUrl: b.optionAImageUrl ?? null,
+    optionAImageContentHash: b.optionAImageContentHash ?? null,
+    optionAImagePerceptualHash: b.optionAImagePerceptualHash ?? null,
     optionBType: b.optionBType,
     optionB: b.optionB ?? '',
     optionBImageKey: b.optionBImageKey,
     optionBImageUrl: b.optionBImageUrl ?? null,
+    optionBImageContentHash: b.optionBImageContentHash ?? null,
+    optionBImagePerceptualHash: b.optionBImagePerceptualHash ?? null,
     optionCType: b.optionCType,
     optionC: b.optionC ?? '',
     optionCImageKey: b.optionCImageKey,
     optionCImageUrl: b.optionCImageUrl ?? null,
+    optionCImageContentHash: b.optionCImageContentHash ?? null,
+    optionCImagePerceptualHash: b.optionCImagePerceptualHash ?? null,
     optionDType: b.optionDType,
     optionD: b.optionD ?? '',
     optionDImageKey: b.optionDImageKey,
     optionDImageUrl: b.optionDImageUrl ?? null,
+    optionDImageContentHash: b.optionDImageContentHash ?? null,
+    optionDImagePerceptualHash: b.optionDImagePerceptualHash ?? null,
     correctOption: b.correctOption,
     marks: b.marks,
     bankQuestionId: b.bankQuestionId,
@@ -236,13 +256,13 @@ export default function QuestionBankModal({ onClose, onImport }: {
               ) : questions.length === 0 ? (
                 <p className="text-sm text-zinc-500 py-6 text-center">No questions found.</p>
               ) : (
-                <div className="relative space-y-3">
-                  <Watermark lines={['OCTET']} />
+                <div className="space-y-3">
                   {questions.map((q, i) => (
                     <label key={q.bankQuestionId}
-                      className={`block rounded-xl border p-4 cursor-pointer transition-colors ${
+                      className={`relative overflow-hidden block rounded-xl border p-4 cursor-pointer transition-colors ${
                         selected.has(q.bankQuestionId) ? 'border-violet-400 bg-violet-50/50' : 'border-zinc-200 hover:bg-zinc-50'
                       }`}>
+                      <Watermark lines={['OCTET']} />
                       <div className="flex items-start gap-3">
                         <input type="checkbox" checked={selected.has(q.bankQuestionId)} onChange={() => toggle(q.bankQuestionId)}
                           className="accent-violet-600 w-4 h-4 mt-1 shrink-0" />

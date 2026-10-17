@@ -5,10 +5,10 @@
 // a batch-wise breakdown, and per-student averages across every test they've
 // taken. Every figure comes from /api/tests/analytics/overall.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  useOverallTestAnalytics, downloadOverallAnalyticsPdf, type AnalyticsPoint,
+  useOverallTestAnalytics, downloadOverallAnalyticsPdf, authedFetch, type AnalyticsPoint,
 } from '@/hooks/useTests'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 
@@ -34,7 +34,15 @@ function formatRange(start: string, end: string) {
 }
 
 export default function OverallAnalyticsModal({ onClose }: { onClose: () => void }) {
-  const [passPct, setPassPct] = useState(40)
+  // Initial default comes from the persisted admin setting (GET
+  // /api/test-settings); a local override here does NOT write back to it —
+  // only the Settings page (app/admin/settings/page.tsx) persists a change.
+  const [passPct, setPassPct] = useState(35)
+  useEffect(() => {
+    authedFetch('/api/test-settings')
+      .then((d) => setPassPct(Number(d?.passPercentage ?? 35)))
+      .catch(() => setPassPct(35))
+  }, [])
   const { analytics, loading, error } = useOverallTestAnalytics(passPct)
 
   const [distType, setDistType] = useState<AttendanceChartType>('bar')

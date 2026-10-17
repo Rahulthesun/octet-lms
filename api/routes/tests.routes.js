@@ -71,6 +71,9 @@ router.post("/:id/attempts/:attemptId/grade", verifyToken, adminOnly, attemptsCt
 // GET  /api/tests/students/:studentId/report      → one student's consolidated monthly test report (?month=YYYY-MM)
 router.get("/students/:studentId/report", verifyToken, adminOnly, attemptsCtrl.adminGetStudentMonthlyReport);
 
+// GET  /api/tests/students/:studentId/report/pdf  → the same, as a downloadable PDF (?month=YYYY-MM)
+router.get("/students/:studentId/report/pdf", verifyToken, adminOnly, attemptsCtrl.adminDownloadStudentMonthlyReportPdf);
+
 // GET  /api/tests/analytics/overall              → analytics across EVERY test (must come before "/:id/analytics" below)
 router.get("/analytics/overall", verifyToken, adminOnly, testsCtrl.getOverallAnalytics);
 

@@ -14,13 +14,32 @@ import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import { authedFetch } from '@/lib/apiClient'
 import AttendanceChart, {
   ATTENDANCE_STATUS_COLORS,
+  NEVER_JOINED_COLOR,
   buildAttendanceTrend,
   buildAttendanceCategoryData,
+  buildAttendanceDateWiseData,
   type AttendanceChartType,
   type ChartDatum,
 } from '@/components/shared/AttendanceChart'
 
 const ACCENT = '#5B21B6'
+
+// ─── Month-picker helpers (mirrors TestReportsTab.tsx's StudentTestReportModal) ─
+
+function currentMonthStr() {
+  return new Date().toISOString().slice(0, 7) // YYYY-MM
+}
+
+function monthLabel(month: string) {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+}
+
+function shiftMonth(month: string, delta: number) {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 function pctColor(pct: number | null) {
   if (pct === null) return '#9CA3AF'
@@ -37,6 +56,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
   const [chartType, setChartType] = useState<AttendanceChartType>('bar')
   const [sendingReport, setSendingReport] = useState(false)
   const [sendReportMessage, setSendReportMessage] = useState<string | null>(null)
+  const [month, setMonth] = useState(currentMonthStr())
 
   async function sendMonthlyReportNow() {
     setSendingReport(true)
@@ -64,11 +84,37 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
     }
   }
 
-  const categoryChartData: ChartDatum[] = report ? buildAttendanceCategoryData(report.records) : []
+  // Backend history endpoint returns the student's full attendance history
+  // unscoped; scope it client-side to the selected month (mirrors how the
+  // test report scopes per-month, just filtered here rather than server-side
+  // since the full per-student history isn't large).
+  const monthRecords = report ? report.records.filter((r) => r.date.slice(0, 7) === month) : []
 
-  const trendChartData: ChartDatum[] = report
-    ? buildAttendanceTrend([...report.records].reverse().map((r) => ({ present: r.status === 'present' })))
-    : []
+  const monthStats = report
+    ? (() => {
+        const present = monthRecords.filter((r) => r.status === 'present').length
+        const absent = monthRecords.length - present
+        return {
+          totalSessions: monthRecords.length,
+          presentCount: present,
+          absentCount: absent,
+          attendancePct: monthRecords.length > 0 ? Math.round((present / monthRecords.length) * 100) : null,
+        }
+      })()
+    : null
+
+  // PRIMARY view: date-by-date, not an aggregate "number of sessions" count —
+  // each bar is one session date, colored by that day's status, with a solid
+  // black bar for a student who never logged into the online class at all
+  // (distinct from "joined but under threshold", which stays red).
+  const dateWiseChartData: ChartDatum[] = buildAttendanceDateWiseData(monthRecords)
+
+  // Secondary/summary view, demoted to the Pie tab: aggregate category totals.
+  const categoryChartData: ChartDatum[] = buildAttendanceCategoryData(monthRecords)
+
+  const trendChartData: ChartDatum[] = buildAttendanceTrend(
+    [...monthRecords].reverse().map((r) => ({ present: r.status === 'present' })),
+  )
 
   async function download(kind: 'pdf' | 'csv') {
     setDownloading(kind)
@@ -110,18 +156,37 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
             <div className="py-16 text-center text-sm text-red-600">{error}</div>
           ) : report ? (
             <>
+              <div className="px-6 py-3 border-b border-zinc-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMonth((m) => shiftMonth(m, -1))}
+                    className="w-7 h-7 flex items-center justify-center rounded-md border border-zinc-300 text-zinc-500 hover:bg-zinc-100"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-sm font-medium text-zinc-800 w-40 text-center">{monthLabel(month)}</span>
+                  <button
+                    onClick={() => setMonth((m) => shiftMonth(m, 1))}
+                    disabled={month >= currentMonthStr()}
+                    className="w-7 h-7 flex items-center justify-center rounded-md border border-zinc-300 text-zinc-500 hover:bg-zinc-100 disabled:opacity-40"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-3 px-6 py-4">
                 <div className="bg-zinc-50 rounded-lg px-3 py-2.5 text-center">
-                  <p className="text-lg font-semibold text-zinc-900 tabular-nums">{report.totalSessions}</p>
+                  <p className="text-lg font-semibold text-zinc-900 tabular-nums">{monthStats?.totalSessions ?? 0}</p>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-400 mt-0.5">Sessions</p>
                 </div>
                 <div className="bg-zinc-50 rounded-lg px-3 py-2.5 text-center">
-                  <p className="text-lg font-semibold text-zinc-900 tabular-nums">{report.presentCount}</p>
+                  <p className="text-lg font-semibold text-zinc-900 tabular-nums">{monthStats?.presentCount ?? 0}</p>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-400 mt-0.5">Present</p>
                 </div>
                 <div className="bg-zinc-50 rounded-lg px-3 py-2.5 text-center">
-                  <p className="text-lg font-semibold tabular-nums" style={{ color: pctColor(report.attendancePct) }}>
-                    {report.attendancePct !== null ? `${report.attendancePct}%` : '—'}
+                  <p className="text-lg font-semibold tabular-nums" style={{ color: pctColor(monthStats?.attendancePct ?? null) }}>
+                    {monthStats?.attendancePct !== null && monthStats?.attendancePct !== undefined ? `${monthStats.attendancePct}%` : '—'}
                   </p>
                   <p className="text-[10px] uppercase tracking-wide text-zinc-400 mt-0.5">Attendance</p>
                 </div>
@@ -131,21 +196,27 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
                 <AttendanceChart
                   type={chartType}
                   onTypeChange={setChartType}
-                  barData={categoryChartData}
+                  barData={dateWiseChartData}
                   pieData={categoryChartData}
                   lineData={trendChartData}
                   lineColor={ACCENT}
-                  valueSuffix={chartType === 'line' ? '%' : ''}
-                  barAxisLabels={{ x: 'Attendance status', y: 'Number of sessions' }}
+                  valueSuffix={chartType === 'bar' ? '' : '%'}
+                  barAxisLabels={{ x: 'Date', y: 'Attendance %' }}
                   lineAxisLabels={{ x: 'Session number', y: 'Attendance % so far' }}
                   description={
                     chartType === 'bar'
-                      ? "How many of this student's sessions fall into each attendance status."
+                      ? 'Attendance by date — black bars mark a class this student never logged into at all.'
                       : chartType === 'pie'
-                      ? "Share of this student's sessions in each attendance status."
+                      ? "Share of this student's sessions in each attendance status (summary)."
                       : 'Running attendance percentage after each session, oldest to most recent.'
                   }
                 />
+                {chartType === 'bar' && (
+                  <p className="text-[10px] text-zinc-400 mt-1.5 flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: NEVER_JOINED_COLOR }} />
+                    Black = never logged into that online class (vs. joined but under threshold, shown in red)
+                  </p>
+                )}
               </div>
 
               <div className="px-6 pb-4">
@@ -156,9 +227,9 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
                     <span className="text-right">Status</span>
                   </div>
                   <div className="divide-y divide-zinc-100 max-h-64 overflow-y-auto">
-                    {report.records.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-zinc-400">No sessions recorded yet.</div>
-                    ) : report.records.map((r, i) => (
+                    {monthRecords.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-zinc-400">No sessions recorded this month.</div>
+                    ) : monthRecords.map((r, i) => (
                       <div key={i} className="grid grid-cols-[1fr_1fr_80px] px-3 py-2 text-sm items-center">
                         <span className="text-zinc-700">{r.date}{r.time ? ` · ${r.time}` : ''}</span>
                         <span className="text-zinc-500 truncate">{r.batchName || '—'}</span>
@@ -214,7 +285,9 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
   const { report, loading, error } = useBatchReport(batchId)
   const [downloading, setDownloading] = useState<'pdf' | 'csv' | null>(null)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
-  const [chartType, setChartType] = useState<AttendanceChartType>('bar')
+  // Date-wise trend opens first (the primary view the admin asked for),
+  // not the aggregate per-student ranking — that stays one tab away on Bar.
+  const [chartType, setChartType] = useState<AttendanceChartType>('line')
 
   // Bar: per-student attendance %, ranked — the most useful "batch-wise" view.
   const barChartData: ChartDatum[] = report

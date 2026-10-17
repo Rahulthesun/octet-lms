@@ -291,7 +291,7 @@ export default function ExamsPage() {
                     {selected ? 'Hide tracking' : 'View tracking'}
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-sm text-gray-500">Students</p>
                     <p className="text-xl text-primary font-inter">{ev.targetedCount}</p>

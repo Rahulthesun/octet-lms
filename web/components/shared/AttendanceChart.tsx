@@ -27,6 +27,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from 'recharts'
 import { IconBarChart, IconPieChart, IconLineChart } from '@/components/ui/SvgIcons'
 
@@ -38,6 +39,14 @@ export const ATTENDANCE_STATUS_COLORS = {
   partial: '#fab219',
   absent: '#d03b3b',
 } as const
+
+// A student who never logged into the online class at all gets a distinct
+// solid-black bar — different from "joined briefly but under the present/
+// partial threshold" (which stays red/orange). Drawn UPWARD at a notable
+// height (same scale as a present bar) so it reads as "no attempt", not as
+// a small/zero value that could be mistaken for a rendering gap.
+export const NEVER_JOINED_COLOR = '#000000'
+const NEVER_JOINED_BAR_HEIGHT = 100
 
 export interface ChartDatum {
   label: string
@@ -75,6 +84,15 @@ interface AttendanceChartProps {
   lineAxisLabels?: AxisLabels
   /** One plain-language sentence, shown under the chart-type toggle, saying what the current chart depicts. */
   description?: string
+  /**
+   * Bar chart only. Draws a bold black reference line at `referenceValue`
+   * (default 100) across the top of the chart — e.g. "100% = max achievable"
+   * for a 0-100 percentage-scale bar chart. Only wire this where the bar
+   * chart is actually on a 0-100 scale (never for e.g. a count-of-sessions
+   * bar chart, where 100 isn't a meaningful ceiling).
+   */
+  showMaxLine?: boolean
+  referenceValue?: number
 }
 
 function hasData(data: ChartDatum[]) {
@@ -97,6 +115,55 @@ export function buildAttendanceTrend(recordsOldestFirst: { present: boolean }[])
   })
 }
 
+/**
+ * PRIMARY view for an attendance report: one bar per session DATE (not an
+ * aggregate "number of sessions" count), oldest to most recent, colored by
+ * that day's status. A student who never logged into the online class at
+ * all (durationMinutes is 0/null AND the session was a Google Meet class)
+ * is distinguished from "joined but under threshold" with a solid black bar
+ * at present-height, rather than being lumped in with ordinary red "absent".
+ */
+export function buildAttendanceDateWiseData(
+  recordsNewestFirst: {
+    date: string
+    status: 'present' | 'absent'
+    attendanceStatus?: 'present' | 'partial' | 'absent'
+    attendancePct?: number | null
+    durationMinutes?: number | null
+    source?: 'OFFLINE' | 'GOOGLE_MEET'
+  }[],
+): ChartDatum[] {
+  return [...recordsNewestFirst]
+    .reverse() // oldest -> newest, left to right
+    .map((r) => {
+      const status = r.attendanceStatus ?? r.status
+      const neverJoined =
+        r.source === 'GOOGLE_MEET' && status === 'absent' && (r.durationMinutes ?? 0) <= 0
+
+      // Short "DD Mon" label (matches the test report's date-label convention)
+      // instead of the full YYYY-MM-DD — kept here (not bare day-of-month)
+      // since this chart can span an unbounded date range across months.
+      const shortLabel = new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+
+      if (neverJoined) {
+        return {
+          label: shortLabel,
+          value: NEVER_JOINED_BAR_HEIGHT,
+          color: NEVER_JOINED_COLOR,
+          tooltipLabel: 'Never logged in',
+        }
+      }
+
+      const value = r.attendancePct ?? (status === 'present' ? 100 : status === 'partial' ? 50 : 0)
+      return {
+        label: shortLabel,
+        value,
+        color: ATTENDANCE_STATUS_COLORS[status],
+        tooltipLabel: `${status[0].toUpperCase()}${status.slice(1)} — ${value}%`,
+      }
+    })
+}
+
 /** Buckets a list of records into the fixed Present/Partial/Absent categories. */
 export function buildAttendanceCategoryData(
   records: { attendanceStatus?: 'present' | 'partial' | 'absent'; status: 'present' | 'absent' }[],
@@ -115,7 +182,7 @@ export function buildAttendanceCategoryData(
   ]
 }
 
-function ChartTypeToggle({
+export function ChartTypeToggle({
   type,
   onTypeChange,
 }: {
@@ -179,11 +246,22 @@ export default function AttendanceChart({
   barAxisLabels,
   lineAxisLabels,
   description,
+  showMaxLine = false,
+  referenceValue = 100,
 }: AttendanceChartProps) {
   const gradientId = useId()
 
   const activeData = type === 'bar' ? barData : type === 'pie' ? pieData : lineData
   const showEmpty = type === 'line' ? lineData.length < 2 : !hasData(activeData)
+
+  // Bar chart Y-axis domain: normally auto, but when any bar datum is
+  // negative (e.g. an "absent" marker drawn as a short downward bar) the
+  // domain must be widened below zero so Recharts doesn't clip it.
+  const hasNegativeBarValue = barData.some((d) => d.value < 0)
+  const barMinValue = hasNegativeBarValue ? Math.min(...barData.map((d) => d.value)) : 0
+  const barYDomain: [number, number] | undefined = hasNegativeBarValue
+    ? [Math.min(barMinValue - 2, -15), 100]
+    : undefined
 
   // Recharts needs extra room to fit an axis title without it overlapping
   // the tick labels — only reserve that space on the axis that has one.
@@ -253,6 +331,7 @@ export default function AttendanceChart({
                       }
                     />
                     <YAxis
+                      domain={barYDomain}
                       tick={{ fontSize: 11, fill: '#71717a' }}
                       axisLine={false}
                       tickLine={false}
@@ -266,6 +345,9 @@ export default function AttendanceChart({
                   </>
                 )}
                 <Tooltip content={<CustomTooltip valueSuffix={valueSuffix} />} cursor={{ fill: '#f4f4f5' }} />
+                {showMaxLine && !horizontalBars && (
+                  <ReferenceLine y={referenceValue} stroke="#000000" strokeWidth={2.5} />
+                )}
                 <Bar dataKey="value" radius={horizontalBars ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontalBars ? 16 : 44}>
                   {barData.map((entry, i) => (
                     <Cell key={i} fill={entry.color || defaultColor} />

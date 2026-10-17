@@ -272,6 +272,18 @@ async function getOrganizerGoogleUserId(adminUserId) {
   return id;
 }
 
+/**
+ * Clears the cached organizer id for one admin (or everyone, if no id is
+ * given). A manual "Retry Sync" is exactly the moment an admin is trying to
+ * fix a stale Google connection — it must never be served a cached value
+ * from before they reconnected/refreshed, even though that cache normally
+ * only holds CONFIRMED ids and is low-risk to keep across automatic ticks.
+ */
+function clearOrganizerCache(adminUserId) {
+  if (adminUserId) organizerIdCache.delete(adminUserId);
+  else organizerIdCache.clear();
+}
+
 module.exports = {
   extractMeetingCode,
   extractGoogleUserId,
@@ -280,4 +292,5 @@ module.exports = {
   getActiveConference,
   endActiveConference,
   getOrganizerGoogleUserId,
+  clearOrganizerCache,
 };
