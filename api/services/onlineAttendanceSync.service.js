@@ -41,8 +41,21 @@ function isoToDateInZone(iso, timeZone) {
 /**
  * Runs (or re-runs) attendance sync for one online class. Safe to call
  * repeatedly — see file header for the idempotency guarantee.
+ *
+ * @param classId
+ * @param {object} [opts]
+ * @param {boolean} [opts.isManualRetry] — true when called from the admin's
+ *   "Retry Sync" button (onlineClasses.controller.js), as opposed to the
+ *   background scheduler. A manual retry is a deliberate, human-triggered
+ *   attempt to fix a stuck sync, so it: (1) resets `sync_attempts` back to 0
+ *   first, so a long run of past failures (automatic or manual) never makes
+ *   the attempt counter meaningless, and so this single attempt is judged on
+ *   its own result; and (2) clears the organizer-id cache for this class's
+ *   admin, so a reconnect/token-refresh the admin just did is never shadowed
+ *   by a stale up-to-10-minute-old cached value.
  */
-async function syncClassAttendance(classId) {
+async function syncClassAttendance(classId, opts = {}) {
+  const { isManualRetry = false } = opts;
   const settings = await attendanceSettingsService.getSettings();
 
   const { data: onlineClass, error: classErr } = await supabase
@@ -60,6 +73,10 @@ async function syncClassAttendance(classId) {
     return { synced: false, reason: "No Google Meet link on this class" };
   }
 
+  if (isManualRetry) {
+    googleMeet.clearOrganizerCache(onlineClass.created_by);
+  }
+
   const sessionDate = isoToDateInZone(onlineClass.scheduled_start, onlineClass.timezone);
   const session = await attendanceService.getOrCreateSessionForOnlineClass(
     onlineClass.audience === "ALL" ? "ALL" : onlineClass.batch_id,
@@ -68,7 +85,9 @@ async function syncClassAttendance(classId) {
   );
 
   await attendanceService.updateSessionSyncStatus(session.id, {
-    sync_attempts: (session.sync_attempts || 0) + 1,
+    // A manual retry is always judged fresh — never piles onto however many
+    // automatic (or earlier manual) attempts already failed.
+    sync_attempts: isManualRetry ? 1 : (session.sync_attempts || 0) + 1,
   });
 
   try {

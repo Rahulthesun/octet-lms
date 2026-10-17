@@ -86,6 +86,12 @@ const CHART_TYPES = ["bar", "pie", "line"];
 // web/components/shared/AttendanceChart.tsx.
 const CHART_STATUS_COLORS = { present: "#0ca30c", partial: "#fab219", absent: "#d03b3b" };
 
+// Matches NEVER_JOINED_COLOR in web/components/shared/AttendanceChart.tsx —
+// a student who never logged into the online class at all, drawn as a solid
+// black bar at present-height, distinct from "joined but under threshold".
+const NEVER_JOINED_COLOR = "#000000";
+const NEVER_JOINED_BAR_HEIGHT = 100;
+
 /** Same threshold coloring as pctColor() in AttendanceReportsTab.tsx. */
 function pctColor(pct) {
   if (pct === null || pct === undefined) return "#9CA3AF";
@@ -116,6 +122,25 @@ function buildCategoryChartData(records) {
     { label: "Partial", value: partial, color: CHART_STATUS_COLORS.partial },
     { label: "Absent", value: absent, color: CHART_STATUS_COLORS.absent },
   ];
+}
+
+/**
+ * PRIMARY chart data for a student report: one bar per session DATE (not an
+ * aggregate "number of sessions" count), oldest to most recent. Mirrors
+ * buildAttendanceDateWiseData() in web/components/shared/AttendanceChart.tsx
+ * exactly, including the solid-black "never logged in" marker, so the PDF
+ * always matches the on-screen primary view.
+ */
+function buildDateWiseChartData(recordsNewestFirst) {
+  return [...recordsNewestFirst].reverse().map((r) => {
+    const status = r.attendanceStatus || r.status;
+    const neverJoined = r.source === "GOOGLE_MEET" && status === "absent" && (r.durationMinutes || 0) <= 0;
+    if (neverJoined) {
+      return { label: r.date, value: NEVER_JOINED_BAR_HEIGHT, color: NEVER_JOINED_COLOR };
+    }
+    const value = r.attendancePct ?? (status === "present" ? 100 : status === "partial" ? 50 : 0);
+    return { label: r.date, value, color: CHART_STATUS_COLORS[status] };
+  });
 }
 
 /**
@@ -394,25 +419,31 @@ function buildStudentReportPdf(doc, report, chartType = "bar") {
   doc.text(`Attendance %: ${report.attendancePct !== null ? report.attendancePct + "%" : "N/A"}`);
   doc.moveDown(1);
 
-  const barData = buildCategoryChartData(report.records);
+  const dateWiseData = buildDateWiseChartData(report.records);
+  const categoryData = buildCategoryChartData(report.records);
   const lineData = buildTrendChartData(
     [...report.records].reverse().map((r) => ({ present: r.status === "present" }))
   );
   const studentChartCopy = {
-    bar: { description: "How many of this student's sessions fall into each attendance status.", axisLabels: { x: "Attendance status", y: "Number of sessions" } },
-    pie: { description: "Share of this student's sessions in each attendance status.", axisLabels: null },
+    bar: { description: "Attendance by date — black bars mark a class this student never logged into at all.", axisLabels: { x: "Date", y: "Attendance %" } },
+    pie: { description: "Share of this student's sessions in each attendance status (summary).", axisLabels: null },
     line: { description: "Running attendance percentage after each session, oldest to most recent.", axisLabels: { x: "Session number", y: "Attendance % so far" } },
   };
   drawStatisticsChart(doc, {
     type,
-    barData,
-    pieData: barData,
+    barData: dateWiseData,
+    pieData: categoryData,
     lineData,
-    valueSuffix: type === "line" ? "%" : "",
+    valueSuffix: type === "bar" ? "" : "%",
     color: "#5B21B6",
     description: studentChartCopy[type].description,
     axisLabels: studentChartCopy[type].axisLabels,
   });
+  if (type === "bar") {
+    doc.fontSize(8).fillColor("#71717a").font("Helvetica-Oblique")
+      .text("Black = never logged into that online class (vs. joined but under threshold, shown in red).");
+    doc.fillColor("black");
+  }
   doc.moveDown(0.5);
 
   doc.font("Helvetica-Bold").fontSize(12).text("Session History");
@@ -517,6 +548,8 @@ module.exports = {
   drawTable,
   buildCategoryChartData,
   buildTrendChartData,
+  buildDateWiseChartData,
   CHART_STATUS_COLORS,
+  NEVER_JOINED_COLOR,
   pctColor,
 };

@@ -92,7 +92,11 @@ function dayFromDateString(dateStr) {
   return parseInt(parts[2], 10);
 }
 
-const DEFAULT_REFRESH_INTERVAL = 30; // seconds
+const DEFAULT_REFRESH_INTERVAL = 45; // seconds — long enough to absorb real scan/network latency (camera focus,
+// upload, server round-trip commonly eats 5-15s) while still rotating often enough that a photographed QR shared
+// with an absent friend is stale well before they could use it.
+const QR_EXPIRY_GRACE_SECONDS = 8; // absorbs clock skew between client/server and the last few seconds of network
+// latency on a scan that was captured right at rotation; small enough to not meaningfully weaken the anti-sharing rotation.
 
 const WEEKDAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -783,8 +787,8 @@ async function scanQrToken(qrToken, authUserId) {
   if (sessErr) throw sessErr;
   if (!session) throw Object.assign(new Error("Invalid or expired QR token"), { status: 400 });
 
-  // 3. Check token expiry
-  if (new Date(session.expires_at) < new Date()) {
+  // 3. Check token expiry (with a small grace window — see QR_EXPIRY_GRACE_SECONDS above)
+  if (new Date(session.expires_at).getTime() + QR_EXPIRY_GRACE_SECONDS * 1000 < Date.now()) {
     throw Object.assign(new Error("QR token has expired"), { status: 400 });
   }
 

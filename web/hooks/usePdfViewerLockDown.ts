@@ -32,6 +32,7 @@ export type SecurityEventName =
   | 'devtools_open'
   | 'devtools_blocked'
   | 'printscreen'
+  | 'snipping_tool'
   | 'suspicious_key'
   | 'suspicious_key_blocked'
 
@@ -119,6 +120,12 @@ export function usePdfViewerLockdown(
       el.addEventListener('contextmenu', preventDefault)
       el.addEventListener('selectstart', preventDefault)
       el.addEventListener('copy', preventDefault)
+      // Permanent CSS deterrents (not just while blurred): blocks text
+      // selection and the mobile long-press "save image / copy" callout.
+      // These only stop in-page copy/save, not an OS screenshot or camera.
+      el.style.userSelect = 'none'
+      ;(el.style as any).webkitUserSelect = 'none'
+      ;(el.style as any).webkitTouchCallout = 'none'
     }
 
     attachElListeners()
@@ -138,7 +145,8 @@ export function usePdfViewerLockdown(
       const el = containerRef.current
       if (!el) return
       el.style.filter = ''
-      el.style.userSelect = ''
+      // userSelect/webkitTouchCallout stay 'none' permanently (set in
+      // attachElListeners) — only pointerEvents was part of the blur itself.
       el.style.pointerEvents = ''
     }
 
@@ -171,12 +179,22 @@ export function usePdfViewerLockdown(
       const isMacScreenshot =
         e.metaKey && e.shiftKey && ['3', '4', '5', '6'].includes(e.key)
 
-      // Windows: PrintScreen key
+      // Windows: PrintScreen key. NOTE — on most browsers/OS combinations the
+      // OS captures PrintScreen to the clipboard before it ever reaches a
+      // keydown listener in JS, so preventDefault() here is best-effort and
+      // cannot reliably stop the capture itself; this still flags/blocks the
+      // session on any browser that does deliver the event.
       const isWindowsPrintScreen = e.key === 'PrintScreen'
 
-      if (isMacScreenshot || isWindowsPrintScreen) {
+      // Windows: Win+Shift+S (Snipping Tool / "Screen snip"). Same caveat as
+      // PrintScreen — the Windows key combo is handled by the OS shell, not
+      // the browser, so this fires only on the rare browser/OS combination
+      // that forwards it as a keydown with metaKey set. Kept as best-effort.
+      const isWindowsSnip = e.shiftKey && (e.metaKey) && k === 's'
+
+      if (isMacScreenshot || isWindowsPrintScreen || isWindowsSnip) {
         e.preventDefault()
-        triggerHardBlock('printscreen', { key: e.key })
+        triggerHardBlock(isWindowsSnip ? 'snipping_tool' : 'printscreen', { key: e.key })
         return
       }
 

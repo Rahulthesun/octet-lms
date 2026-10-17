@@ -75,6 +75,23 @@ export interface TestQuestionInput extends QuestionContentFields {
   optionBImageKey?: string | null
   optionCImageKey?: string | null
   optionDImageKey?: string | null
+  // SHA-256 hex of the actual image bytes (computed client-side at upload
+  // time), used server-side for true duplicate detection instead of the
+  // random R2 storage key. Optional/nullable for backward compatibility.
+  questionImageContentHash?: string | null
+  optionAImageContentHash?: string | null
+  optionBImageContentHash?: string | null
+  optionCImageContentHash?: string | null
+  optionDImageContentHash?: string | null
+  // dHash perceptual hash (computed client-side at upload time), used
+  // server-side for NEAR-duplicate detection (separate screenshots of the
+  // same question) in addition to the exact content hash above. Optional/
+  // nullable for backward compatibility.
+  questionImagePerceptualHash?: string | null
+  optionAImagePerceptualHash?: string | null
+  optionBImagePerceptualHash?: string | null
+  optionCImagePerceptualHash?: string | null
+  optionDImagePerceptualHash?: string | null
   correctOption: OptionKey
   marks?: number
   bankQuestionId?: string | null
@@ -594,6 +611,27 @@ export function useStudentTestReport(studentId: string | null, month: string) {
   useEffect(() => { refetch() }, [refetch])
 
   return { report, loading, error, refetch }
+}
+
+/** Downloads the student's monthly test report PDF (same auth-header-then-blob pattern as the attendance report download). */
+export async function downloadStudentTestReportPdf(studentId: string, month: string, filename: string) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/tests/students/${studentId}/report/pdf?month=${month}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export async function gradeDescriptiveAttempt(testId: string, attemptId: string, marksAwarded: number, feedback: string) {

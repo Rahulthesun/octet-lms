@@ -6,10 +6,10 @@
 // /api/tests/:id/analytics; the admin can switch each graph between bar,
 // pie and line, and download the whole report as a PDF.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  useTestAnalytics, downloadTestAnalyticsPdf,
+  useTestAnalytics, downloadTestAnalyticsPdf, authedFetch,
   type TestSummary, type AnalyticsPoint,
 } from '@/hooks/useTests'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
@@ -34,7 +34,15 @@ export default function TestAnalyticsModal({ test, onClose }: {
   test: TestSummary
   onClose: () => void
 }) {
-  const [passPct, setPassPct] = useState(40)
+  // Initial default comes from the persisted admin setting (GET
+  // /api/test-settings); a local override here does NOT write back to it —
+  // only the Settings page (app/admin/settings/page.tsx) persists a change.
+  const [passPct, setPassPct] = useState(35)
+  useEffect(() => {
+    authedFetch('/api/test-settings')
+      .then((d) => setPassPct(Number(d?.passPercentage ?? 35)))
+      .catch(() => setPassPct(35))
+  }, [])
   const { analytics, loading, error } = useTestAnalytics(test.id, passPct)
 
   const [distType, setDistType] = useState<AttendanceChartType>('bar')

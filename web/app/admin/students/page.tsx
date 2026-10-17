@@ -87,7 +87,7 @@ function ApplicationCard({
       </div>
 
       {/* Document links — pulled from marksheet_10th_url / school_id_card_url */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {[
           { label: '10th ID Card', sub: 'Identity proof', url: app.school_id_card_url },
           { label: '10th Marksheet', sub: 'Academic proof', url: app.marksheet_10th_url },

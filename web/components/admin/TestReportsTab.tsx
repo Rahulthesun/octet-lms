@@ -15,10 +15,33 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStudents } from '@/hooks/admin/useStudents'
-import { useStudentTestReport } from '@/hooks/useTests'
-import AttendanceChart, { type ChartDatum } from '@/components/shared/AttendanceChart'
+import { useStudentTestReport, downloadStudentTestReportPdf } from '@/hooks/useTests'
+import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 
 const ACCENT = '#5B21B6'
+
+// Score-band color coding, consistent with the app's existing Present
+// (green) / Partial (orange) / Absent (red) attendance palette
+// (ATTENDANCE_STATUS_COLORS in AttendanceChart.tsx) — reused here for the
+// same visual language on test scores.
+const SCORE_BAND_COLORS = {
+  low: '#d03b3b', // 0-34%
+  mid: '#fab219', // 35-79%
+  high: '#0ca30c', // 80-100%
+} as const
+
+/** 0-34 -> red, 35-79 -> orange, 80-100 -> green. Shared by bar + pie score charts. */
+function scoreBandColor(pct: number): string {
+  if (pct < 35) return SCORE_BAND_COLORS.low
+  if (pct < 80) return SCORE_BAND_COLORS.mid
+  return SCORE_BAND_COLORS.high
+}
+
+// Visual-only marker magnitude for an absent date's downward bar — doesn't
+// mean anything numerically, just needs to render a visible short bar below
+// the zero-axis.
+const ABSENT_MARKER_VALUE = -10
+const ABSENT_MARKER_COLOR = '#000000'
 
 function currentMonthStr() {
   return new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -43,9 +66,27 @@ function StudentTestReportModal({ studentId, studentName, onClose }: {
   onClose: () => void
 }) {
   const [month, setMonth] = useState(currentMonthStr())
+  const [chartType, setChartType] = useState<AttendanceChartType>('line')
+  const [downloading, setDownloading] = useState(false)
   const { report, loading, error } = useStudentTestReport(studentId, month)
 
-  const chartData: ChartDatum[] = useMemo(() => {
+  async function downloadPdf() {
+    setDownloading(true)
+    try {
+      const name = `test_report_${studentName.replace(/\s+/g, '_')}_${month}.pdf`
+      await downloadStudentTestReportPdf(studentId, month, name)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  // Per-date score data, shared by the bar/pie/line chart variants. Each
+  // evaluated attempt becomes a 0-100% datum colored by score band; each
+  // absent date becomes a black downward marker (bar/line only — a pie
+  // chart has no "below axis" concept, so absences are left out of it).
+  const scorePoints: ChartDatum[] = useMemo(() => {
     if (!report) return []
     return report.points.map((p) => {
       const pct = p.maxMarks > 0 ? Math.round((p.marksAwarded / p.maxMarks) * 100) : 0
@@ -53,11 +94,28 @@ function StudentTestReportModal({ studentId, studentName, onClose }: {
       return {
         label: String(day),
         value: pct,
-        color: ACCENT,
+        color: scoreBandColor(pct),
         tooltipLabel: `${p.marksAwarded}/${p.maxMarks} — ${pct}% (${p.testTitle})`,
       }
     })
   }, [report])
+
+  const absentPoints: ChartDatum[] = useMemo(() => {
+    if (!report) return []
+    return report.absentDates.map((day) => ({
+      label: String(day),
+      value: ABSENT_MARKER_VALUE,
+      color: ABSENT_MARKER_COLOR,
+      tooltipLabel: `Absent (test scheduled, not attempted)`,
+    }))
+  }, [report])
+
+  const lineData = scorePoints
+  const barData = useMemo(
+    () => [...scorePoints, ...absentPoints].sort((a, b) => Number(a.label) - Number(b.label)),
+    [scorePoints, absentPoints],
+  )
+  const pieData = scorePoints
 
   return (
     <motion.div
@@ -68,7 +126,7 @@ function StudentTestReportModal({ studentId, studentName, onClose }: {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-2xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[88vh] flex flex-col"
+        className="bg-white w-full sm:max-w-5xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
@@ -105,26 +163,19 @@ function StudentTestReportModal({ studentId, studentName, onClose }: {
             <div className="py-16 text-center text-sm text-red-600">{error}</div>
           ) : report ? (
             <div className="px-6 py-4">
-              <div className="flex items-start justify-between mb-2 gap-3">
-                <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mt-1">Score trend</p>
-                {report.absentDates.length > 0 && (
-                  <p className="text-xs text-rose-600 text-right shrink-0 max-w-[55%]">
-                    Absent on: {report.absentDates.join(', ')}
-                  </p>
-                )}
-              </div>
-
               <AttendanceChart
-                type="line"
-                onTypeChange={() => {}}
-                barData={[]}
-                pieData={[]}
-                lineData={chartData}
+                type={chartType}
+                onTypeChange={setChartType}
+                barData={barData}
+                pieData={pieData}
+                lineData={lineData}
                 lineColor={ACCENT}
                 valueSuffix="%"
+                barAxisLabels={{ x: 'Date of month', y: 'Score %' }}
                 lineAxisLabels={{ x: 'Date of month', y: 'Score %' }}
+                showMaxLine
                 emptyMessage="No evaluated test attempts for this student in this month."
-                description="Each evaluated test attempt's score for this student this month, normalized to a 0–100% scale. Dates with no attempt are skipped — not plotted as zero."
+                description="Each evaluated test attempt's score for this student this month, normalized to a 0–100% scale. Black bars below the axis = absent (a test was scheduled but not attempted). Dates with neither are skipped."
               />
 
               <div className="mt-4 border border-zinc-200 rounded-lg overflow-hidden">
@@ -152,6 +203,17 @@ function StudentTestReportModal({ studentId, studentName, onClose }: {
               </div>
             </div>
           ) : null}
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
+          <button
+            onClick={downloadPdf}
+            disabled={!report || downloading}
+            className="w-full py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+            style={{ backgroundColor: ACCENT }}
+          >
+            {downloading ? 'Preparing…' : 'Download PDF'}
+          </button>
         </div>
       </motion.div>
     </motion.div>

@@ -6,7 +6,9 @@
  * ─────────────────────────────────────────────────────────────
  */
 
+const PDFDocument = require("pdfkit");
 const testAttemptsService = require("../services/testAttempts.service");
+const { buildStudentTestReportPdf } = require("../utils/testReportPdf");
 
 // ─── Student ────────────────────────────────────────────────────
 
@@ -101,6 +103,22 @@ const adminGetStudentMonthlyReport = async (req, res) => {
   }
 };
 
+const adminDownloadStudentMonthlyReportPdf = async (req, res) => {
+  try {
+    const report = await testAttemptsService.getStudentMonthlyReport(req.params.studentId, req.query.month);
+    const filename = `test_report_${(report.student.name || report.student.id).toString().replace(/[^a-zA-Z0-9_-]/g, "_")}_${report.month}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+    buildStudentTestReportPdf(doc, report);
+    doc.end();
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   listMyTests,
   startAttempt,
@@ -111,4 +129,5 @@ module.exports = {
   adminGetAttempt,
   gradeAttempt,
   adminGetStudentMonthlyReport,
+  adminDownloadStudentMonthlyReportPdf,
 };

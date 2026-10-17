@@ -18,7 +18,8 @@ const notificationsService = require("./notifications.service");
 const audienceService = require("./audience.service");
 const questionBank = require("./questionBank.service");
 const { signKey } = require("./questionImages.service");
-const { toDbColumns, serializeQuestion } = require("../utils/mcqQuestion");
+const { FIELDS, toDbColumns, serializeQuestion } = require("../utils/mcqQuestion");
+const { isNearDuplicateImage } = require("../utils/perceptualHash");
 
 const BUCKET = process.env.R2_BUCKET_NAME;
 
@@ -27,6 +28,19 @@ function badRequest(message) {
 }
 function notFound(message = "Test not found") {
   return Object.assign(new Error(message), { status: 404 });
+}
+function conflict(message) {
+  return Object.assign(new Error(message), { status: 409 });
+}
+function formatReadableDate(iso) {
+  if (!iso) return "an unknown date";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "an unknown date";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+/** f.label reads naturally as "Option A" but not as "The question image" — use "question" there instead. */
+function fieldImageLabel(f) {
+  return f.api === "question" ? "question" : f.label;
 }
 
 // ─── R2 file helpers (question papers, answer keys) ────────────────────────
@@ -99,6 +113,83 @@ function validateQuestions(questions) {
   }
   // Every question and each of its four options must have an image or text.
   questions.forEach((q, i) => toDbColumns(q, i + 1));
+}
+
+// Only the columns a near-duplicate scan against the bank needs — never the
+// full row — kept minimal since this runs on every real create/update.
+const PERCEPTUAL_SCAN_COLUMNS = ["id", "source_test_title", "created_at", ...FIELDS.map((f) => f.imagePerceptualHash)];
+
+/**
+ * Perceptual (near-duplicate) image check for a real, validated test save —
+ * an ADDITIONAL mechanism to the exact byte-hash dedup the question bank
+ * already does on sync (see utils/perceptualHash.js for the dHash
+ * algorithm/threshold reasoning). Catches two kinds of near-duplicate:
+ *
+ *   (a) within this SAME submission — e.g. the same screenshot pasted twice
+ *       by mistake into two different questions of the test being saved.
+ *   (b) against the question bank — the same underlying image already saved
+ *       from an earlier test (or added manually).
+ *
+ * `excludeTestId`, when updating an existing test, leaves that test's OWN
+ * previously-synced bank rows out of the against-bank comparison — without
+ * it, re-saving an unchanged test would always "match" its own bank copies
+ * and could never be saved again.
+ *
+ * Deliberately NOT called from createDraftTest()/updateDraftTest() (the
+ * autosave path) — see those functions' own comments. It is only wired into
+ * createTest(), updateTest() (and therefore promoteDraftTest(), which calls
+ * updateTest()) — the points where a test becomes (or already is) a real,
+ * fully-validated row.
+ *
+ * Cheap no-op when nothing in `questions` has any image field at all — the
+ * common case for text-only MCQs — checked first, before any DB query.
+ */
+async function assertNoDuplicateImages(questions, { excludeTestId } = {}) {
+  const colsByQuestion = questions.map((q, i) => toDbColumns(q, i + 1));
+  const hasAnyImageField = colsByQuestion.some((cols) => FIELDS.some((f) => cols[f.type] === "image"));
+  if (!hasAnyImageField) return;
+
+  // (a) Within this same submission: every pair of questions, same field position.
+  for (const f of FIELDS) {
+    for (let i = 0; i < colsByQuestion.length; i++) {
+      const hashI = colsByQuestion[i][f.type] === "image" ? colsByQuestion[i][f.imagePerceptualHash] : null;
+      if (!hashI) continue;
+      for (let j = i + 1; j < colsByQuestion.length; j++) {
+        const hashJ = colsByQuestion[j][f.type] === "image" ? colsByQuestion[j][f.imagePerceptualHash] : null;
+        if (!hashJ) continue;
+        if (isNearDuplicateImage(hashI, hashJ)) {
+          throw conflict(
+            `Question ${j + 1}'s ${fieldImageLabel(f)} image looks identical to Question ${i + 1}'s — remove or replace one before saving.`
+          );
+        }
+      }
+    }
+  }
+
+  // (b) Against the question bank.
+  let query = supabase.from("question_bank").select(PERCEPTUAL_SCAN_COLUMNS.join(", "));
+  if (excludeTestId) query = query.neq("source_test_id", excludeTestId);
+  const { data: bankRows, error } = await query;
+  if (error) throw error;
+  if (!bankRows || bankRows.length === 0) return;
+
+  for (const f of FIELDS) {
+    for (let i = 0; i < colsByQuestion.length; i++) {
+      const hashI = colsByQuestion[i][f.type] === "image" ? colsByQuestion[i][f.imagePerceptualHash] : null;
+      if (!hashI) continue;
+      for (const row of bankRows) {
+        const bankHash = row[f.imagePerceptualHash];
+        if (!bankHash) continue;
+        if (isNearDuplicateImage(hashI, bankHash)) {
+          throw conflict(
+            `Question ${i + 1}'s ${fieldImageLabel(f)} image looks identical to a question already in the bank ` +
+              `(from "${row.source_test_title || "an untitled group"}", added ${formatReadableDate(row.created_at)}) — ` +
+              `remove or replace it before saving.`
+          );
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -381,7 +472,10 @@ async function createTest({
   if (!scheduledStart || !scheduledEnd) throw badRequest("Start and end time are required");
   if (new Date(scheduledEnd) <= new Date(scheduledStart)) throw badRequest("End time must be after start time");
 
-  if (type === "mcq") validateQuestions(questions);
+  if (type === "mcq") {
+    validateQuestions(questions);
+    await assertNoDuplicateImages(questions);
+  }
 
   // The picker assigns a chapter, not a subject directly — subject_id is
   // still derived and stored from it so existing subject-based display stays correct.
@@ -464,6 +558,14 @@ async function updateTest(testId, updates) {
 
   if (allowed.scheduled_start && allowed.scheduled_end && new Date(allowed.scheduled_end) <= new Date(allowed.scheduled_start)) {
     throw badRequest("End time must be after start time");
+  }
+
+  // Validated BEFORE writing anything — a duplicate-image rejection here
+  // must never leave the test row partially updated. excludeTestId leaves
+  // this test's own already-synced bank rows out of the against-bank
+  // comparison, so re-saving an unchanged test never flags itself.
+  if (updates.questions !== undefined) {
+    await assertNoDuplicateImages(updates.questions, { excludeTestId: testId });
   }
 
   const { data, error } = await supabase.from("tests").update(allowed).eq("id", testId).select(TEST_SELECT).maybeSingle();

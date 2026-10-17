@@ -86,7 +86,7 @@ async function cancel(req, res) {
  */
 async function syncAttendance(req, res) {
   try {
-    const result = await syncClassAttendance(req.params.classId);
+    const result = await syncClassAttendance(req.params.classId, { isManualRetry: true });
     res.json(result);
   } catch (err) {
     handleError(res, err);

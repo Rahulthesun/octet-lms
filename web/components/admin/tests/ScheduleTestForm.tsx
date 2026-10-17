@@ -27,11 +27,11 @@ const labelCls = 'block text-sm font-medium text-zinc-700 mb-2'
 // Image is the default for the question and for every option.
 function blankQuestion(): TestQuestionInput {
   return {
-    questionType: 'image', questionText: '', questionImageKey: null, questionImageUrl: null,
-    optionAType: 'image', optionA: '', optionAImageKey: null, optionAImageUrl: null,
-    optionBType: 'image', optionB: '', optionBImageKey: null, optionBImageUrl: null,
-    optionCType: 'image', optionC: '', optionCImageKey: null, optionCImageUrl: null,
-    optionDType: 'image', optionD: '', optionDImageKey: null, optionDImageUrl: null,
+    questionType: 'image', questionText: '', questionImageKey: null, questionImageUrl: null, questionImageContentHash: null, questionImagePerceptualHash: null,
+    optionAType: 'image', optionA: '', optionAImageKey: null, optionAImageUrl: null, optionAImageContentHash: null, optionAImagePerceptualHash: null,
+    optionBType: 'image', optionB: '', optionBImageKey: null, optionBImageUrl: null, optionBImageContentHash: null, optionBImagePerceptualHash: null,
+    optionCType: 'image', optionC: '', optionCImageKey: null, optionCImageUrl: null, optionCImageContentHash: null, optionCImagePerceptualHash: null,
+    optionDType: 'image', optionD: '', optionDImageKey: null, optionDImageUrl: null, optionDImageContentHash: null, optionDImagePerceptualHash: null,
     correctOption: 'a',
     marks: 1,
   }
@@ -54,6 +54,8 @@ function getField(q: TestQuestionInput, f: QuestionField): FieldValue {
     text: r[textKeyOf(f)] ?? '',
     imageKey: r[`${f}ImageKey`] ?? null,
     imageUrl: r[`${f}ImageUrl`] ?? null,
+    imageContentHash: r[`${f}ImageContentHash`] ?? null,
+    imagePerceptualHash: r[`${f}ImagePerceptualHash`] ?? null,
   }
 }
 
@@ -64,6 +66,8 @@ function withField(q: TestQuestionInput, f: QuestionField, v: FieldValue): TestQ
     [textKeyOf(f)]: v.text,
     [`${f}ImageKey`]: v.imageKey,
     [`${f}ImageUrl`]: v.imageUrl,
+    [`${f}ImageContentHash`]: v.imageContentHash ?? null,
+    [`${f}ImagePerceptualHash`]: v.imagePerceptualHash ?? null,
   } as TestQuestionInput
 }
 
@@ -224,6 +228,32 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
 
   const totalMcqMarks = questions.reduce((s, q) => s + (Number(q.marks) || 1), 0)
 
+  // Flags questions that are byte-for-byte identical to an earlier one in
+  // this same test — the exact pattern that fills the question bank with
+  // repeats when a question is accidentally pasted/saved more than once
+  // while iterating on a test. Compares every field's content (text or
+  // image key) plus the correct answer; doesn't require the server-side
+  // image-hash migration since it only ever compares questions already
+  // loaded in this form.
+  function questionSignature(q: TestQuestionInput) {
+    return QUESTION_FIELDS.map(({ field }) => {
+      const v = getField(q, field)
+      return v.type === 'image' ? `img:${v.imageKey || ''}` : `txt:${v.text.trim().toLowerCase()}`
+    }).join('|') + `|correct:${q.correctOption}`
+  }
+  const duplicateQuestionIndexes = useMemo(() => {
+    const seen = new Map<string, number>()
+    const dupes = new Set<number>()
+    questions.forEach((q, i) => {
+      if (isBlankQuestion(q)) return
+      const sig = questionSignature(q)
+      if (seen.has(sig)) dupes.add(i)
+      else seen.set(sig, i)
+    })
+    return dupes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions])
+
   const scheduledStart = date && startTime ? new Date(`${date}T${startTime}`).toISOString() : ''
   const scheduledEnd = date && endTime ? new Date(`${date}T${endTime}`).toISOString() : ''
 
@@ -240,9 +270,10 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
         const missing = QUESTION_FIELDS.filter(({ field }) => !fieldFilled(q, field)).map((f) => f.label)
         if (missing.length) p.push(`Question ${i + 1} needs: ${missing.join(', ')}`)
       })
+      duplicateQuestionIndexes.forEach((i) => p.push(`Question ${i + 1} is an exact duplicate of an earlier question — remove or change one of them`))
     }
     return p
-  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, type, questions])
+  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, type, questions, duplicateQuestionIndexes])
 
   // Builds the same shape createTest/updateTest/draft endpoints all take, from current form state.
   function buildInput(): CreateTestInput {
@@ -473,16 +504,23 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
               </div>
             )}
 
-            <div className="relative space-y-6">
-            <Watermark lines={['OCTET']} />
+            <div className="space-y-6">
             {questions.map((q, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-zinc-200 p-6 sm:p-8 space-y-6">
+              <div key={i} className={`relative overflow-hidden bg-white rounded-2xl border p-6 sm:p-8 space-y-6 ${
+                duplicateQuestionIndexes.has(i) ? 'border-rose-300 ring-2 ring-rose-100' : 'border-zinc-200'
+              }`}>
+                <Watermark lines={['OCTET']} />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-base font-semibold text-zinc-900">Question {i + 1}</span>
                     {q.bankQuestionId && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500" title="Changes here do not affect the original">
                         Imported copy
+                      </span>
+                    )}
+                    {duplicateQuestionIndexes.has(i) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                        Exact duplicate of another question
                       </span>
                     )}
                   </div>

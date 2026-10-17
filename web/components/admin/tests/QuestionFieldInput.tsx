@@ -15,6 +15,10 @@ export interface FieldValue {
   text: string
   imageKey: string | null
   imageUrl: string | null
+  /** SHA-256 of the image bytes (for true duplicate detection server-side). */
+  imageContentHash?: string | null
+  /** dHash perceptual hash of the image (for near-duplicate detection server-side). */
+  imagePerceptualHash?: string | null
 }
 
 function TextIcon({ className }: { className?: string }) {
@@ -83,7 +87,7 @@ export default function QuestionFieldInput({
     setBusy(true)
     try {
       const uploaded = await uploadQuestionImage(file)
-      onChange({ ...value, type: 'image', imageKey: uploaded.key, imageUrl: uploaded.previewUrl })
+      onChange({ ...value, type: 'image', imageKey: uploaded.key, imageUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image upload failed')
     } finally {
@@ -149,7 +153,7 @@ export default function QuestionFieldInput({
                   className="text-xs px-2.5 py-1 rounded-md border border-zinc-300 text-zinc-700 hover:bg-zinc-100 disabled:opacity-50">
                   Replace
                 </button>
-                <button type="button" onClick={() => onChange({ ...value, imageKey: null, imageUrl: null })} disabled={busy}
+                <button type="button" onClick={() => onChange({ ...value, imageKey: null, imageUrl: null, imageContentHash: null, imagePerceptualHash: null })} disabled={busy}
                   className="text-xs px-2.5 py-1 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50">
                   Remove
                 </button>
