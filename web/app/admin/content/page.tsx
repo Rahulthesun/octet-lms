@@ -13,6 +13,7 @@ import { useContentTree, authHeaders } from "../../../hooks/admin/useContentTree
 import { PdfViewer } from "../../../components/admin/PDFViewer";
 import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer";
 import { getSession } from "@/lib/auth";
+import { QaCategorySection } from "@/components/admin/qa/QaCategorySection";
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
 
@@ -254,6 +255,7 @@ export default function ContentPage() {
 
   // ── Navigation state ───────────────────────────────────────────────────────
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
+  const [openCategoryId, setOpenCategoryId] = useState<"qa" | "practice" | null>(null);
   const [openChapterId, setOpenChapterId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1032,9 +1034,6 @@ export default function ContentPage() {
             <h1 className="text-3xl font-bold text-gray-900">
               Content Manager
             </h1>
-            <p className="text-base text-gray-600 mt-1">
-              
-            </p>
           </div>
           <div className="flex-1 flex items-center justify-end gap-4">
             <div className="lg:w-100 shrink-0">
@@ -1609,6 +1608,61 @@ export default function ContentPage() {
                 );
               })
             )}
+
+            {/* ── Q&A / Practice Questions — same list, same row style as a
+                real subject above, but these are question-based content
+                categories (Subject → Unit → Class), not PDF/video subjects. ── */}
+            {([
+              { key: "qa" as const, label: "Q&A" },
+              { key: "practice" as const, label: "Practise Questions" },
+            ]).map(({ key, label }) => {
+              const open = openCategoryId === key;
+              return (
+                <div key={key} className="border-b border-gray-100 last:border-0">
+                  <div
+                    className={`group w-full flex items-center gap-1 pl-4 pr-2 py-1.5 transition-colors ${
+                      open ? "bg-gray-50" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <button
+                      onClick={() => setOpenCategoryId(open ? null : key)}
+                      className="flex-1 flex items-center gap-3 py-1.5 text-left cursor-pointer"
+                    >
+                      <span className="flex-1 text-lg text-gray-800 font-medium">
+                        {label}
+                      </span>
+                      <ChevronIcon open={open} className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                    {/* Invisible spacers matching the rename/delete icon
+                        buttons every real subject row reserves space for
+                        (even hidden at opacity-0, they still occupy layout
+                        width) — without these the chevron above sits in a
+                        different column than the real subjects' chevrons. */}
+                    <span className="shrink-0 rounded-lg p-1.5 opacity-0 pointer-events-none" aria-hidden>
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="shrink-0 rounded-lg p-1.5 opacity-0 pointer-events-none" aria-hidden>
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: "auto" }}
+                        exit={{ height: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pl-8 pr-3 pb-3">
+                          <QaCategorySection category={key} title={label} embedded />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
 

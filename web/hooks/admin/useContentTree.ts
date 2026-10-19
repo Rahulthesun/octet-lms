@@ -98,7 +98,12 @@ export async function authHeaders(): Promise<Record<string, string>> {
     : {};
 }
 
-export function useContentTree(autoLoadChapters = true) {
+// `category` selects which subjects this tree loads — 'notes' (default,
+// the existing Content Manager page) or 'qa'/'practice' for the new
+// Q&A / Practice Questions sections, which reuse this same hook and the
+// same subjects/chapters tables, just scoped by subjects.category (see
+// api/sql/content_category.sql and subject.service.js getAllSubjects()).
+export function useContentTree(autoLoadChapters = true, category: "notes" | "qa" | "practice" = "notes") {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chaptersMap, setChaptersMap] = useState<ChaptersMap>({});
   const [pdfsMap, setPdfsMap] = useState<PdfsMap>({});
@@ -122,7 +127,7 @@ export function useContentTree(autoLoadChapters = true) {
     async function fetchSubjects() {
       try {
         const headers = await authHeaders();
-        const res = await fetch(`${BASE}/api/subjects/`, { headers });
+        const res = await fetch(`${BASE}/api/subjects/?category=${category}`, { headers });
         const data = await res.json();
 
         if (!res.ok) {
@@ -175,7 +180,7 @@ export function useContentTree(autoLoadChapters = true) {
       cancelled = true;
     };
 
-  }, [BASE, autoLoadChapters]);
+  }, [BASE, autoLoadChapters, category]);
 
   // ... the rest of your hook (loadChapters, loadChapterContent, etc.) remains unchanged
   // But we need to modify `loadChapters` so it doesn't refetch if already loaded
@@ -283,7 +288,7 @@ export function useContentTree(autoLoadChapters = true) {
       const res = await fetch(`${BASE}/api/subjects/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ name, grade }),
+        body: JSON.stringify({ name, grade, category }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -296,7 +301,7 @@ export function useContentTree(autoLoadChapters = true) {
       setChaptersMap((prev) => ({ ...prev, [subject.id]: [] }));
       return subject;
     },
-    [BASE],
+    [BASE, category],
   );
 
   // Rename a subject.

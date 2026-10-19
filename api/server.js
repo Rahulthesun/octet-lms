@@ -89,6 +89,7 @@ const alumniRouter = require("./routes/alumni.routes");
 const passwordResetRouter = require("./routes/passwordReset.routes");
 const questionBankRouter = require("./routes/questionBank.routes");
 const examDocumentsRouter = require("./routes/examDocuments.routes");
+const qaContentRouter = require("./routes/qaContent.routes");
 const { startAlumniScheduler } = require("./services/alumniScheduler.service");
 const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
 const { startMonthlyReportScheduler } = require("./services/parentReportScheduler.service");
@@ -101,7 +102,12 @@ app.use("/api/content/pdf",  pdfRouter);
 app.use("/api/content/video", videoRouter);
 app.use("/api/subjects",      subjectRouter);
 app.use("/api/chapters",      chapterRouter);
-//app.use("/api/subtopics",     subtopicRouter); DEPRECATED USE OF SUBTOPIC ROUTER
+// Re-enabled for the new Q&A / Practice Questions feature, which needs a
+// working POST /api/subtopics to create a "Class" under a Unit (chapter).
+// The old admin Content Manager UI never called this route, but the
+// backend route itself is functional — confirmed via subtopic.controller.js
+// / subtopic.service.js.
+app.use("/api/subtopics",     subtopicRouter);
 app.use("/api/storage",       storageRouter);
 
 //For indexed file search 
@@ -132,6 +138,7 @@ app.use("/api/alumni", alumniRouter);
 app.use("/api/auth", passwordResetRouter);
 app.use("/api/question-bank", questionBankRouter);
 app.use("/api/exam-documents", examDocumentsRouter);
+app.use("/api/qa-content", qaContentRouter);
 
 app.use("/api/security" , securityRouter)
  

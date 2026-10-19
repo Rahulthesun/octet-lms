@@ -43,43 +43,63 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const ACCENT = '#5B21B6'
+  const tableMissing = !!error && /test_settings/i.test(error)
+
   return (
-    <div className="max-w-xl">
-      <h1 className="text-lg font-semibold text-zinc-900 mb-1">Settings</h1>
-      <p className="text-sm text-zinc-500 mb-6">Platform-wide defaults used across the admin dashboard.</p>
+    <div className="p-8 max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-zinc-900">Settings</h1>
+        <p className="text-[15px] text-zinc-500 mt-1">Platform-wide defaults used across the admin dashboard.</p>
+      </div>
 
-      <div className="border border-zinc-200 rounded-xl p-5 bg-white">
-        <h2 className="text-sm font-semibold text-zinc-900 mb-1">Test pass percentage</h2>
-        <p className="text-xs text-zinc-500 mb-4">
-          The default pass mark used in test analytics reports (Test Results &gt; Report, and the All Tests report).
-          Admins can still override it per-session in those reports without changing this saved default.
-        </p>
+      {tableMissing && (
+        <div className="mb-6 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          This setting can&apos;t be saved yet — its database table hasn&apos;t been created. Run <code className="px-1 py-0.5 rounded bg-amber-100 font-mono text-xs">api/sql/test_settings.sql</code> once in the Supabase SQL editor, then reload this page.
+        </div>
+      )}
 
-        {loading ? (
-          <p className="text-sm text-zinc-400">Loading…</p>
-        ) : (
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={passPercentage}
-              onChange={(e) => setPassPercentage(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-              className="w-24 text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200"
-            />
-            <span className="text-sm text-zinc-500">%</span>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 text-sm rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            {saved && <span className="text-xs text-emerald-600">Saved</span>}
+      <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100">
+        <div className="p-6 flex flex-col sm:flex-row sm:items-start gap-5">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-semibold text-zinc-900">Test pass percentage</h2>
+            <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
+              The default pass mark used in test analytics reports (Test Results → Report, and the All Tests
+              report). Admins can still override it per-session in those reports without changing this saved
+              default — useful if your board&apos;s official pass percentage ever changes.
+            </p>
           </div>
-        )}
 
-        {error && <p className="text-xs text-rose-600 mt-3">{error}</p>}
+          <div className="shrink-0 w-full sm:w-auto">
+            {loading ? (
+              <p className="text-sm text-zinc-400">Loading…</p>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={passPercentage}
+                    onChange={(e) => setPassPercentage(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                    className="w-24 text-[15px] rounded-lg pl-3 pr-7 py-2.5 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400 pointer-events-none">%</span>
+                </div>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || tableMissing}
+                  className="px-5 py-2.5 rounded-lg text-white text-[15px] disabled:opacity-50 hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: ACCENT }}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
+            {saved && <p className="text-xs text-emerald-600 mt-2 text-right">Saved</p>}
+            {error && !tableMissing && <p className="text-xs text-rose-600 mt-2 text-right">{error}</p>}
+          </div>
+        </div>
       </div>
     </div>
   )

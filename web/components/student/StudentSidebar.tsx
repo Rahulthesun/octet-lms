@@ -49,6 +49,17 @@ const navItems = [
     ),
   },
   {
+    href: '/student/practice',
+    label: 'Q&A / Practice',
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M 7.5,7.5 Q 7.5,5.5 10,5.5 Q 12.5,5.5 12.5,7.8 Q 12.5,9.5 10,10 L 10,11.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="10" cy="14" r="0.9" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     href: '/student/attendance',
     label: 'Attendance',
     icon: (

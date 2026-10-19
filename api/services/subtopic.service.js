@@ -50,8 +50,11 @@ const getSubtopicsByChapter = async (chapterId) => {
     .order("order_index", { ascending: true });
 
   if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new Error(`No subtopics found for chapter ID: ${chapterId}`);
-  return data;
+  // A chapter/Unit with zero subtopics/Classes yet is a normal, expected
+  // state (e.g. right after creating a new Unit) — return [] rather than
+  // throwing, so callers (including the new Q&A/Practice Questions admin
+  // UI) can render an empty list instead of erroring out.
+  return data || [];
 };
 
 // ─── Read one ─────────────────────────────────────────────────

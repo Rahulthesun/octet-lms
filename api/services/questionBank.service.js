@@ -138,7 +138,7 @@ async function syncFromTest(test, questionRows) {
  * same upsert+ignoreDuplicates so re-submitting the same content never
  * double-stores it.
  */
-async function createManual({ questions, label, createdBy, sourceTestId }) {
+async function createManual({ questions, label, createdBy, sourceTestId, subtopicId }) {
   const list = Array.isArray(questions) ? questions : [];
   if (list.length === 0) throw badRequest("At least one question is required");
   const title = normalizeTitleKey(label);
@@ -155,6 +155,7 @@ async function createManual({ questions, label, createdBy, sourceTestId }) {
       source_test_title: title,
       source_question_id: null,
       created_by: createdBy || null,
+      subtopic_id: subtopicId || null,
     });
   }
   const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
@@ -394,6 +395,74 @@ async function deleteGroup({ sourceTestId, title }) {
   return { deleted: data.length };
 }
 
+/**
+ * All bank questions tied to one Class (subtopic) — used by both the admin
+ * Q&A/Practice Questions manager and the student practice view. Signed
+ * image URLs included; withKeys only needed for admin editing, so callers
+ * that are student-facing can ignore the extra fields.
+ */
+async function listQuestionsForSubtopic(subtopicId) {
+  if (!subtopicId) throw badRequest("subtopicId is required");
+  const { data, error } = await supabase
+    .from("question_bank")
+    .select("*")
+    .eq("subtopic_id", subtopicId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const out = [];
+  for (const row of data || []) {
+    out.push({
+      bankQuestionId: row.id,
+      correctOption: row.correct_option,
+      marks: Number(row.marks),
+      ...(await serializeQuestion(row, signKey, { withKeys: true })),
+    });
+  }
+  return out;
+}
+
+/**
+ * Copies existing bank questions INTO a Class (subtopic) — a one-way copy,
+ * mirroring the existing "import into a test" semantics
+ * (components/admin/tests/QuestionBankModal.tsx's copyForNewTest()): a NEW
+ * question_bank row is created with subtopic_id set. The original bank
+ * row is completely untouched — this is a copy, not a move.
+ */
+async function copyQuestionsToSubtopic(bankQuestionIds, subtopicId, createdBy) {
+  const ids = [...new Set((bankQuestionIds || []).filter(Boolean))];
+  if (ids.length === 0) throw badRequest("At least one bankQuestionId is required");
+  if (!subtopicId) throw badRequest("subtopicId is required");
+
+  const { data: sources, error: fetchErr } = await supabase
+    .from("question_bank")
+    .select(COPY_COLUMNS.join(", "))
+    .in("id", ids);
+  if (fetchErr) throw fetchErr;
+  if (!sources || sources.length === 0) throw Object.assign(new Error("No matching questions found in bank"), { status: 404 });
+
+  const rows = sources.map((q) => {
+    const copy = Object.fromEntries(COPY_COLUMNS.map((c) => [c, q[c] ?? null]));
+    return {
+      ...copy,
+      content_hash: contentHash(copy),
+      source_test_id: null,
+      source_test_title: "Imported from Question Bank",
+      source_question_id: null,
+      created_by: createdBy || null,
+      subtopic_id: subtopicId,
+    };
+  });
+
+  const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
+  const { data, error } = await supabase
+    .from("question_bank")
+    .upsert(unique, { onConflict: "content_hash", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw error;
+  return { copied: (data || []).length, submitted: sources.length };
+}
+
 /** Which of these bank ids really exist (validates the tracking reference on save). */
 async function existingIds(ids) {
   const wanted = [...new Set((ids || []).filter(Boolean))];
@@ -403,4 +472,8 @@ async function existingIds(ids) {
   return new Set((data || []).map((r) => r.id));
 }
 
-module.exports = { syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds, updateQuestion, renameManualGroup, deleteQuestion, deleteGroup };
+module.exports = {
+  syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds,
+  updateQuestion, renameManualGroup, deleteQuestion, deleteGroup,
+  listQuestionsForSubtopic, copyQuestionsToSubtopic,
+};

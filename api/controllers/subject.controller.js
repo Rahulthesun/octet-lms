@@ -27,7 +27,7 @@ function parseGrade(value) {
 /** POST /api/subjects  →  create a subject */
 const createSubject = async (req, res) => {
   try {
-    const { name, description, grade } = req.body;
+    const { name, description, grade, category } = req.body;
     if (!name) return res.status(400).json({ error: "Subject name is required" });
 
     const parsedGrade = parseGrade(grade);
@@ -35,7 +35,7 @@ const createSubject = async (req, res) => {
       return res.status(400).json({ error: "Grade must be 11 or 12" });
     }
 
-    const subject = await subjectService.createSubject({ name, description, grade: parsedGrade });
+    const subject = await subjectService.createSubject({ name, description, grade: parsedGrade, category });
     res.status(201).json(subject);
   } catch (err) {
     handleError(res, err, "Failed to create subject");
@@ -45,7 +45,7 @@ const createSubject = async (req, res) => {
 /** GET /api/subjects  →  list all subjects */
 const getAllSubjects = async (req, res) => {
   try {
-    const subjects = await subjectService.getAllSubjects();
+    const subjects = await subjectService.getAllSubjects(req.query.category);
     res.status(200).json(subjects);
   } catch (err) {
     handleError(res, err, "Failed to load subjects");

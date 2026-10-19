@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   useBatches,
@@ -129,7 +130,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
     }
   }
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -138,7 +139,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-lg shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[85vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-lg shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[92vh] sm:max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
@@ -275,7 +276,8 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
           )}
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   )
 }
 
@@ -337,7 +339,7 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
     }
   }
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -346,7 +348,7 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-2xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[88vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-2xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
@@ -491,7 +493,8 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
           <SessionAttendanceModal sessionId={openSessionId} onClose={() => setOpenSessionId(null)} />
         </div>
       )}
-    </motion.div>
+    </motion.div>,
+    document.body
   )
 }
 
