@@ -9,6 +9,8 @@ import AttendanceReportsTab from '@/components/admin/AttendanceReportsTab'
 import TestReportsTab from '@/components/admin/TestReportsTab'
 import VideoReportsTab from '@/components/admin/VideoReportsTab'
 import { authedFetch } from '@/lib/apiClient'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import Select from '@/components/ui/Select'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -349,7 +351,7 @@ export default function StudentsPage() {
         {activeTab === 'applications' && (
           <motion.div key="applications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }}>
             {loadingApplications ? (
-              <div className="text-center py-16 text-gray-600 text-base">Loading applications…</div>
+              <SkeletonCard count={3} />
             ) : applications.length === 0 ? (
               <div className="text-center py-16 text-gray-600 text-base">No pending applications.</div>
             ) : (
@@ -470,17 +472,17 @@ export default function StudentsPage() {
                   Access ends on this date and students move to Alumni. Clear a single student&apos;s date in the table to undo it.
                 </p>
               </div>
-              <select
+              <Select
                 value={bulkBatch}
                 onChange={(e) => setBulkBatch(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-base text-gray-700 bg-white outline-none focus:border-primary"
+                wrapperClassName="min-w-[180px]"
                 aria-label="Batch"
               >
                 <option value="">Select batch</option>
                 {batches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
-              </select>
+              </Select>
               <input
                 type="date"
                 value={bulkDate}
@@ -520,7 +522,7 @@ export default function StudentsPage() {
               </div>
               <div className="divide-y divide-gray-100">
                 {loadingStudents ? (
-                  <div className="py-12 text-center text-gray-600 text-base">Loading students…</div>
+                  <div className="p-4"><SkeletonTable rows={6} columns={7} /></div>
                 ) : filteredStudents.length === 0 ? (
                   <div className="py-12 text-center text-gray-600 text-base">No students match your filters.</div>
                 ) : (

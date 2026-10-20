@@ -13,6 +13,7 @@ import { authedFetch } from '@/lib/apiClient'
 import { imageFromClipboard, imageFromFiles, uploadQuestionImage } from '@/lib/questionImages'
 import QuestionContent from '@/components/shared/QuestionContent'
 import { Watermark, useExamGuard } from '@/components/shared/ExamSecurity'
+import { SkeletonList } from '@/components/ui/Skeleton'
 import type { ContentType, OptionKey, QuestionContentFields } from '@/hooks/useTests'
 
 const ACCENT = '#5B21B6'
@@ -475,7 +476,7 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => { e.stopPropagation(); onClose() }}>
-      <div className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+      <div className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
@@ -652,7 +653,7 @@ function EditQuestionModal({ question, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => { e.stopPropagation(); onClose() }}>
-      <div className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+      <div className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
@@ -822,7 +823,7 @@ export default function QuestionBankPage() {
       {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 mb-4">{error}</div>}
 
       {loading ? (
-        <p className="text-sm text-zinc-500 py-8 text-center">Loading...</p>
+        <SkeletonList count={5} />
       ) : groups.length === 0 ? (
         <p className="text-sm text-zinc-500 py-12 text-center bg-white border border-zinc-200 rounded-xl">
           {debounced ? 'No groups match your search.' : 'The question bank is empty. Questions are saved automatically when you schedule an MCQ test, or add them directly here.'}

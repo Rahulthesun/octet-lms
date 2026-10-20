@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useMyOnlineClasses, type OnlineClass } from '@/hooks/useOnlineClasses'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
 import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
+import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -202,7 +203,7 @@ export default function StudentClassesPage() {
           </h2>
 
           {loading ? (
-            <div className="text-center py-12 text-muted">Loading classes…</div>
+            <SkeletonCard count={3} />
           ) : error ? (
             <div className="text-center py-12 text-rose-600">{error}</div>
           ) : visibleClasses.length === 0 ? (

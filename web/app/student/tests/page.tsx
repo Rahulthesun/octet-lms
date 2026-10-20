@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useMyTests, type StudentTestListItem } from '@/hooks/useTests'
 import DescriptiveAnswerPanel from '@/components/student/tests/DescriptiveAnswerPanel'
+import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -164,7 +165,7 @@ export default function StudentTestsPage() {
       </div>
 
       {error && <p className="text-rose-600 text-[15px] mb-4">{error}</p>}
-      {loading && <p className="text-muted text-[15px]">Loading tests…</p>}
+      {loading && <SkeletonCard count={3} />}
 
       <div className="space-y-4">
         {displayTests.map((test, i) => (

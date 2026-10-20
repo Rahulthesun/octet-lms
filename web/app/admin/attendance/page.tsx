@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase/client'
+import { Select } from '@/components/ui/Select'
+import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import {
   useBatches,
   useBatchStudents,
@@ -183,7 +185,7 @@ function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
         </div>
 
         {loading ? (
-          <div className="px-6 py-12 text-center text-sm text-zinc-400">Loading…</div>
+          <div className="px-6 py-4 space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
         ) : loadError ? (
           <div className="px-6 py-12 text-center text-sm text-red-600">{loadError}</div>
         ) : eligible.length === 0 ? (
@@ -263,7 +265,7 @@ function StudentGraphModal({ student, onClose }: { student: Student; onClose: ()
         <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400 mb-4">Last 5 sessions</p>
 
         {loading ? (
-          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">Loading…</div>
+          <Skeleton className="h-[108px] w-full rounded-lg" />
         ) : error ? (
           <div className="h-[108px] flex items-center justify-center text-sm text-red-600">{error}</div>
         ) : points.length === 0 ? (
@@ -664,16 +666,16 @@ export default function AttendancePage() {
                       Demo — simulate scan
                     </p>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <select
+                      <Select
                         value={selectedStudentIdForScan}
                         onChange={e => setSelectedStudentIdForScan(e.target.value)}
-                        className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                        className="flex-1 text-sm"
                       >
                         <option value="">Select student…</option>
                         {students.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
-                      </select>
+                      </Select>
                       <button
                         onClick={handleSimulateScan}
                         disabled={!selectedStudentIdForScan}

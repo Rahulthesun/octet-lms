@@ -28,7 +28,8 @@ const {
 } = require("../utils/meetInterval");
 const { matchByRegisteredEmail } = require("../utils/participantMatch");
 
-const MAX_AUTO_ATTEMPTS = 5; // after this many failed automatic attempts, only a manual "Retry Sync" tries again
+const MAX_AUTO_ATTEMPTS = 5; // after this many back-to-back failed automatic attempts, back off
+const STUCK_RETRY_COOLDOWN_MS = 6 * 60 * 60 * 1000; // ...but never give up forever: retry a stuck class again every 6h
 
 /** "2026-08-15T10:00:00.000Z" + "Asia/Kolkata" -> "2026-08-15" (the calendar date in that zone, for the attendance_sessions.date column). */
 function isoToDateInZone(iso, timeZone) {
@@ -353,7 +354,16 @@ async function runDueSyncs() {
       const lastMsAgo = session.last_synced_at ? Date.now() - new Date(session.last_synced_at).getTime() : Infinity;
       if (!hasUnmatched || endedMsAgo > 48 * 60 * 60 * 1000 || lastMsAgo < 10 * 60 * 1000) continue;
     }
-    if ((session?.sync_attempts || 0) >= MAX_AUTO_ATTEMPTS) continue; // stop hammering Google; admin can still manually retry
+    if ((session?.sync_attempts || 0) >= MAX_AUTO_ATTEMPTS) {
+      // There is no manual "Retry Sync" button in the UI, so a class that
+      // keeps failing must still get picked up on its own eventually rather
+      // than being stuck forever. Back off from hammering Google for a
+      // while, then let it through again — last_synced_at is updated on
+      // every attempt (success or failure), so this measures time since the
+      // most recent try, not just the first one.
+      const lastMsAgo = session?.last_synced_at ? Date.now() - new Date(session.last_synced_at).getTime() : Infinity;
+      if (lastMsAgo < STUCK_RETRY_COOLDOWN_MS) continue;
+    }
 
     try {
       const result = await syncClassAttendance(cls.id);

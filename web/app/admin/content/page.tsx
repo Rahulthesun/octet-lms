@@ -13,7 +13,8 @@ import { useContentTree, authHeaders } from "../../../hooks/admin/useContentTree
 import { PdfViewer } from "../../../components/admin/PDFViewer";
 import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer";
 import { getSession } from "@/lib/auth";
-import { QaCategorySection } from "@/components/admin/qa/QaCategorySection";
+import { QaCategorySection, QaUnitContentPanel, type SelectedQaUnit } from "@/components/admin/qa/QaCategorySection";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
 
@@ -256,6 +257,10 @@ export default function ContentPage() {
   // ── Navigation state ───────────────────────────────────────────────────────
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
   const [openCategoryId, setOpenCategoryId] = useState<"qa" | "practice" | null>(null);
+  // The Q&A/Practice Unit currently shown in the big right panel — same
+  // visual slot as a real notes chapter's "Upload PDF or PPTX" panel,
+  // instead of being squeezed into the narrow left rail.
+  const [selectedQaUnit, setSelectedQaUnit] = useState<SelectedQaUnit | null>(null);
   const [openChapterId, setOpenChapterId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -507,10 +512,12 @@ export default function ContentPage() {
     }
     setChapterContentType((prev) => ({ ...prev, [chapterId]: ct }));
     setSelectedItemId(null);
+    setSelectedQaUnit(null);
   }
 
   function selectFile(id: string, title: string) {
     setSelectedItemId(id);
+    setSelectedQaUnit(null);
     setEditTitle(title);
     setEditDesc("");
     setReplaceFile(null);
@@ -1005,7 +1012,21 @@ export default function ContentPage() {
     ? "MP4, WebM, MKV, MOV or AVI — max 4 GB"
     : "PDF or PPTX — max 50 MB";
 
-  const allSubjects = subjects as BackendSubject[];
+  // Only show notes/study material subjects in the top tree; deduplicate by name per grade
+  // to prevent duplicated entries appearing on different devices due to legacy records.
+  const notesSubjects = (subjects as (BackendSubject & { category?: string })[]).filter(
+    (s) => !s.category || s.category === "notes"
+  );
+
+  const seenGrade11 = new Set<string>();
+  const seenGrade12 = new Set<string>();
+  const allSubjects = notesSubjects.filter((s) => {
+    const key = (s.name || "").trim().toLowerCase();
+    const targetSet = s.grade === 11 ? seenGrade11 : seenGrade12;
+    if (targetSet.has(key)) return false;
+    targetSet.add(key);
+    return true;
+  });
 
   const gradeSubjects = allSubjects.filter((s) => s.grade === activeGrade);
 
@@ -1029,14 +1050,14 @@ export default function ContentPage() {
     <div className="flex flex-col h-full p-3">
       {/* ── Page header ── */}
       <div className="shrink-0 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="shrink-0">
             <h1 className="text-3xl font-bold text-gray-900">
               Content Manager
             </h1>
           </div>
-          <div className="flex-1 flex items-center justify-end gap-4">
-            <div className="lg:w-100 shrink-0">
+          <div className="w-full sm:flex-1 flex items-center justify-end gap-4 min-w-0">
+            <div className="w-full sm:w-auto lg:w-100 shrink-0">
               <StorageBar totalBytes={storage.totalBytes} />
             </div>
           </div>
@@ -1079,9 +1100,9 @@ export default function ContentPage() {
       </div>
 
       {/* ── Two-panel body ── */}
-      <div className="flex flex-1 min-h-0 p-3">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 p-2 md:p-3 gap-3">
         {/* ── Left rail ── */}
-        <div className="w-[45%] shrink-0 border-r rounded-2xl border-gray-200 bg-white flex flex-col h-full overflow-hidden">
+        <div className="w-full lg:w-[45%] shrink-0 lg:border-r rounded-2xl border border-gray-200 bg-white flex flex-col min-h-[420px] lg:h-full overflow-hidden shadow-xs">
           {/* Grade tabs + Add, right at the top of the subject card */}
           <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
             <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 p-1">
@@ -1118,8 +1139,8 @@ export default function ContentPage() {
 
           <div className="flex-1 overflow-y-auto">
             {loading && (
-              <div className="p-8 text-center text-gray-400 text-base">
-                Loading subjects…
+              <div className="p-4">
+                <SkeletonList count={5} />
               </div>
             )}
             {error && (
@@ -1655,7 +1676,19 @@ export default function ContentPage() {
                         className="overflow-hidden"
                       >
                         <div className="pl-8 pr-3 pb-3">
-                          <QaCategorySection category={key} title={label} embedded />
+                          <QaCategorySection
+                            category={key}
+                            title={label}
+                            activeGrade={activeGrade}
+                            embedded
+                            selectedUnitId={selectedQaUnit?.category === key ? selectedQaUnit.id : null}
+                            onSelectUnit={(unit) => {
+                              setSelectedItemId(null)
+                              setSelectedQaUnit(
+                                unit ? { id: unit.id, name: unit.name, category: key, categoryTitle: label } : null
+                              )
+                            }}
+                          />
                         </div>
                       </motion.div>
                     )}
@@ -1668,8 +1701,10 @@ export default function ContentPage() {
 
         {/* ── Right panel ── */}
         <div className="flex-1 h-full overflow-y-auto">
-          {/* ── PDF selected: viewer + edit form ── */}
-          {selectedFile &&
+          {/* ── Q&A / Practice Questions: a Unit was picked ── */}
+          {selectedQaUnit ? (
+            <QaUnitContentPanel unit={selectedQaUnit} onClose={() => setSelectedQaUnit(null)} />
+          ) : selectedFile &&
           selectedPath &&
           selectedPath.contentType === "pdf" ? (
             <div className="p-4 space-y-4">

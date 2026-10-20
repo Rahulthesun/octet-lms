@@ -16,17 +16,23 @@ function badRequest(message) {
 }
 
 function normalizeField(input, prefix) {
-  const type = input[`${prefix}Type`] === "image" ? "image" : "text";
-  const text = type === "text" ? String(input[prefix] || "").trim() : null;
-  const imageKey = type === "image" ? input[`${prefix}ImageKey`] || null : null;
+  const obj = typeof input[prefix] === "object" && input[prefix] !== null ? input[prefix] : null;
+  const rawType = obj ? obj.type : input[`${prefix}Type`];
+  const type = rawType === "image" ? "image" : "text";
+  const rawText = obj ? obj.text : input[prefix];
+  const text = type === "text" ? String(rawText || "").trim() : null;
+  const imageKey = type === "image" ? (obj ? obj.imageKey || obj.imageUrl : input[`${prefix}ImageKey`]) || null : null;
+  const contentHash = type === "image" ? (obj ? obj.contentHash || obj.imageContentHash : input[`${prefix}ImageContentHash`]) || null : null;
+  const perceptualHash = type === "image" ? (obj ? obj.perceptualHash || obj.imagePerceptualHash : input[`${prefix}ImagePerceptualHash`]) || null : null;
+
   if (type === "text" && !text) throw badRequest(`${prefix === "question" ? "Question" : "Answer"} text is required`);
   if (type === "image" && !imageKey) throw badRequest(`${prefix === "question" ? "Question" : "Answer"} image is required`);
   return {
     type,
     text,
     imageKey,
-    contentHash: type === "image" ? input[`${prefix}ImageContentHash`] || null : null,
-    perceptualHash: type === "image" ? input[`${prefix}ImagePerceptualHash`] || null : null,
+    contentHash,
+    perceptualHash,
   };
 }
 

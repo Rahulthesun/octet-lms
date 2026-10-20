@@ -28,6 +28,7 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 
+const supabase = require("../config/supabase");
 const bank = require("../services/questionBank.service");
 const descriptive = require("../services/qaDescriptive.service");
 const resources = require("../services/qaBankResources.service");
@@ -45,6 +46,70 @@ const handle = (fn) => async (req, res) => {
     res.status(err.status || 500).json({ error: err.message || "Something went wrong" });
   }
 };
+
+async function getOrCreateCategorySubject(category, grade) {
+  const g = Number(grade) === 11 ? 11 : 12;
+  const cat = category === "practice" ? "practice" : "qa";
+  const name = cat === "qa" ? "Q&A" : "Practise Questions";
+
+  const { data: existing } = await supabase
+    .from("subjects")
+    .select("*")
+    .eq("category", cat)
+    .eq("grade", g)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data: created, error } = await supabase
+    .from("subjects")
+    .insert({
+      name,
+      grade: g,
+      category: cat,
+      order_index: 99,
+      is_visible: true,
+    })
+    .select()
+    .single();
+
+  if (error && error.code === "23505") {
+    const { data: retry } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("category", cat)
+      .eq("grade", g)
+      .maybeSingle();
+    if (retry) return retry;
+  }
+  if (error) throw error;
+  return created;
+}
+
+async function getOrCreateUnitSubtopic(chapterId, unitName) {
+  const { data: subtopics, error } = await supabase
+    .from("subtopics")
+    .select("*")
+    .eq("chapter_id", chapterId)
+    .order("order_index", { ascending: true });
+
+  if (error) throw error;
+  if (subtopics && subtopics.length > 0) return subtopics[0];
+
+  const { data: created, error: subError } = await supabase
+    .from("subtopics")
+    .insert({
+      chapter_id: chapterId,
+      name: unitName || "General",
+      order_index: 0,
+      is_visible: true,
+    })
+    .select()
+    .single();
+
+  if (subError) throw subError;
+  return created;
+}
 
 // ─── File upload (PDF / Word) for a Class's attached resources ───────────
 
@@ -99,6 +164,159 @@ router.get(
       tree.push({ ...subject, chapters: chaptersWithClasses });
     }
     return tree;
+  })
+);
+
+// ─── Unit-level operations (Subject → Unit) ───────────────────────────────
+
+// GET /api/qa-content/units?category=qa|practice&grade=11|12
+router.get(
+  "/units",
+  verifyToken,
+  handle(async (req) => {
+    const category = req.query.category === "practice" ? "practice" : "qa";
+    const grade = Number(req.query.grade) === 11 ? 11 : 12;
+    const subject = await getOrCreateCategorySubject(category, grade);
+
+    const chapters = await chapterService.getChaptersBySubject(subject.id);
+    const units = [];
+    for (const ch of chapters) {
+      const subtopic = await getOrCreateUnitSubtopic(ch.id, ch.name);
+      const mcqs = await bank.listQuestionsForSubtopic(subtopic.id);
+      const desc = await descriptive.listForSubtopic(subtopic.id);
+      const resList = await resources.getResourcesBySubtopic(subtopic.id);
+
+      units.push({
+        id: ch.id,
+        name: ch.name,
+        subjectId: subject.id,
+        subtopicId: subtopic.id,
+        grade,
+        category,
+        mcqCount: (mcqs || []).length,
+        descriptiveCount: (desc || []).length,
+        resourcesCount: (resList || []).length,
+        totalQuestions: (mcqs || []).length + (desc || []).length,
+      });
+    }
+    return units;
+  })
+);
+
+// POST /api/qa-content/units  (admin creates unit under Q&A / Practice)
+router.post(
+  "/units",
+  verifyToken,
+  adminOnly,
+  handle(async (req) => {
+    const category = req.body.category === "practice" ? "practice" : "qa";
+    const grade = Number(req.body.grade) === 11 ? 11 : 12;
+    const name = (req.body.name || "").trim();
+    if (!name) throw Object.assign(new Error("Unit name is required"), { status: 400 });
+
+    const subject = await getOrCreateCategorySubject(category, grade);
+    const chapter = await chapterService.createChapter({
+      name,
+      subjectId: subject.id,
+    });
+    const subtopic = await getOrCreateUnitSubtopic(chapter.id, name);
+
+    return {
+      id: chapter.id,
+      name: chapter.name,
+      subjectId: subject.id,
+      subtopicId: subtopic.id,
+      grade,
+      category,
+      mcqCount: 0,
+      descriptiveCount: 0,
+      resourcesCount: 0,
+      totalQuestions: 0,
+    };
+  })
+);
+
+// PATCH /api/qa-content/units/:unitId  (admin renames unit)
+router.patch(
+  "/units/:unitId",
+  verifyToken,
+  adminOnly,
+  handle(async (req) => {
+    const name = (req.body.name || "").trim();
+    if (!name) throw Object.assign(new Error("Unit name is required"), { status: 400 });
+    const updated = await chapterService.updateChapter(req.params.unitId, { name });
+    return updated;
+  })
+);
+
+// DELETE /api/qa-content/units/:unitId  (admin deletes unit)
+router.delete(
+  "/units/:unitId",
+  verifyToken,
+  adminOnly,
+  handle(async (req) => {
+    await chapterService.deleteChapter(req.params.unitId);
+    return { success: true, id: req.params.unitId };
+  })
+);
+
+// GET /api/qa-content/units/:unitId/content  (fetch all questions for a unit)
+router.get(
+  "/units/:unitId/content",
+  verifyToken,
+  handle(async (req) => {
+    const chapter = await chapterService.getChapterById(req.params.unitId);
+    if (!chapter) throw Object.assign(new Error("Unit not found"), { status: 404 });
+
+    const subtopic = await getOrCreateUnitSubtopic(chapter.id, chapter.name);
+    const mcqs = await bank.listQuestionsForSubtopic(subtopic.id);
+    const desc = await descriptive.listForSubtopic(subtopic.id);
+    const resList = await resources.getResourcesBySubtopic(subtopic.id);
+
+    return {
+      unit: chapter,
+      subtopicId: subtopic.id,
+      mcqs: mcqs || [],
+      descriptive: desc || [],
+      resources: resList || [],
+    };
+  })
+);
+
+// POST /api/qa-content/units/:unitId/mcq  (add MCQ question to unit)
+router.post(
+  "/units/:unitId/mcq",
+  verifyToken,
+  adminOnly,
+  handle(async (req) => {
+    const chapter = await chapterService.getChapterById(req.params.unitId);
+    if (!chapter) throw Object.assign(new Error("Unit not found"), { status: 404 });
+    const subtopic = await getOrCreateUnitSubtopic(chapter.id, chapter.name);
+
+    return bank.createManual({
+      questions: [req.body],
+      label: chapter.name,
+      createdBy: req.user.id,
+      subtopicId: subtopic.id,
+    });
+  })
+);
+
+// POST /api/qa-content/units/:unitId/descriptive  (add descriptive question to unit)
+router.post(
+  "/units/:unitId/descriptive",
+  verifyToken,
+  adminOnly,
+  handle(async (req) => {
+    const chapter = await chapterService.getChapterById(req.params.unitId);
+    if (!chapter) throw Object.assign(new Error("Unit not found"), { status: 404 });
+    const subtopic = await getOrCreateUnitSubtopic(chapter.id, chapter.name);
+
+    return descriptive.createItems({
+      subtopicId: subtopic.id,
+      items: [req.body],
+      createdBy: req.user.id,
+    });
   })
 );
 

@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useAttendanceData'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import { authedFetch } from '@/lib/apiClient'
+import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import AttendanceChart, {
   ATTENDANCE_STATUS_COLORS,
   NEVER_JOINED_COLOR,
@@ -152,7 +153,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
 
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <div className="py-16 text-center text-sm text-zinc-400">Loading report…</div>
+            <div className="px-6 py-4 space-y-4"><div className="grid grid-cols-3 gap-3"><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div><Skeleton className="h-48 w-full rounded-lg" /></div>
           ) : error ? (
             <div className="py-16 text-center text-sm text-red-600">{error}</div>
           ) : report ? (
@@ -361,7 +362,7 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
 
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <div className="py-16 text-center text-sm text-zinc-400">Loading statistics…</div>
+            <div className="px-6 py-4 space-y-4"><div className="grid grid-cols-2 gap-3"><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div><Skeleton className="h-48 w-full rounded-lg" /></div>
           ) : error ? (
             <div className="py-16 text-center text-sm text-red-600">{error}</div>
           ) : report ? (
@@ -530,7 +531,7 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
 
       <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
         {loading ? (
-          <div className="py-12 text-center text-sm text-zinc-400">Loading students…</div>
+          <div className="p-3 space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
         ) : error ? (
           <div className="py-12 text-center text-sm text-red-600">{error}</div>
         ) : students.length === 0 ? (
@@ -578,7 +579,7 @@ export default function AttendanceReportsTab() {
         <>
           <p className="text-sm text-zinc-500 mb-4">Select a batch to view its students and attendance report.</p>
           {loading ? (
-            <div className="py-16 text-center text-sm text-zinc-400">Loading batches…</div>
+            <div className="space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
           ) : error ? (
             <div className="py-16 text-center text-sm text-red-600">{error}</div>
           ) : batches.length === 0 ? (

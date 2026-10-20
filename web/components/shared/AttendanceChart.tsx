@@ -218,14 +218,15 @@ function CustomTooltip({ active, payload, valueSuffix }: any) {
   if (!active || !payload || !payload.length) return null
   const entry = payload[0]
   const color = entry.payload?.color || entry.color || entry.fill
+  const isNegative = typeof entry.value === 'number' && entry.value < 0
   return (
-    <div className="bg-white border border-zinc-200 rounded-md shadow-md px-3 py-2 text-xs">
-      <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-zinc-700 font-medium">{entry.payload?.label ?? entry.name}</span>
+    <div className="bg-white border border-zinc-200 rounded-lg shadow-lg px-3.5 py-2.5 text-xs z-50 min-w-[130px]">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className="text-zinc-900 font-semibold">{entry.payload?.label ?? entry.name}</span>
       </div>
-      <p className="text-zinc-500 mt-0.5 tabular-nums">
-        {entry.payload?.tooltipLabel ?? `${entry.value}${valueSuffix ?? ''}`}
+      <p className="text-zinc-500 font-medium tabular-nums">
+        {entry.payload?.tooltipLabel ?? (isNegative ? 'Absent (No attempt)' : `${entry.value}${valueSuffix ?? ''}`)}
       </p>
     </div>
   )
@@ -254,33 +255,33 @@ export default function AttendanceChart({
   const activeData = type === 'bar' ? barData : type === 'pie' ? pieData : lineData
   const showEmpty = type === 'line' ? lineData.length < 2 : !hasData(activeData)
 
-  // Bar chart Y-axis domain: normally auto, but when any bar datum is
-  // negative (e.g. an "absent" marker drawn as a short downward bar) the
-  // domain must be widened below zero so Recharts doesn't clip it.
+  // Bar chart Y-axis domain: when any datum is negative (absent marker),
+  // widen below zero so the black bar sits distinctly BELOW the 0-line X axis,
+  // with enough headroom so it NEVER overlaps with the bottom date labels.
   const hasNegativeBarValue = barData.some((d) => d.value < 0)
   const barMinValue = hasNegativeBarValue ? Math.min(...barData.map((d) => d.value)) : 0
   const barYDomain: [number, number] | undefined = hasNegativeBarValue
-    ? [Math.min(barMinValue - 2, -15), 100]
+    ? [Math.min(-28, barMinValue - 10), 100]
     : undefined
 
   // Recharts needs extra room to fit an axis title without it overlapping
   // the tick labels — only reserve that space on the axis that has one.
-  const barBottomMargin = !horizontalBars && barAxisLabels?.x ? 22 : 4
-  const barLeftMargin = horizontalBars ? 8 : barAxisLabels?.y ? 4 : -12
-  const lineBottomMargin = lineAxisLabels?.x ? 22 : 4
-  const lineLeftMargin = lineAxisLabels?.y ? 4 : -12
+  const barBottomMargin = hasNegativeBarValue ? 42 : !horizontalBars && barAxisLabels?.x ? 24 : 10
+  const barLeftMargin = horizontalBars ? 8 : barAxisLabels?.y ? 6 : -8
+  const lineBottomMargin = lineAxisLabels?.x ? 24 : 8
+  const lineLeftMargin = lineAxisLabels?.y ? 6 : -8
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400">Statistics</p>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Statistics</p>
         <ChartTypeToggle type={type} onTypeChange={onTypeChange} />
       </div>
       {description && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
 
       {showEmpty ? (
         <div
-          className="flex items-center justify-center text-sm text-zinc-400 border border-dashed border-zinc-200 rounded-lg"
+          className="flex items-center justify-center text-sm text-zinc-400 border border-dashed border-zinc-200 rounded-xl"
           style={{ height }}
         >
           {emptyMessage}
@@ -292,15 +293,17 @@ export default function AttendanceChart({
               <BarChart
                 data={barData}
                 layout={horizontalBars ? 'vertical' : 'horizontal'}
-                margin={{ top: 4, right: 12, left: barLeftMargin, bottom: barBottomMargin }}
+                margin={{ top: 12, right: 16, left: barLeftMargin, bottom: barBottomMargin }}
+                barCategoryGap={horizontalBars ? '28%' : '32%'}
+                barGap={4}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={horizontalBars} horizontal={!horizontalBars} />
                 {horizontalBars ? (
                   <>
                     <XAxis
                       type="number"
-                      tick={{ fontSize: 11, fill: '#71717a' }}
-                      axisLine={{ stroke: '#e5e7eb' }}
+                      tick={{ fontSize: 12, fill: '#71717a' }}
+                      axisLine={false}
                       tickLine={false}
                       label={
                         barAxisLabels
@@ -312,8 +315,8 @@ export default function AttendanceChart({
                       type="category"
                       dataKey="label"
                       width={96}
-                      tick={{ fontSize: 11, fill: '#71717a' }}
-                      axisLine={{ stroke: '#e5e7eb' }}
+                      tick={{ fontSize: 12, fill: '#71717a' }}
+                      axisLine={false}
                       tickLine={false}
                     />
                   </>
@@ -321,21 +324,23 @@ export default function AttendanceChart({
                   <>
                     <XAxis
                       dataKey="label"
-                      tick={{ fontSize: 11, fill: '#71717a' }}
-                      axisLine={{ stroke: '#e5e7eb' }}
+                      tick={{ fontSize: 12, fill: '#71717a', dy: hasNegativeBarValue ? 10 : 0 }}
+                      axisLine={false}
                       tickLine={false}
                       label={
                         barAxisLabels
-                          ? { value: barAxisLabels.x, position: 'insideBottom', offset: -6, fontSize: 11, fill: '#71717a' }
+                          ? { value: barAxisLabels.x, position: 'insideBottom', offset: hasNegativeBarValue ? -16 : -6, fontSize: 11, fill: '#71717a' }
                           : undefined
                       }
                     />
                     <YAxis
                       domain={barYDomain}
+                      ticks={[0, 25, 50, 75, 100]}
+                      tickFormatter={(v) => `${v}${valueSuffix || '%'}`}
                       tick={{ fontSize: 11, fill: '#71717a' }}
                       axisLine={false}
                       tickLine={false}
-                      width={barAxisLabels?.y ? 46 : 32}
+                      width={barAxisLabels?.y ? 48 : 38}
                       label={
                         barAxisLabels
                           ? { value: barAxisLabels.y, angle: -90, position: 'insideLeft', fontSize: 11, fill: '#71717a' }
@@ -344,11 +349,60 @@ export default function AttendanceChart({
                     />
                   </>
                 )}
-                <Tooltip content={<CustomTooltip valueSuffix={valueSuffix} />} cursor={{ fill: '#f4f4f5' }} />
-                {showMaxLine && !horizontalBars && (
-                  <ReferenceLine y={referenceValue} stroke="#000000" strokeWidth={2.5} />
+                <Tooltip content={<CustomTooltip valueSuffix={valueSuffix} />} cursor={{ fill: '#f4f4f5', opacity: 0.6 }} />
+
+                {/* Bold black 0-line: the real floor. Score bars (0-100) stand on top of it,
+                    black absent/never-joined bars hang below it. This is the ONLY horizontal
+                    "axis" line drawn — XAxis's own axisLine is disabled above so there is no
+                    second, differently-positioned line at the bottom of a widened negative domain. */}
+                {!horizontalBars && (
+                  <ReferenceLine y={0} stroke="#000000" strokeWidth={2.5} />
                 )}
-                <Bar dataKey="value" radius={horizontalBars ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontalBars ? 16 : 44}>
+                {showMaxLine && !horizontalBars && (
+                  <ReferenceLine y={referenceValue} stroke="#9333ea" strokeWidth={1.5} strokeDasharray="3 3" />
+                )}
+                <Bar
+                  dataKey="value"
+                  maxBarSize={horizontalBars ? 16 : 40}
+                  shape={(props: any) => {
+                    const { fill, x, y, width, height } = props
+                    // In Recharts, for negative values, height is negative (y(0) - y(value) < 0)
+                    // and y is the coordinate of the negative value (near the bottom).
+                    // In SVG, <rect> draws downward from y to y + height.
+                    // To start from y=0 and go downward: rectY must be y + height (which is y(0))!
+                    const isNegative = height < 0
+                    const rectY = isNegative ? y + height : y
+                    const rectHeight = Math.max(3, Math.abs(height))
+                    const rectWidth = Math.max(4, width)
+                    const r = 4
+                    // Only round the corner that's furthest from the 0-line, so the edge
+                    // touching the 0-line always stays a crisp, flush square edge — a
+                    // positive score bar's bottom sits flat on the line, and a negative
+                    // absent bar's top sits flat on the line too.
+                    const path = isNegative
+                      ? `M ${x},${rectY}
+                         L ${x + rectWidth},${rectY}
+                         L ${x + rectWidth},${rectY + rectHeight - r}
+                         Q ${x + rectWidth},${rectY + rectHeight} ${x + rectWidth - r},${rectY + rectHeight}
+                         L ${x + r},${rectY + rectHeight}
+                         Q ${x},${rectY + rectHeight} ${x},${rectY + rectHeight - r}
+                         Z`
+                      : `M ${x},${rectY + rectHeight}
+                         L ${x},${rectY + r}
+                         Q ${x},${rectY} ${x + r},${rectY}
+                         L ${x + rectWidth - r},${rectY}
+                         Q ${x + rectWidth},${rectY} ${x + rectWidth},${rectY + r}
+                         L ${x + rectWidth},${rectY + rectHeight}
+                         Z`
+                    return (
+                      <path
+                        d={path}
+                        fill={fill}
+                        className="transition-all duration-200 hover:opacity-85"
+                      />
+                    )
+                  }}
+                >
                   {barData.map((entry, i) => (
                     <Cell key={i} fill={entry.color || defaultColor} />
                   ))}

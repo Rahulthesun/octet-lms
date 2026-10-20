@@ -21,28 +21,25 @@ import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/co
 
 const ACCENT = '#5B21B6'
 
-// Score-band color coding, consistent with the app's existing Present
-// (green) / Partial (orange) / Absent (red) attendance palette
-// (ATTENDANCE_STATUS_COLORS in AttendanceChart.tsx) — reused here for the
-// same visual language on test scores.
+// Score-band color coding: Emerald (high), Amber (mid), Red (low),
+// Jet Black (absent downward bar below zero line).
 const SCORE_BAND_COLORS = {
-  low: '#d03b3b', // 0-34%
-  mid: '#fab219', // 35-79%
-  high: '#0ca30c', // 80-100%
+  low: '#dc2626', // 0-39%
+  mid: '#d97706', // 40-74%
+  high: '#059669', // 75-100%
 } as const
 
-/** 0-34 -> red, 35-79 -> orange, 80-100 -> green. Shared by bar + pie score charts. */
+/** < 40 -> red, 40-74 -> amber, >= 75 -> emerald. Shared by bar + pie score charts. */
 function scoreBandColor(pct: number): string {
-  if (pct < 35) return SCORE_BAND_COLORS.low
-  if (pct < 80) return SCORE_BAND_COLORS.mid
+  if (pct < 40) return SCORE_BAND_COLORS.low
+  if (pct < 75) return SCORE_BAND_COLORS.mid
   return SCORE_BAND_COLORS.high
 }
 
-// Visual-only marker magnitude for an absent date's downward bar — doesn't
-// mean anything numerically, just needs to render a visible short bar below
-// the zero-axis.
+// Visual-only marker magnitude for an absent date's downward bar — renders
+// a distinct jet black bar below the 0-line axis.
 const ABSENT_MARKER_VALUE = -10
-const ABSENT_MARKER_COLOR = '#000000'
+const ABSENT_MARKER_COLOR = '#18181b'
 
 function currentMonthStr() {
   return new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -61,13 +58,13 @@ function shiftMonth(month: string, delta: number) {
 
 // ─── Individual student report ─────────────────────────────────────────────
 
-function StudentTestReportModal({ studentId, studentName, onClose }: {
+export function StudentTestReportModal({ studentId, studentName, onClose }: {
   studentId: string
   studentName: string
   onClose: () => void
 }) {
   const [month, setMonth] = useState(currentMonthStr())
-  const [chartType, setChartType] = useState<AttendanceChartType>('line')
+  const [chartType, setChartType] = useState<AttendanceChartType>('bar')
   const [downloading, setDownloading] = useState(false)
   const { report, loading, error } = useStudentTestReport(studentId, month)
 

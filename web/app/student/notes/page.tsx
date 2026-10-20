@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useContentTree, authHeaders } from '../../../hooks/admin/useContentTree'
 import { PdfViewer } from '../../../components/student/PDFViewer'
+import { StudentQaSection } from '@/components/student/StudentQaSection'
+import { Skeleton, SkeletonList } from '@/components/ui/Skeleton'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8000'
 
@@ -470,11 +472,30 @@ export default function PdfNotesPage() {
   const [openDoc,      setOpenDoc]      = useState<OpenDoc | null>(null)
   const [sidebarOpen,  setSidebarOpen]  = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [studentGrade, setStudentGrade] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    authHeaders().then((headers) => {
+      fetch(`${BASE_URL}/api/students/profile`, { headers })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!cancelled && data?.grade) {
+            const g = Number(data.grade)
+            if (g === 11 || g === 12) setStudentGrade(g)
+          }
+        })
+        .catch(() => {})
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Simulate initial loading (or wait for content tree to be ready)
   useEffect(() => {
     if (!loading) {
-      const timer = setTimeout(() => setInitialLoading(false), 500)
+      const timer = setTimeout(() => setInitialLoading(false), 300)
       return () => clearTimeout(timer)
     }
   }, [loading])
@@ -563,35 +584,23 @@ export default function PdfNotesPage() {
     setOpenChapters(new Set())
   }
 
-  // ── Initial Loading State ─────────────────────────────────────────────────
+  // ── Initial Loading State with Skeleton ───────────────────────────────────
   if (initialLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-6">
-          {/* Animated logo */}
-          <div className="relative w-20 h-20 mx-auto">
-            <div className="absolute inset-0 bg-brand/10 rounded-2xl animate-pulse" />
-            <div className="absolute inset-2 bg-brand/20 rounded-xl animate-pulse delay-100" />
-            <div className="absolute inset-4 flex items-center justify-center">
-              <PdfIcon className="w-8 h-8 text-brand animate-bounce" />
-            </div>
-          </div>
-          
-          {/* Loading text */}
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-primary">Loading PDF Notes</h2>
-            <p className="text-sm text-muted">Preparing your study materials...</p>
-          </div>
-          
-          {/* Progress bar */}
-          <div className="w-64 mx-auto h-1 bg-gray-200 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-brand rounded-full"
-              initial={{ width: "0%" }}
-              animate={{ width: "100%" }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
-          </div>
+      <div className="p-6 lg:p-6 max-w-7xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-48 rounded-lg" />
+          <Skeleton className="h-4 w-80 rounded" />
+        </div>
+        <div className="flex gap-4">
+          <Skeleton className="h-12 flex-1 rounded-lg" />
+          <Skeleton className="h-12 w-32 rounded-lg" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
         </div>
       </div>
     )
@@ -795,6 +804,10 @@ export default function PdfNotesPage() {
               </div>
             )
           })}
+
+          {/* Q&A & Practise Questions at the bottom of the content queue */}
+          <StudentQaSection category="qa" title="Q&A" studentGrade={studentGrade} />
+          <StudentQaSection category="practice" title="Practise Questions" studentGrade={studentGrade} />
         </div>
 
         {filtered.length === 0 && (
