@@ -51,9 +51,10 @@ app.use(cors({
       origin.startsWith("http://127.0.0.1") ||
       origin.startsWith("http://192.168.") ||
       origin.endsWith(".trycloudflare.com") ||
-      origin.endsWith(".vercel.app") ||
-      configured.includes(origin.replace(/\/$/, ""))
-    ) {
+      origin.endsWith(".vercel.app")
+    );
+
+    if (devOrigin || configured.includes(origin.replace(/\/$/, ""))) {
       return callback(null, true);
     }
 
