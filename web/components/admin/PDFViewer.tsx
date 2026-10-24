@@ -286,8 +286,7 @@ export function PdfViewer({ url, filename, className = "" }: PdfViewerProps) {
     (async () => {
       try {
         const pdfjsLib = (await import("pdfjs-dist")) as any;
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const doc = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
         if (cancelled) return;
         const fit = await computeFitScale(doc, 1);
