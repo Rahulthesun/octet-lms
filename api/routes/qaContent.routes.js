@@ -37,7 +37,7 @@ const chapterService = require("../services/chapter.service");
 const subtopicService = require("../services/subtopic.service");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 const handle = (fn) => async (req, res) => {
   try {

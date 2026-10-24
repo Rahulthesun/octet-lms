@@ -13,6 +13,9 @@
 const express = require("express");
 const router = express.Router();
 const ctrl = require("../controllers/passwordReset.controller");
+const { passwordResetLimiter } = require("../middleware/rateLimit");
+
+router.use(passwordResetLimiter);
 
 // POST /api/auth/forgot-password        — request a reset link by email
 router.post("/forgot-password", ctrl.requestReset);

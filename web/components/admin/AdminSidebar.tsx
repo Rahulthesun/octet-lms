@@ -332,7 +332,7 @@ export default function AdminSidebar({
       )}
 
       {/* Nav items */}
-      <nav className="flex-1 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 min-h-0 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-contain" data-lenis-prevent>
         {visibleNavItems.map((item) => {
           const active = isActive(item.href);
           return (
@@ -366,7 +366,7 @@ export default function AdminSidebar({
       </nav>
 
       {/* My Profile + Sign out */}
-      <div className={`${collapsed ? "flex flex-col items-center gap-1" : ""}`}>
+      <div className="shrink-0">
         {/* Guest mode — admin-only. Lets the admin preview the exact UI a
             student would see, purely as a client-side view toggle. */}
         {(role === "admin" || role === "both") && (
@@ -488,36 +488,25 @@ export default function AdminSidebar({
           </Link>
         )}
 
-        {/* Sign out */}
-        {collapsed ? (
-          <button
-            onClick={handleSignOut}
-            className="relative group w-12 mb-2 h-10 bg-primary flex items-center justify-center text-white font-inter text-base"
-            title="Sign out"
-          >
-            A
+        {/* Sign out — its own row, same as the student sidebar */}
+        <button
+          onClick={handleSignOut}
+          className={`relative group flex items-center h-12 w-full border-l-2 border-transparent text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors ${
+            collapsed ? "justify-center" : "gap-3 px-4"
+          }`}
+          title="Sign out"
+        >
+          <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+            <path d="M8 10h8M13 7l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 4H5a1 1 0 00-1 1v10a1 1 0 001 1h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          {!collapsed && <span className="text-lg whitespace-nowrap">Sign Out</span>}
+          {collapsed && (
             <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-gray-900 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
               Sign Out
             </span>
-          </button>
-        ) : (
-          <div className="flex items-center gap-3 px-4 py-2">
-            <div className="w-9 h-9 bg-primary flex items-center justify-center text-white font-inter text-base shrink-0">
-              A
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-base text-gray-800 leading-tight truncate">
-                Admin
-              </p>
-              <button
-                onClick={handleSignOut}
-                className="text-sm text-gray-400 hover:text-primary transition-colors"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </button>
       </div>
     </div>
   );

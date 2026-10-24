@@ -18,7 +18,7 @@ const ctrl         = require("../controllers/attendance.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
 // Role gate for admin/developer actions
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // ─── Batches ──────────────────────────────────────────────────────────────────
 // GET  /api/attendance/batches              → list all batches

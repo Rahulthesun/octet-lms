@@ -14,7 +14,7 @@ const router = express.Router();
 const bank = require("../services/questionBank.service");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 const handle = (fn) => async (req, res) => {
   try {

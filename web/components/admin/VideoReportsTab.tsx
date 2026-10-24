@@ -8,6 +8,7 @@ import {
 } from '@/hooks/useVideoAnalytics'
 import { DropOffChart, EngagementHeatmap, formatDuration } from '@/components/shared/VideoAnalyticsCharts'
 import { Select } from '@/components/ui/Select'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const ACCENT = '#5B21B6'
 
@@ -125,6 +126,7 @@ function BatchVideoReportView({ batch, onBack, onOpenStudent }: {
   onOpenStudent: (studentId: string) => void
 }) {
   const { report, loading, error } = useBatchVideoReport(batch.id)
+  const paging = usePagination(report?.perStudent ?? [])
 
   return (
     <div>
@@ -162,8 +164,8 @@ function BatchVideoReportView({ batch, onBack, onOpenStudent }: {
           </div>
 
           <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mb-2">Most-watched videos in this batch</p>
-          <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white mb-6">
-            <div className="grid grid-cols-[1fr_90px_90px_80px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
+          <div className="border border-zinc-200 rounded-lg overflow-x-auto bg-white mb-6">
+            <div className="grid min-w-[440px] grid-cols-[1fr_90px_90px_80px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
               <span>Video</span>
               <span className="text-right">Viewers</span>
               <span className="text-right">Watch Time</span>
@@ -173,7 +175,7 @@ function BatchVideoReportView({ batch, onBack, onOpenStudent }: {
               {report.topVideos.length === 0 ? (
                 <div className="py-8 text-center text-sm text-zinc-400">No watch data yet.</div>
               ) : report.topVideos.map((v) => (
-                <div key={v.videoId} className="grid grid-cols-[1fr_90px_90px_80px] px-3 py-2.5 text-sm items-center">
+                <div key={v.videoId} className="grid min-w-[440px] grid-cols-[1fr_90px_90px_80px] px-3 py-2.5 text-sm items-center">
                   <div className="min-w-0">
                     <p className="text-zinc-800 truncate">{v.title}</p>
                     {v.chapterTitle && <p className="text-xs text-zinc-400 truncate">{v.chapterTitle}</p>}
@@ -189,19 +191,19 @@ function BatchVideoReportView({ batch, onBack, onOpenStudent }: {
           </div>
 
           <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mb-2">Per-student</p>
-          <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
-            <div className="grid grid-cols-[1fr_90px_80px_70px_70px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
+          <div className="border border-zinc-200 rounded-lg overflow-x-auto bg-white">
+            <div className="grid min-w-[440px] grid-cols-[1fr_90px_80px_70px_70px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
               <span>Student</span>
               <span className="text-right">Watch Time</span>
               <span className="text-right">Videos</span>
               <span className="text-right">Compl.</span>
               <span className="text-right">Report</span>
             </div>
-            <div className="divide-y divide-zinc-100 max-h-72 overflow-y-auto">
+            <div className="divide-y divide-zinc-100">
               {report.perStudent.length === 0 ? (
                 <div className="py-8 text-center text-sm text-zinc-400">No students enrolled.</div>
-              ) : report.perStudent.map((s) => (
-                <div key={s.studentId} className="grid grid-cols-[1fr_90px_80px_70px_70px] px-3 py-2.5 text-sm items-center">
+              ) : paging.pageItems.map((s) => (
+                <div key={s.studentId} className="grid min-w-[440px] grid-cols-[1fr_90px_80px_70px_70px] px-3 py-2.5 text-sm items-center">
                   <span className="text-zinc-700 truncate">{s.name}</span>
                   <span className="text-right text-zinc-600 tabular-nums font-mono">{formatDuration(s.totalWatchedSecs)}</span>
                   <span className="text-right text-zinc-600 tabular-nums">{s.videosWatchedCount}</span>
@@ -220,6 +222,10 @@ function BatchVideoReportView({ batch, onBack, onOpenStudent }: {
                 </div>
               ))}
             </div>
+            <Pagination
+              page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+              onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="students"
+            />
           </div>
         </>
       )}

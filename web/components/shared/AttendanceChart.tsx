@@ -95,6 +95,22 @@ interface AttendanceChartProps {
   referenceValue?: number
 }
 
+// Categorical palette for pie slices — mirrored by PIE_PALETTE in
+// api/utils/attendanceReportFormat.js so the downloaded PDF uses the same colors.
+export const PIE_PALETTE = ['#5B21B6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#8b5cf6', '#84cc16', '#f97316']
+
+/**
+ * Slices that already carry distinct, meaningful colors (Present / Partial /
+ * Absent) keep them. Otherwise — one shared color, or none — every slice gets
+ * its own palette color, so a pie's categories can always be told apart.
+ */
+export function withPieColors(data: ChartDatum[]): ChartDatum[] {
+  const colors = data.map((d) => d.color).filter(Boolean)
+  const allDistinct = colors.length === data.length && new Set(colors).size === data.length
+  if (allDistinct || data.length < 2) return data
+  return data.map((d, i) => ({ ...d, color: PIE_PALETTE[i % PIE_PALETTE.length] }))
+}
+
 function hasData(data: ChartDatum[]) {
   return data.length > 0 && data.some((d) => d.value > 0)
 }
@@ -252,6 +268,15 @@ export default function AttendanceChart({
 }: AttendanceChartProps) {
   const gradientId = useId()
 
+  // Category axes key bars by their dataKey, so two data points sharing a label
+  // (e.g. two tests on day 3) collapsed onto one slot and hovering the second
+  // showed the first one's tooltip. Key by position instead and print the label.
+  const keyedBarData = barData.map((d, i) => ({ ...d, _idx: i }))
+  const keyedLineData = lineData.map((d, i) => ({ ...d, _idx: i }))
+  const labelAtBar = (i: number | string) => keyedBarData[Number(i)]?.label ?? ''
+  const labelAtLine = (i: number | string) => keyedLineData[Number(i)]?.label ?? ''
+
+  const coloredPieData = withPieColors(pieData)
   const activeData = type === 'bar' ? barData : type === 'pie' ? pieData : lineData
   const showEmpty = type === 'line' ? lineData.length < 2 : !hasData(activeData)
 
@@ -291,7 +316,7 @@ export default function AttendanceChart({
           <ResponsiveContainer width="100%" height="100%">
             {type === 'bar' ? (
               <BarChart
-                data={barData}
+                data={keyedBarData}
                 layout={horizontalBars ? 'vertical' : 'horizontal'}
                 margin={{ top: 12, right: 16, left: barLeftMargin, bottom: barBottomMargin }}
                 barCategoryGap={horizontalBars ? '28%' : '32%'}
@@ -313,7 +338,8 @@ export default function AttendanceChart({
                     />
                     <YAxis
                       type="category"
-                      dataKey="label"
+                      dataKey="_idx"
+                      tickFormatter={labelAtBar}
                       width={96}
                       tick={{ fontSize: 12, fill: '#71717a' }}
                       axisLine={false}
@@ -323,7 +349,8 @@ export default function AttendanceChart({
                 ) : (
                   <>
                     <XAxis
-                      dataKey="label"
+                      dataKey="_idx"
+                      tickFormatter={labelAtBar}
                       tick={{ fontSize: 12, fill: '#71717a', dy: hasNegativeBarValue ? 10 : 0 }}
                       axisLine={false}
                       tickLine={false}
@@ -411,19 +438,12 @@ export default function AttendanceChart({
             ) : type === 'pie' ? (
               <PieChart margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
                 <Tooltip content={<CustomTooltip valueSuffix={valueSuffix} />} />
-                <Legend
-                  verticalAlign="bottom"
-                  height={28}
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(value) => <span style={{ fontSize: 12, color: '#52525b' }}>{value}</span>}
-                />
                 <Pie
-                  data={pieData}
+                  data={coloredPieData}
                   dataKey="value"
                   nameKey="label"
                   cx="50%"
-                  cy="46%"
+                  cy="50%"
                   innerRadius="52%"
                   outerRadius="80%"
                   paddingAngle={2}
@@ -432,13 +452,13 @@ export default function AttendanceChart({
                   label={({ percent }) => (percent && percent > 0.06 ? `${Math.round(percent * 100)}%` : '')}
                   labelLine={false}
                 >
-                  {pieData.map((entry, i) => (
+                  {coloredPieData.map((entry, i) => (
                     <Cell key={i} fill={entry.color || defaultColor} />
                   ))}
                 </Pie>
               </PieChart>
             ) : (
-              <AreaChart data={lineData} margin={{ top: 8, right: 16, left: lineLeftMargin, bottom: lineBottomMargin }}>
+              <AreaChart data={keyedLineData} margin={{ top: 8, right: 16, left: lineLeftMargin, bottom: lineBottomMargin }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={lineColor} stopOpacity={0.18} />
@@ -447,7 +467,8 @@ export default function AttendanceChart({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis
-                  dataKey="label"
+                  dataKey="_idx"
+                  tickFormatter={labelAtLine}
                   tick={{ fontSize: 10, fill: '#71717a' }}
                   axisLine={{ stroke: '#e5e7eb' }}
                   tickLine={false}
@@ -484,6 +505,18 @@ export default function AttendanceChart({
             )}
           </ResponsiveContainer>
         </div>
+      )}
+      {/* Pie legend lives outside the fixed-height chart so many slices wrap
+          onto extra lines instead of overlapping whatever sits below. */}
+      {!showEmpty && type === 'pie' && (
+        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3 text-xs text-zinc-600">
+          {coloredPieData.map((d, i) => (
+            <li key={i} className="inline-flex items-center gap-1.5 max-w-full">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color || defaultColor }} />
+              <span className="truncate">{d.label}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

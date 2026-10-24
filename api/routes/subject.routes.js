@@ -18,7 +18,7 @@ const router  = express.Router();
 const subjectController = require("../controllers/subject.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // POST  /api/subjects      → create a new subject (admin only)
 router.post("/", verifyToken, adminOnly, subjectController.createSubject);

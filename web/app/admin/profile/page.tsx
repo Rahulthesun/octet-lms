@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'next/navigation'
 import { authedFetch } from '@/hooks/useTests'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 // ─── Mock activity log ────────────────────────────────────────────────────────
 
@@ -140,11 +141,12 @@ export default function AdminProfilePage() {
     setTimeout(() => setPwSaved(false), 3000)
   }
 
+  const activityPaging = usePagination(activityLog)
   const ACCENT = '#5B21B6'
   const tableMissing = !!settingsError && /test_settings/i.test(settingsError)
 
   return (
-    <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Profile &amp; Settings</h1>
@@ -319,22 +321,28 @@ export default function AdminProfilePage() {
             </div>
           )}
 
-          <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100 shadow-sm">
-            <div className="p-6 flex flex-col sm:flex-row sm:items-start gap-5">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-[15px] font-semibold text-zinc-900">Test pass percentage</h2>
-                <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
+          <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-100">
+              <h2 className="text-base font-semibold text-zinc-900">Test settings</h2>
+              <p className="text-sm text-zinc-500 mt-0.5">Platform-wide defaults applied to every test report.</p>
+            </div>
+
+            {/* One settings row: description on the left, control on the right, both vertically centred */}
+            <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-x-8 gap-y-4 items-center">
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-semibold text-zinc-900">Test pass percentage</h3>
+                <p className="text-sm text-zinc-500 mt-1 leading-relaxed max-w-2xl">
                   The default pass mark used in test analytics reports (Test Results → Report, and the All Tests
                   report). Admins can still override it per-session in those reports without changing this saved
                   default — useful if your board&apos;s official pass percentage ever changes.
                 </p>
               </div>
 
-              <div className="shrink-0 w-full sm:w-auto">
+              <div className="sm:justify-self-end">
                 {settingsLoading ? (
                   <p className="text-sm text-zinc-400">Loading…</p>
                 ) : (
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     <div className="relative">
                       <input
                         type="number"
@@ -342,24 +350,29 @@ export default function AdminProfilePage() {
                         max={100}
                         value={passPercentage}
                         onChange={(e) => setPassPercentage(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-                        className="w-24 text-[15px] rounded-lg pl-3 pr-7 py-2.5 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                        className="w-24 h-11 text-[15px] rounded-lg pl-3 pr-7 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400 pointer-events-none">%</span>
                     </div>
                     <button
                       onClick={handleSaveSettings}
                       disabled={settingsSaving || tableMissing}
-                      className="px-5 py-2.5 rounded-lg text-white text-[15px] disabled:opacity-50 hover:opacity-90 transition-opacity cursor-pointer"
+                      className="h-11 px-6 rounded-lg text-white text-[15px] disabled:opacity-50 hover:opacity-90 transition-opacity cursor-pointer"
                       style={{ backgroundColor: ACCENT }}
                     >
                       {settingsSaving ? 'Saving…' : 'Save'}
                     </button>
                   </div>
                 )}
-                {settingsSaved && <p className="text-xs text-emerald-600 mt-2 text-right">Saved</p>}
-                {settingsError && !tableMissing && <p className="text-xs text-rose-600 mt-2 text-right">{settingsError}</p>}
               </div>
             </div>
+
+            {(settingsSaved || (settingsError && !tableMissing)) && (
+              <div className="px-6 pb-4 -mt-1">
+                {settingsSaved && <p className="text-sm text-emerald-600">Saved</p>}
+                {settingsError && !tableMissing && <p className="text-sm text-rose-600">{settingsError}</p>}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -371,8 +384,8 @@ export default function AdminProfilePage() {
             <h2 className="text-base font-semibold text-gray-800">Recent Activity</h2>
             <p className="text-sm text-gray-400 mt-0.5">A log of actions performed in this admin session.</p>
           </div>
-          <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-            {activityLog.map((entry, i) => (
+          <div className="divide-y divide-gray-100">
+            {activityPaging.pageItems.map((entry, i) => (
               <div key={i} className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
                   <IconClock className="w-4 h-4" />
@@ -385,6 +398,10 @@ export default function AdminProfilePage() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={activityPaging.page} pageCount={activityPaging.pageCount} pageSize={activityPaging.pageSize} total={activityPaging.total}
+            onPageChange={activityPaging.setPage} onPageSizeChange={activityPaging.setPageSize} label="entries"
+          />
         </div>
       )}
     </div>

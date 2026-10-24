@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import {
   useOverallTestAnalytics, downloadOverallAnalyticsPdf, authedFetch, type AnalyticsPoint,
 } from '@/hooks/useTests'
@@ -44,6 +45,8 @@ export default function OverallAnalyticsModal({ onClose }: { onClose: () => void
       .catch(() => setPassPct(35))
   }, [])
   const { analytics, loading, error } = useOverallTestAnalytics(passPct)
+  const testPaging = usePagination(analytics?.perTest ?? [])
+  const studentPaging = usePagination(analytics?.perStudent ?? [])
 
   const [distType, setDistType] = useState<AttendanceChartType>('bar')
   const [batchType, setBatchType] = useState<AttendanceChartType>('bar')
@@ -160,19 +163,19 @@ export default function OverallAnalyticsModal({ onClose }: { onClose: () => void
 
               <div className="border-t border-zinc-100 pt-6">
                 <p className="text-sm font-medium text-zinc-700 mb-3">Per-test summary</p>
-                <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                  <div className="hidden sm:grid sm:grid-cols-[1fr_90px_90px_80px_90px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
+                <div className="border border-zinc-200 rounded-xl overflow-x-auto">
+                  <div className="hidden sm:grid sm:min-w-[440px] sm:grid-cols-[1fr_90px_90px_80px_90px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
                     <span>Test</span>
                     <span>Batch</span>
                     <span className="text-right">Attempted</span>
                     <span className="text-right">Avg %</span>
                     <span className="text-right">Pass/Fail</span>
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y divide-zinc-100">
+                  <div className="divide-y divide-zinc-100">
                     {analytics.perTest.length === 0 && (
                       <p className="px-4 py-4 text-sm text-zinc-400">No tests have been scheduled yet.</p>
                     )}
-                    {analytics.perTest.map((t) => (
+                    {testPaging.pageItems.map((t) => (
                       <div key={t.testId} className="flex flex-wrap sm:grid sm:grid-cols-[1fr_90px_90px_80px_90px] gap-2 px-4 py-2.5 text-sm items-center">
                         <div className="min-w-0">
                           <p className="text-zinc-900 truncate">{t.title}</p>
@@ -187,20 +190,24 @@ export default function OverallAnalyticsModal({ onClose }: { onClose: () => void
                       </div>
                     ))}
                   </div>
+                  <Pagination
+                    page={testPaging.page} pageCount={testPaging.pageCount} pageSize={testPaging.pageSize} total={testPaging.total}
+                    onPageChange={testPaging.setPage} onPageSizeChange={testPaging.setPageSize} label="tests"
+                  />
                 </div>
               </div>
 
               {analytics.perStudent.length > 0 && (
                 <div className="border-t border-zinc-100 pt-6">
                   <p className="text-sm font-medium text-zinc-700 mb-3">Per-student average (across every test they've taken)</p>
-                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                    <div className="hidden sm:grid sm:grid-cols-[1fr_120px_90px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
+                  <div className="border border-zinc-200 rounded-xl overflow-x-auto">
+                    <div className="hidden sm:grid sm:min-w-[440px] sm:grid-cols-[1fr_120px_90px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
                       <span>Student</span>
                       <span className="text-right">Tests evaluated</span>
                       <span className="text-right">Avg %</span>
                     </div>
-                    <div className="max-h-72 overflow-y-auto divide-y divide-zinc-100">
-                      {analytics.perStudent.map((s) => (
+                    <div className="divide-y divide-zinc-100">
+                      {studentPaging.pageItems.map((s) => (
                         <div key={s.studentId} className="flex flex-wrap sm:grid sm:grid-cols-[1fr_120px_90px] gap-2 px-4 py-2.5 text-sm items-center">
                           <span className="text-zinc-900 truncate">{s.name}</span>
                           <span className="text-right text-zinc-600 font-inter">{s.testsEvaluated}</span>
@@ -208,6 +215,10 @@ export default function OverallAnalyticsModal({ onClose }: { onClose: () => void
                         </div>
                       ))}
                     </div>
+                  <Pagination
+                    page={studentPaging.page} pageCount={studentPaging.pageCount} pageSize={studentPaging.pageSize} total={studentPaging.total}
+                    onPageChange={studentPaging.setPage} onPageSizeChange={studentPaging.setPageSize} label="students"
+                  />
                   </div>
                 </div>
               )}

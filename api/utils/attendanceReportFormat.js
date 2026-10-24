@@ -230,7 +230,24 @@ function drawBarChartHorizontal(doc, { x, width, data, valueSuffix }) {
   doc.fillColor("black");
 }
 
-function drawPieChart(doc, { x, y, width, height, data, valueSuffix }) {
+// Categorical palette for pie slices — mirrors PIE_PALETTE in
+// web/components/shared/AttendanceChart.tsx so the PDF slice colors match the screen.
+const PIE_PALETTE = ["#5B21B6", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6", "#8b5cf6", "#84cc16", "#f97316"];
+
+/**
+ * Slices that already carry distinct meaningful colors (e.g. Present/Partial/
+ * Absent) keep them; when they don't (one shared color, or none), every slice
+ * gets its own palette color so categories can be told apart.
+ */
+function withPieColors(data) {
+  const colors = data.map((d) => d.color).filter(Boolean);
+  const distinct = new Set(colors).size === data.length && colors.length === data.length;
+  if (distinct || data.length < 2) return data;
+  return data.map((d, i) => ({ ...d, color: PIE_PALETTE[i % PIE_PALETTE.length] }));
+}
+
+function drawPieChart(doc, { x, y, width, height, data: rawData, valueSuffix }) {
+  const data = withPieColors(rawData);
   const total = data.reduce((a, d) => a + d.value, 0);
   const cx = x + Math.min(width, height) / 2.4;
   const cy = y + height / 2;
@@ -395,6 +412,11 @@ function drawTable(doc, { headers, rows, colWidths, startX = doc.page.margins.le
   });
 
   doc.y = y + 10;
+  // drawRow() positions text at explicit x coordinates, which leaves pdfkit's
+  // cursor at the LAST column — without this reset the next heading flows
+  // from that x and wraps into a thin right-hand column ("Batch-wise break
+  // down" stacked over the final column).
+  doc.x = startX;
 }
 
 /** Writes a single student's report onto an open PDFDocument. */

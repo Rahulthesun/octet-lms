@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { useMyTests, type StudentTestListItem } from '@/hooks/useTests'
 import DescriptiveAnswerPanel from '@/components/student/tests/DescriptiveAnswerPanel'
 import { SkeletonCard } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -120,6 +121,7 @@ export default function StudentTestsPage() {
   const [filter, setFilter] = useState<'all' | 'live' | 'upcoming' | 'ended'>('all')
 
   const displayTests = filter === 'all' ? tests : tests.filter((t) => t.window === filter)
+  const paging = usePagination(displayTests)
 
   const summary = [
     { label: 'Total Tests', val: tests.length, color: 'text-slate-700', stroke: '#475569' },
@@ -168,11 +170,20 @@ export default function StudentTestsPage() {
       {loading && <SkeletonCard count={3} />}
 
       <div className="space-y-4">
-        {displayTests.map((test, i) => (
+        {paging.pageItems.map((test, i) => (
           <motion.div key={test.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
             <TestCard test={test} onRefetch={refetch} />
           </motion.div>
         ))}
+        {displayTests.length > 0 && (
+          <div className="rounded-xl overflow-hidden border border-zinc-200">
+            <Pagination
+              page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+              onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="tests"
+              className="border-t-0"
+            />
+          </div>
+        )}
         {!loading && displayTests.length === 0 && (
           <div className="text-center py-12 text-muted">
             <p className="text-[15px]">{tests.length === 0 ? 'No tests have been scheduled for your batch yet.' : 'No tests for this filter.'}</p>

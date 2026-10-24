@@ -18,6 +18,7 @@ import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
 import { SkeletonCard, Skeleton } from '@/components/ui/Skeleton'
 import { Select } from '@/components/ui/Select'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const ACCENT = '#5B21B6'
 
@@ -869,6 +870,7 @@ export default function OnlineClassesPage() {
     if (viewFilter === 'today') return sorted.filter((c) => classDayBucket(c) === 'today')
     return sorted.filter((c) => classDayBucket(c) === 'past')
   }, [sorted, viewFilter])
+  const paging = usePagination(filtered)
 
   async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) {
     const { batchId, chapterId, ...rest } = input
@@ -929,7 +931,7 @@ export default function OnlineClassesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-zinc-200">
         <div>
           <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Online Classes</p>
@@ -995,7 +997,7 @@ export default function OnlineClassesPage() {
               : 'No online classes scheduled yet.'}
           </div>
         ) : (
-          filtered.map((cls) => (
+          paging.pageItems.map((cls) => (
             <div
               key={cls.id}
               className="bg-white rounded-xl border border-zinc-200 hover:border-violet-200 hover:shadow-sm transition-all p-5"
@@ -1068,6 +1070,16 @@ export default function OnlineClassesPage() {
           ))
         )}
       </div>
+
+      {!loading && !error && (
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <Pagination
+            page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+            onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="classes"
+            className="border-t-0"
+          />
+        </div>
+      )}
 
       <AnimatePresence>
         {showSchedule && (

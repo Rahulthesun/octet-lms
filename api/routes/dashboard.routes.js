@@ -10,7 +10,7 @@ const router = express.Router();
 const ctrl = require("../controllers/dashboard.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // GET /api/dashboard/admin — admin/developer only
 router.get("/admin", verifyToken, adminOnly, ctrl.getAdminOverview);

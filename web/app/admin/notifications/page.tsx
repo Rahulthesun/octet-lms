@@ -15,7 +15,7 @@ export default function AdminNotificationsPage() {
   const [showCompose, setShowCompose] = useState(false)
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Notifications</h1>

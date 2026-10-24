@@ -279,23 +279,23 @@ export default function StudentDetailPage() {
   }
 
   if (loading) {
-    return <div className="p-8 text-base text-gray-600">Loading student…</div>
+    return <div className="text-base text-gray-600">Loading student…</div>
   }
 
   if (error && !student) {
     return (
-      <div className="p-8">
+      <div>
         <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-base rounded-lg">{error}</div>
       </div>
     )
   }
 
   if (!student) {
-    return <div className="p-8 text-base text-gray-600">Student not found.</div>
+    return <div className="text-base text-gray-600">Student not found.</div>
   }
 
   return (
-    <div className="p-8">
+    <div>
       {/* Back */}
       <Link href="/admin/students"
         className="inline-flex items-center gap-2 text-base text-gray-500 hover:text-primary transition-colors mb-6">

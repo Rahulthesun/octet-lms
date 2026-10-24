@@ -16,7 +16,20 @@
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const { globalLimiter } = require("./middleware/rateLimit");
+const sanitizeErrors = require("./middleware/sanitizeErrors");
 const app = express();
+
+const IS_PROD = process.env.NODE_ENV === "production";
+
+// Behind Fly.io's proxy: trust one hop so rate limiting sees the real client IP.
+app.set("trust proxy", 1);
+
+// This is a JSON API (no HTML), so a strict default policy is safe. The
+// cross-origin resource policy is relaxed because the web app on another
+// origin fetches signed/streamed responses from here.
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 app.use(cors({
   origin(origin, callback) {
@@ -30,12 +43,15 @@ app.use(cors({
       .map((o) => (o || "").trim().replace(/\/$/, ""))
       .filter(Boolean);
 
-    if (
+    // Local/LAN origins are a development convenience only — never trusted in
+    // production. Tunnel domains (e.g. trycloudflare.com) must be listed
+    // explicitly in CORS_ORIGINS; a wildcard would trust anyone's subdomain.
+    const devOrigin = !IS_PROD && (
       origin.startsWith("http://localhost") ||
-      origin.startsWith("http://192.168.") ||
-      origin.endsWith(".trycloudflare.com") ||
-      configured.includes(origin.replace(/\/$/, ""))
-    ) {
+      origin.startsWith("http://127.0.0.1") ||
+      origin.startsWith("http://192.168.")
+    );
+    if (devOrigin || configured.includes(origin.replace(/\/$/, ""))) {
       return callback(null, true);
     }
 
@@ -48,11 +64,15 @@ app.use(cors({
 // express.json() parses incoming request bodies that have the
 // Content-Type: application/json header. Without this, req.body
 // would be undefined in your route handlers.
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+// Blanket per-IP request ceiling; stricter limiters sit on the sensitive routes.
+app.use("/api", globalLimiter);
+app.use(sanitizeErrors);
 
 // express.urlencoded() handles form submissions (HTML <form> POST).
 // { extended: true } allows nested objects in the body.
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 
 
@@ -163,7 +183,11 @@ app.use((req, res) => {
 // signature: (err, req, res, next).
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: "Internal server error", detail: err.message });
+  // Never send stack traces / raw database errors to the client in production.
+  if (err.message === "Not allowed by CORS") return res.status(403).json({ error: "Origin not allowed" });
+  const body = { error: "Internal server error" };
+  if (!IS_PROD) body.detail = err.message;
+  res.status(err.status && err.status < 500 ? err.status : 500).json(body);
 });
 
 // ── Start listening ───────────────────────────────────────────

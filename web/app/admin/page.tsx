@@ -214,7 +214,7 @@ export default function AdminDashboard() {
     : []
 
   return (
-    <div className="p-8 lg:p-10 max-w-[1400px] mx-auto space-y-10">
+    <div className="space-y-10">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}

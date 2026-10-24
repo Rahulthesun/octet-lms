@@ -11,6 +11,7 @@ import {
   downloadAttendanceFile,
   type Batch,
 } from '@/hooks/useAttendanceData'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import { authedFetch } from '@/lib/apiClient'
 import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
@@ -222,8 +223,8 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
               </div>
 
               <div className="px-6 pb-4">
-                <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-[1fr_1fr_80px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
+                <div className="border border-zinc-200 rounded-lg overflow-x-auto">
+                  <div className="grid min-w-[440px] grid-cols-[1fr_1fr_80px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
                     <span>Date</span>
                     <span>Batch</span>
                     <span className="text-right">Status</span>
@@ -232,7 +233,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
                     {monthRecords.length === 0 ? (
                       <div className="py-8 text-center text-sm text-zinc-400">No sessions recorded this month.</div>
                     ) : monthRecords.map((r, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_1fr_80px] px-3 py-2 text-sm items-center">
+                      <div key={i} className="grid min-w-[440px] grid-cols-[1fr_1fr_80px] px-3 py-2 text-sm items-center">
                         <span className="text-zinc-700">{r.date}{r.time ? ` · ${r.time}` : ''}</span>
                         <span className="text-zinc-500 truncate">{r.batchName || '—'}</span>
                         <span className={`text-right text-xs font-medium ${r.status === 'present' ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -286,6 +287,8 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
 
 function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () => void }) {
   const { report, loading, error } = useBatchReport(batchId)
+  const statPaging = usePagination(report?.studentStats ?? [])
+  const dayPaging = usePagination(report?.dailyBreakdown ?? [])
   const [downloading, setDownloading] = useState<'pdf' | 'csv' | null>(null)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   // Date-wise trend opens first (the primary view the admin asked for),
@@ -403,18 +406,18 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
 
               <div className="px-6 pb-3">
                 <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mb-2">Per-student</p>
-                <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-[1fr_60px_60px_60px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
+                <div className="border border-zinc-200 rounded-lg overflow-x-auto">
+                  <div className="grid min-w-[440px] grid-cols-[1fr_60px_60px_60px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
                     <span>Student</span>
                     <span className="text-right">Present</span>
                     <span className="text-right">Absent</span>
                     <span className="text-right">%</span>
                   </div>
-                  <div className="divide-y divide-zinc-100 max-h-56 overflow-y-auto">
+                  <div className="divide-y divide-zinc-100">
                     {report.studentStats.length === 0 ? (
                       <div className="py-8 text-center text-sm text-zinc-400">No students enrolled.</div>
-                    ) : report.studentStats.map(s => (
-                      <div key={s.studentId} className="grid grid-cols-[1fr_60px_60px_60px] px-3 py-2 text-sm items-center">
+                    ) : statPaging.pageItems.map(s => (
+                      <div key={s.studentId} className="grid min-w-[440px] grid-cols-[1fr_60px_60px_60px] px-3 py-2 text-sm items-center">
                         <span className="text-zinc-700 truncate">{s.name}</span>
                         <span className="text-right text-zinc-600 tabular-nums">{s.presentCount}</span>
                         <span className="text-right text-zinc-600 tabular-nums">{s.absentCount}</span>
@@ -424,13 +427,17 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
                       </div>
                     ))}
                   </div>
+                  <Pagination
+                    page={statPaging.page} pageCount={statPaging.pageCount} pageSize={statPaging.pageSize} total={statPaging.total}
+                    onPageChange={statPaging.setPage} onPageSizeChange={statPaging.setPageSize} label="students"
+                  />
                 </div>
               </div>
 
               <div className="px-6 pb-4">
                 <p className="text-[10px] font-medium tracking-widest uppercase text-zinc-400 mb-2">Day by day</p>
-                <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-[1fr_70px_60px_60px_60px_70px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
+                <div className="border border-zinc-200 rounded-lg overflow-x-auto">
+                  <div className="grid min-w-[440px] grid-cols-[1fr_70px_60px_60px_60px_70px] px-3 py-2 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
                     <span>Date</span>
                     <span>Source</span>
                     <span className="text-right">Present</span>
@@ -438,11 +445,11 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
                     <span className="text-right">Absent</span>
                     <span className="text-right">View</span>
                   </div>
-                  <div className="divide-y divide-zinc-100 max-h-56 overflow-y-auto">
+                  <div className="divide-y divide-zinc-100">
                     {report.dailyBreakdown.length === 0 ? (
                       <div className="py-8 text-center text-sm text-zinc-400">No sessions held yet.</div>
-                    ) : report.dailyBreakdown.map((d) => (
-                      <div key={d.sessionId} className="grid grid-cols-[1fr_70px_60px_60px_60px_70px] px-3 py-2 text-sm items-center">
+                    ) : dayPaging.pageItems.map((d) => (
+                      <div key={d.sessionId} className="grid min-w-[440px] grid-cols-[1fr_70px_60px_60px_60px_70px] px-3 py-2 text-sm items-center">
                         <div className="min-w-0">
                           <span className="text-zinc-700 block">{d.date}</span>
                           {d.classTitle && <span className="text-xs text-zinc-400 truncate block">{d.classTitle}</span>}
@@ -462,6 +469,10 @@ function BatchReportModal({ batchId, onClose }: { batchId: string; onClose: () =
                       </div>
                     ))}
                   </div>
+                  <Pagination
+                    page={dayPaging.page} pageCount={dayPaging.pageCount} pageSize={dayPaging.pageSize} total={dayPaging.total}
+                    onPageChange={dayPaging.setPage} onPageSizeChange={dayPaging.setPageSize} label="sessions"
+                  />
                 </div>
               </div>
             </>
@@ -508,6 +519,7 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
   onOpenBatchReport: () => void
 }) {
   const { students, loading, error } = useBatchStudents(batch.id, new Date().toISOString().slice(0, 10))
+  const paging = usePagination(students)
 
   return (
     <div>
@@ -529,7 +541,7 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
         {students.length} student{students.length !== 1 ? 's' : ''} enrolled{batch.mode ? ` · ${batch.mode}` : ''}
       </p>
 
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-lg overflow-x-auto bg-white">
         {loading ? (
           <div className="p-3 space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
         ) : error ? (
@@ -538,7 +550,7 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
           <div className="py-12 text-center text-sm text-zinc-400">No students enrolled in this batch yet.</div>
         ) : (
           <div className="divide-y divide-zinc-100">
-            {students.map(s => (
+            {paging.pageItems.map(s => (
               <div key={s.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50 transition-colors">
                 <div className="min-w-0">
                   <p className="text-sm text-zinc-900 truncate">{s.name}</p>
@@ -558,6 +570,12 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
               </div>
             ))}
           </div>
+        )}
+        {!loading && !error && (
+          <Pagination
+            page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+            onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="students"
+          />
         )}
       </div>
     </div>

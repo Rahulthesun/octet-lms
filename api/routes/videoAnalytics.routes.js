@@ -14,7 +14,7 @@ const router = express.Router();
 const ctrl = require("../controllers/videoAnalytics.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // GET /api/video-analytics/me/watched          — every video I have watch data for
 router.get("/me/watched", verifyToken, ctrl.getMyWatchedVideos);

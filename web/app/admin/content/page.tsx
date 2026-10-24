@@ -1047,9 +1047,9 @@ export default function ContentPage() {
 
   // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full p-3">
+    <div className="flex flex-col h-full">
       {/* ── Page header ── */}
-      <div className="shrink-0 px-6 py-4">
+      <div className="shrink-0 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="shrink-0">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -1100,7 +1100,7 @@ export default function ContentPage() {
       </div>
 
       {/* ── Two-panel body ── */}
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 p-2 md:p-3 gap-3">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-3">
         {/* ── Left rail ── */}
         <div className="w-full lg:w-[45%] shrink-0 lg:border-r rounded-2xl border border-gray-200 bg-white flex flex-col min-h-[420px] lg:h-full overflow-hidden shadow-xs">
           {/* Grade tabs + Add, right at the top of the subject card */}

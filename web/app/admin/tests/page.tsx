@@ -6,12 +6,13 @@ import { useAdminTests, useAdminAttempts, type TestSummary } from '@/hooks/useTe
 import { useBatches } from '@/hooks/useAttendanceData'
 import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
+import AttemptReportModal from '@/components/admin/tests/AttemptReportModal'
 import TestAnalyticsModal from '@/components/admin/tests/TestAnalyticsModal'
 import OverallAnalyticsModal from '@/components/admin/tests/OverallAnalyticsModal'
 import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon, EditIcon, EyeIcon } from '@/components/admin/tests/icons'
 import ViewQuestionsModal from '@/components/admin/tests/ViewQuestionsModal'
-import { StudentTestReportModal } from '@/components/admin/TestReportsTab'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const ACCENT = '#5B21B6'
 
@@ -52,7 +53,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
   const badge = WINDOW_BADGE[w]
   const { attempts, loading: attemptsLoading, refetch } = useAdminAttempts(isOpen ? test.id : null)
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
-  const [reportingStudent, setReportingStudent] = useState<{ id: string; name: string } | null>(null)
+  const [reportAttemptId, setReportAttemptId] = useState<string | null>(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [showQuestions, setShowQuestions] = useState(false)
   const [sortMode, setSortMode] = useState<'default' | 'fastest' | 'marksHigh' | 'marksLow'>('default')
@@ -96,6 +97,8 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
     }
     return list
   }, [attempts, sortMode])
+
+  const paging = usePagination(sortedAttempts)
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
@@ -202,7 +205,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 ] as const).map((opt) => (
                   <button
                     key={opt.key}
-                    onClick={() => setSortMode(opt.key)}
+                    onClick={() => { setSortMode(opt.key); paging.setPage(1) }}
                     className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                       sortMode === opt.key
                         ? 'text-white border-transparent'
@@ -224,7 +227,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 {!attemptsLoading && attempts.length === 0 && (
                   <div className="px-4 py-4 text-sm text-zinc-400">No student has attempted this test yet.</div>
                 )}
-                {sortedAttempts.map((a) => {
+                {paging.pageItems.map((a) => {
                   const pct = a.marksAwarded !== null && a.maxMarks ? Math.round((a.marksAwarded / a.maxMarks) * 100) : null
                   const clickable = a.status === 'submitted' || a.status === 'evaluated'
                   const timeTakenSeconds = a.startedAt && a.submittedAt
@@ -255,9 +258,10 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                       <div className="text-right">
                         <button
                           type="button"
-                          onClick={() => setReportingStudent({ id: a.studentId, name: a.studentName })}
-                          className="text-xs px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 font-medium transition-colors cursor-pointer"
-                          title="View individual test report bar graph"
+                          disabled={!clickable}
+                          onClick={() => setReportAttemptId(a.id)}
+                          className="text-xs px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                          title="View this student's report for this test"
                         >
                           Report
                         </button>
@@ -266,6 +270,10 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                   )
                 })}
                 </div>
+                <Pagination
+                  page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+                  onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="students"
+                />
               </div>
             </div>
           </motion.div>
@@ -277,18 +285,20 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
           onClose={() => setSelectedAttemptId(null)}
           onGraded={refetch} />
       )}
+      {reportAttemptId && (() => {
+        const scored = attempts.filter((x) => x.marksAwarded !== null).sort((x, y) => (y.marksAwarded || 0) - (x.marksAwarded || 0))
+        const idx = scored.findIndex((x) => x.id === reportAttemptId)
+        return (
+          <AttemptReportModal test={test} attemptId={reportAttemptId}
+            rank={idx >= 0 ? idx + 1 : null} totalAttempted={scored.length}
+            onClose={() => setReportAttemptId(null)} />
+        )
+      })()}
       {showAnalytics && (
         <TestAnalyticsModal test={test} onClose={() => setShowAnalytics(false)} />
       )}
       {showQuestions && (
         <ViewQuestionsModal testId={test.id} title={test.title} onClose={() => setShowQuestions(false)} />
-      )}
-      {reportingStudent && (
-        <StudentTestReportModal
-          studentId={reportingStudent.id}
-          studentName={reportingStudent.name}
-          onClose={() => setReportingStudent(null)}
-        />
       )}
     </div>
   )
@@ -321,7 +331,7 @@ export default function AdminTestsPage() {
   ]
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Tests</h1>

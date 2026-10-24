@@ -265,16 +265,17 @@ const getVideoById = async (id) => {
  * The client should call this endpoint fresh on each player mount,
  * not cache the URL across sessions.
  */
-const getVideoStreamUrl = async (id) => {
+const getVideoStreamUrl = async (id, user) => {
   const { data, error } = await supabase
     .from("videos")
-    .select("r2_key, is_visible, title")
+    .select("r2_key, is_visible, title, chapter_id")
     .eq("id", id)
     .single();
 
   if (error?.code === "PGRST116" || !data) throw new Error("VIDEO_NOT_FOUND");
   if (error) throw new Error(error.message);
   if (!data.is_visible) throw new Error("VIDEO_NOT_VISIBLE");
+  await require("../utils/contentAccess").assertStudentCanAccess(user, data);
 
   const url = await presign(data.r2_key, 600);
   return { url, expiresIn: 600 };

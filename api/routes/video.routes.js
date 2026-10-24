@@ -69,7 +69,7 @@ const uploadFields = upload.fields([
   { name: "thumbnail", maxCount: 1 },
 ]);
 
-const ADMIN_ROLES = ["admin", "developer"];
+const ADMIN_ROLES = ["admin"];
 
 // ─────────────────────────────────────────────────────────────
 // Routes

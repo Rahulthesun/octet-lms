@@ -11,7 +11,7 @@ const router = express.Router();
 const ctrl = require("../controllers/parentReports.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 router.post("/students/:studentId/send", verifyToken, adminOnly, ctrl.sendForStudent);
 router.post("/run-monthly", verifyToken, adminOnly, ctrl.runMonthly);

@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase/client'
 import { Select } from '@/components/ui/Select'
 import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import {
   useBatches,
   useBatchStudents,
@@ -308,6 +309,9 @@ export default function AttendancePage() {
     : (batches.find(b => b.id === selectedBatchId) ?? null)
 
   const { students, refetch: refetchStudents } = useBatchStudents(selectedBatchId, date)
+  const markPaging = usePagination(students)
+  const summaryStudents = useMemo(() => students.filter((s) => s.attendancePct !== null), [students])
+  const summaryPaging = usePagination(summaryStudents)
   const { summary } = useBatchSummary(selectedBatchId)
 
   const hasContext = !!(selectedGrade && selectedBatchId)
@@ -385,7 +389,7 @@ export default function AttendancePage() {
   })
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
+    <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-zinc-200">
@@ -717,8 +721,8 @@ export default function AttendancePage() {
                   />
                 </div>
 
-                <div className="divide-y divide-zinc-100 overflow-y-auto flex-1" style={{ maxHeight: 400 }}>
-                  {students.map(s => {
+                <div className="divide-y divide-zinc-100 flex-1">
+                  {markPaging.pageItems.map(s => {
                     const present = isPresent(s.id)
                     return (
                       <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
@@ -738,6 +742,10 @@ export default function AttendancePage() {
                     )
                   })}
                 </div>
+                <Pagination
+                  page={markPaging.page} pageCount={markPaging.pageCount} pageSize={markPaging.pageSize} total={markPaging.total}
+                  onPageChange={markPaging.setPage} onPageSizeChange={markPaging.setPageSize} label="students"
+                />
               </div>
             </motion.div>
           )}
@@ -780,9 +788,8 @@ export default function AttendancePage() {
                 </div>
 
                 <div className="divide-y divide-zinc-100">
-                  {students.map(s => {
-                    if (s.attendancePct === null) return null
-                    const pct = s.attendancePct
+                  {summaryPaging.pageItems.map(s => {
+                    const pct = s.attendancePct as number
                     const st = s.unblocked ? STATUS.active : statusOf(pct)
                     const isBlocked = !s.unblocked && pct < 75
 
@@ -838,6 +845,10 @@ export default function AttendancePage() {
                     )
                   })}
                 </div>
+                <Pagination
+                  page={summaryPaging.page} pageCount={summaryPaging.pageCount} pageSize={summaryPaging.pageSize} total={summaryPaging.total}
+                  onPageChange={summaryPaging.setPage} onPageSizeChange={summaryPaging.setPageSize} label="students"
+                />
               </div>
             </motion.div>
           )}

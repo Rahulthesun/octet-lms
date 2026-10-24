@@ -202,7 +202,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
       )}
 
       {/* Nav items */}
-      <nav className="flex-1 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 min-h-0 py-1 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-contain" data-lenis-prevent>
         {visibleNavItems.map((item) => {
           const active = isActive(item.href)
           return (

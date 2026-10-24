@@ -45,7 +45,12 @@ const createSubject = async (req, res) => {
 /** GET /api/subjects  →  list all subjects */
 const getAllSubjects = async (req, res) => {
   try {
-    const subjects = await subjectService.getAllSubjects(req.query.category);
+    // Default to notes: the video/notes/online-class lists (student + admin)
+    // call this without a category and must never see the qa/practice
+    // container subjects (they rendered as duplicate "Q&A"/"Practise
+    // Questions" rows). Pass ?category=all to get every category.
+    const category = req.query.category === "all" ? undefined : req.query.category || "notes";
+    const subjects = await subjectService.getAllSubjects(category);
     res.status(200).json(subjects);
   } catch (err) {
     handleError(res, err, "Failed to load subjects");

@@ -12,6 +12,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
+  const fillHeight = /^\/admin\/content\/?$/.test(pathname || '')
+  const fullBleed = /^\/admin\/tests\/(new|[^/]+\/edit)\/?$/.test(pathname || '')
 
   // Auto-close mobile drawer on route navigation
   useEffect(() => {
@@ -99,7 +101,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </header>
 
             <main className="flex-1 h-full overflow-y-auto bg-transparent" data-lenis-prevent>
-              {children}
+              {/* One shared content container — every admin page inherits the
+                  same gutter/max-width so content never shifts relative to the
+                  sidebar between pages. The schedule/edit-test form is the
+                  exception: it owns a full-bleed sticky action bar. */}
+              {fullBleed ? children : fillHeight ? (
+                // Content manager is a viewport-height two-pane workspace.
+                <div className="h-full w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                  {children}
+                </div>
+              ) : (
+                <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                  {children}
+                </div>
+              )}
             </main>
           </div>
         </div>
