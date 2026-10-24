@@ -6,10 +6,13 @@ import { useAdminTests, useAdminAttempts, type TestSummary } from '@/hooks/useTe
 import { useBatches } from '@/hooks/useAttendanceData'
 import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
+import AttemptReportModal from '@/components/admin/tests/AttemptReportModal'
 import TestAnalyticsModal from '@/components/admin/tests/TestAnalyticsModal'
 import OverallAnalyticsModal from '@/components/admin/tests/OverallAnalyticsModal'
 import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, ReportIcon, EditIcon, EyeIcon } from '@/components/admin/tests/icons'
 import ViewQuestionsModal from '@/components/admin/tests/ViewQuestionsModal'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const ACCENT = '#5B21B6'
 
@@ -50,6 +53,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
   const badge = WINDOW_BADGE[w]
   const { attempts, loading: attemptsLoading, refetch } = useAdminAttempts(isOpen ? test.id : null)
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
+  const [reportAttemptId, setReportAttemptId] = useState<string | null>(null)
   const [showAnalytics, setShowAnalytics] = useState(false)
   const [showQuestions, setShowQuestions] = useState(false)
   const [sortMode, setSortMode] = useState<'default' | 'fastest' | 'marksHigh' | 'marksLow'>('default')
@@ -93,6 +97,8 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
     }
     return list
   }, [attempts, sortMode])
+
+  const paging = usePagination(sortedAttempts)
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
@@ -199,7 +205,7 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                 ] as const).map((opt) => (
                   <button
                     key={opt.key}
-                    onClick={() => setSortMode(opt.key)}
+                    onClick={() => { setSortMode(opt.key); paging.setPage(1) }}
                     className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                       sortMode === opt.key
                         ? 'text-white border-transparent'
@@ -213,15 +219,15 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
               </div>
 
               <div className="bg-white rounded-xl border border-zinc-200 overflow-x-auto">
-                <div className="min-w-[520px]">
-                <div className="grid grid-cols-[1fr_100px_90px_90px_90px] gap-2 px-4 py-2.5 bg-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
-                  <span>Student</span><span>Status</span><span>Marks</span><span>Time taken</span><span className="text-right">%</span>
+                <div className="min-w-[560px]">
+                <div className="grid grid-cols-[1fr_100px_90px_90px_70px_70px] gap-2 px-4 py-2.5 bg-zinc-100 text-xs text-zinc-500 uppercase tracking-wide">
+                  <span>Student</span><span>Status</span><span>Marks</span><span>Time taken</span><span className="text-right">%</span><span className="text-right">Report</span>
                 </div>
-                {attemptsLoading && <div className="px-4 py-4 text-sm text-zinc-400">Loading attempts…</div>}
+                {attemptsLoading && <div className="p-3"><SkeletonTable rows={3} columns={6} /></div>}
                 {!attemptsLoading && attempts.length === 0 && (
                   <div className="px-4 py-4 text-sm text-zinc-400">No student has attempted this test yet.</div>
                 )}
-                {sortedAttempts.map((a) => {
+                {paging.pageItems.map((a) => {
                   const pct = a.marksAwarded !== null && a.maxMarks ? Math.round((a.marksAwarded / a.maxMarks) * 100) : null
                   const clickable = a.status === 'submitted' || a.status === 'evaluated'
                   const timeTakenSeconds = a.startedAt && a.submittedAt
@@ -235,19 +241,39 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                       })()
                     : null
                   return (
-                    <button key={a.id} disabled={!clickable} onClick={() => setSelectedAttemptId(a.id)}
-                      className={`w-full grid grid-cols-[1fr_100px_90px_90px_90px] gap-2 px-4 py-2.5 border-b border-zinc-50 last:border-0 text-left ${
-                        clickable ? 'hover:bg-zinc-50 cursor-pointer' : 'cursor-default opacity-70'
-                      }`}>
-                      <span className="text-[15px] text-zinc-800 truncate">{a.studentName}</span>
+                    <div key={a.id}
+                      className="w-full grid grid-cols-[1fr_100px_90px_90px_70px_70px] gap-2 px-4 py-2.5 border-b border-zinc-50 last:border-0 items-center hover:bg-zinc-50/70 transition-colors">
+                      <button
+                        type="button"
+                        disabled={!clickable}
+                        onClick={() => setSelectedAttemptId(a.id)}
+                        className={`text-left truncate font-medium text-[15px] ${clickable ? 'text-zinc-900 hover:text-violet-700 cursor-pointer' : 'text-zinc-600 cursor-default'}`}
+                      >
+                        {a.studentName}
+                      </button>
                       <span className="text-sm text-zinc-500 capitalize">{a.status.replace('_', ' ')}</span>
                       <span className="text-sm font-inter text-zinc-700">{a.marksAwarded !== null ? `${a.marksAwarded}/${a.maxMarks}` : '—'}</span>
                       <span className="text-sm font-inter text-zinc-500">{timeTakenLabel !== null ? timeTakenLabel : '—'}</span>
-                      <span className="text-sm font-inter text-zinc-500 text-right">{pct !== null ? `${pct}%` : '—'}</span>
-                    </button>
+                      <span className="text-sm font-inter text-zinc-700 text-right">{pct !== null ? `${pct}%` : '—'}</span>
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          disabled={!clickable}
+                          onClick={() => setReportAttemptId(a.id)}
+                          className="text-xs px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                          title="View this student's report for this test"
+                        >
+                          Report
+                        </button>
+                      </div>
+                    </div>
                   )
                 })}
                 </div>
+                <Pagination
+                  page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+                  onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="students"
+                />
               </div>
             </div>
           </motion.div>
@@ -259,6 +285,15 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
           onClose={() => setSelectedAttemptId(null)}
           onGraded={refetch} />
       )}
+      {reportAttemptId && (() => {
+        const scored = attempts.filter((x) => x.marksAwarded !== null).sort((x, y) => (y.marksAwarded || 0) - (x.marksAwarded || 0))
+        const idx = scored.findIndex((x) => x.id === reportAttemptId)
+        return (
+          <AttemptReportModal test={test} attemptId={reportAttemptId}
+            rank={idx >= 0 ? idx + 1 : null} totalAttempted={scored.length}
+            onClose={() => setReportAttemptId(null)} />
+        )
+      })()}
       {showAnalytics && (
         <TestAnalyticsModal test={test} onClose={() => setShowAnalytics(false)} />
       )}
@@ -296,13 +331,13 @@ export default function AdminTestsPage() {
   ]
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Tests</h1>
           <p className="text-[15px] text-zinc-500 mt-1">Schedule MCQ and descriptive tests, and grade student answers.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link href="/admin/question-bank"
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
             Question Bank
@@ -358,7 +393,7 @@ export default function AdminTestsPage() {
       </div>
 
       {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 mb-4">{error}</div>}
-      {loading && <p className="text-sm text-zinc-400">Loading tests…</p>}
+      {loading && <SkeletonCard count={3} />}
 
       {!loading && tests.length === 0 && (
         <div className="py-16 text-center text-zinc-400 text-[15px]">No tests scheduled yet.</div>

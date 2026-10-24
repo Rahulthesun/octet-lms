@@ -116,11 +116,12 @@ const getVideoById = async (req, res) => {
 const streamVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await videoService.getVideoStreamUrl(id);
+    const result = await videoService.getVideoStreamUrl(id, req.user);
     res.status(200).json(result);
   } catch (err) {
     if (err.message === "VIDEO_NOT_FOUND")
       return res.status(404).json({ error: "Video not found" });
+    if (err.status === 403) return res.status(403).json({ error: err.message });
     if (err.message === "VIDEO_NOT_VISIBLE")
       return res.status(403).json({ error: "Video is not available" });
     res.status(500).json({ error: err.message });

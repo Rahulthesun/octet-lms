@@ -16,15 +16,35 @@ const router = express.Router();
 const ctrl = require("../controllers/notifications.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const { publicHookLimiter } = require("../middleware/rateLimit");
+const crypto = require("crypto");
+
+const adminOnly = requireRole(["admin"]);
+
+// The webhook is called by Brevo, not a browser, so it authenticates with a
+// shared secret (set BREVO_WEBHOOK_SECRET and configure Brevo to send it as
+// "Authorization: Bearer <secret>" or ?secret=). With no secret configured the
+// endpoint is closed rather than open to anyone.
+function requireWebhookSecret(req, res, next) {
+  const expected = process.env.BREVO_WEBHOOK_SECRET;
+  if (!expected) return res.status(503).json({ error: "Webhook not configured" });
+  const header = req.headers.authorization || "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7) : String(req.query.secret || "");
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Invalid webhook credentials" });
+  }
+  next();
+}
 
 // ─── Public ──────────────────────────────────────────────────────
 
 // GET  /api/notifications/track/:logId/open.gif   — email open-tracking pixel
-router.get("/track/:logId/open.gif", ctrl.trackOpen);
+router.get("/track/:logId/open.gif", publicHookLimiter, ctrl.trackOpen);
 
 // POST /api/notifications/webhook/brevo           — optional Brevo delivery/bounce webhook
-router.post("/webhook/brevo", ctrl.providerWebhook);
+router.post("/webhook/brevo", publicHookLimiter, requireWebhookSecret, ctrl.providerWebhook);
 
 // ─── Self (any authenticated user) ──────────────────────────────
 

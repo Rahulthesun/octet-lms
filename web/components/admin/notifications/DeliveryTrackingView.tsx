@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import { useEmailLog, useEmailLogSummary } from '@/hooks/useNotifications'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -17,6 +18,7 @@ export default function DeliveryTrackingView() {
   const [filter, setFilter] = useState<typeof STATUS_FILTERS[number]>('all')
   const { summary } = useEmailLogSummary()
   const { log, loading, error } = useEmailLog(filter === 'all' ? undefined : filter)
+  const paging = usePagination(log)
 
   return (
     <div>
@@ -54,10 +56,10 @@ export default function DeliveryTrackingView() {
             <span className="text-right">Status</span>
             <span className="text-right">Sent</span>
           </div>
-          <div className="divide-y divide-zinc-100 max-h-[28rem] overflow-y-auto">
+          <div className="divide-y divide-zinc-100">
             {log.length === 0 ? (
               <div className="py-10 text-center text-sm text-zinc-400">No emails yet.</div>
-            ) : log.map((row) => (
+            ) : paging.pageItems.map((row) => (
               <div key={row.id} className="grid grid-cols-[1fr_1fr_90px_120px] px-3 py-2.5 text-sm items-center">
                 <span className="text-zinc-700 truncate">{row.recipientEmail}</span>
                 <span className="text-zinc-600 truncate">{row.subject}</span>
@@ -72,6 +74,10 @@ export default function DeliveryTrackingView() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+            onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="emails"
+          />
         </div>
       )}
     </div>

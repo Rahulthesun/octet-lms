@@ -34,9 +34,15 @@ function duplicateSubjectError(name, grade) {
 
 // ─── Create ───────────────────────────────────────────────────
 
-const createSubject = async ({ name, description, orderIndex, isVisible, grade }) => {
+const VALID_CATEGORIES = ["notes", "qa", "practice"];
+
+const createSubject = async ({ name, description, orderIndex, isVisible, grade, category }) => {
   if (!VALID_GRADES.includes(grade)) {
     throw Object.assign(new Error("grade must be 11 or 12"), { status: 400 });
+  }
+  const cat = category || "notes";
+  if (!VALID_CATEGORIES.includes(cat)) {
+    throw Object.assign(new Error("category must be one of notes, qa, practice"), { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -47,6 +53,7 @@ const createSubject = async ({ name, description, orderIndex, isVisible, grade }
       order_index: orderIndex ?? 0,
       is_visible:  isVisible  ?? true,
       grade,
+      category: cat,
     })
     .select()
     .single();
@@ -60,13 +67,27 @@ const createSubject = async ({ name, description, orderIndex, isVisible, grade }
 
 // ─── Read all ─────────────────────────────────────────────────
 
-const getAllSubjects = async () => {
-  const { data, error } = await supabase
+// `category` ('notes' | 'qa' | 'practice') optionally filters the result.
+// Callers that omit it (e.g. any pre-existing code) get every subject
+// across all categories, same as before this column existed — ONLY the
+// admin Content Manager (notes) page is expected to now pass
+// category=notes explicitly so the new qa/practice subjects never leak
+// into it (see web/hooks/admin/useContentTree.ts).
+const getAllSubjects = async (category) => {
+  let query = supabase
     .from("subjects")
     .select("*")
     .order("grade", { ascending: true })
     .order("order_index", { ascending: true });
 
+  if (category) {
+    if (!VALID_CATEGORIES.includes(category)) {
+      throw Object.assign(new Error("category must be one of notes, qa, practice"), { status: 400 });
+    }
+    query = query.eq("category", category);
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data;
 };
@@ -100,6 +121,12 @@ const updateSubject = async (id, updates) => {
   if (updates.orderIndex  !== undefined) allowed.order_index = updates.orderIndex;
   if (updates.isVisible   !== undefined) allowed.is_visible  = updates.isVisible;
   if (updates.grade       !== undefined) allowed.grade       = updates.grade;
+  if (updates.category    !== undefined) {
+    if (!VALID_CATEGORIES.includes(updates.category)) {
+      throw Object.assign(new Error("category must be one of notes, qa, practice"), { status: 400 });
+    }
+    allowed.category = updates.category;
+  }
   allowed.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase

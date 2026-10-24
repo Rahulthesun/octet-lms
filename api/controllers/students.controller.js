@@ -122,7 +122,14 @@ exports.createStudent = async (req, res) => {
 );
     res.status(201).json(result);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    // Validation problems (400/409) are safe to show; anything else is logged
+    // server-side and answered generically so database errors never leak.
+    const known = error.status === 400 || error.status === 409;
+    if (!known) console.error("createStudent failed:", error.message);
+    res.status(known ? error.status : 500).json({
+      success: false,
+      error: known ? error.message : "Could not submit the application. Please try again.",
+    });
   }
 };
 

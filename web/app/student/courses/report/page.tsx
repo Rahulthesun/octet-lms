@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useMyWatchedVideos, useMyVideoReport } from '@/hooks/useVideoAnalytics'
 import { DropOffChart, EngagementHeatmap, formatDuration } from '@/components/shared/VideoAnalyticsCharts'
+import { Select } from '@/components/ui/Select'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -59,17 +60,17 @@ export default function VideoReportPage() {
         <>
           <div className="mb-6">
             <label className="text-muted text-[13px] block mb-1.5">Lesson</label>
-            <select
+            <Select
               value={selectedVideoId ?? ''}
               onChange={(e) => setSelectedVideoId(e.target.value)}
-              className="w-full sm:w-96 px-4 py-2.5 rounded-md border border-[#e2e5ec] bg-white text-primary text-[15px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full sm:w-96"
             >
               {videos.map((v) => (
                 <option key={v.videoId} value={v.videoId}>
                   {v.subjectTitle ? `${v.subjectTitle} · ` : ''}{v.chapterTitle ? `${v.chapterTitle} · ` : ''}{v.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {reportLoading && <p className="text-muted text-[15px]">Loading report…</p>}

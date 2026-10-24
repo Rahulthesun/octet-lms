@@ -16,9 +16,10 @@ import { authedFetch } from '@/lib/apiClient'
 import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
 import QuestionBankModal from './QuestionBankModal'
-import { Watermark } from '@/components/shared/ExamSecurity'
 import TimeInput12h from '@/components/shared/TimeInput12h'
 import { chapterLabel } from '@/lib/helpers'
+import Select from '@/components/ui/Select'
+import { Watermark } from '@/components/shared/ExamSecurity'
 
 const ACCENT = '#5B21B6'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
@@ -414,28 +415,42 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
               <input id="t-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                 placeholder="Chemistry" className={inputCls} />
             </div>
-            <div>
-              <label className={labelCls} htmlFor="t-type">Type</label>
-              <select id="t-type" value={type} onChange={(e) => setType(e.target.value as TestType)} className={inputCls}>
-                <option value="mcq">MCQ (auto-graded)</option>
-                <option value="descriptive">Descriptive (manually graded)</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="t-chapter">Chapter</label>
-              <select id="t-chapter" value={chapterId} onChange={(e) => setChapterId(e.target.value)} className={inputCls}>
-                <option value="">No chapter</option>
-                {chapters.map((c) => <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="t-batch">Batch</label>
-              <select id="t-batch" value={batchId} onChange={(e) => setBatchId(e.target.value)} className={inputCls}>
-                <option value="">Select a batch</option>
-                <option value="ALL">All Students</option>
-                {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
+            <Select
+              label="Type"
+              id="t-type"
+              value={type}
+              onChange={(e) => setType(e.target.value as TestType)}
+            >
+              <option value="mcq">MCQ (auto-graded)</option>
+              <option value="descriptive">Descriptive (manually graded)</option>
+            </Select>
+            <Select
+              label="Chapter"
+              id="t-chapter"
+              value={chapterId}
+              onChange={(e) => setChapterId(e.target.value)}
+            >
+              <option value="">No chapter</option>
+              {chapters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {chapterLabel(chapters, c)}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Batch"
+              id="t-batch"
+              value={batchId}
+              onChange={(e) => setBatchId(e.target.value)}
+            >
+              <option value="">Select a batch</option>
+              <option value="ALL">All Students</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
           </div>
         </Section>
 

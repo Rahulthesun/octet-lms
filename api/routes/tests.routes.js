@@ -20,7 +20,7 @@ const testsCtrl = require("../controllers/tests.controller");
 const attemptsCtrl = require("../controllers/testAttempts.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 const allowedExtensions = new Set(["pdf", "pptx", "docx", "doc", "png", "jpg", "jpeg"]);
 const upload = multer({

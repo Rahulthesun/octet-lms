@@ -40,6 +40,21 @@ function resetUrl(rawToken) {
 /** Finds an auth user by email. Supabase's admin API has no "get by email", so this pages through, same as scripts/admin-roles.js. */
 async function findAuthUserByEmail(email) {
   const target = email.trim().toLowerCase();
+
+  // Fast path: students carry their auth user id, so one indexed lookup + one
+  // getUserById replaces paging through every account.
+  const { data: student } = await supabase
+    .from("students")
+    .select("auth_user_id")
+    .ilike("email", target)
+    .not("auth_user_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (student?.auth_user_id) {
+    const { data } = await supabase.auth.admin.getUserById(student.auth_user_id);
+    if (data?.user && (data.user.email || "").toLowerCase() === target) return data.user;
+  }
+  // Staff accounts have no students row — fall back to the full scan.
   for (let page = 1; ; page += 1) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
     if (error) throw error;
@@ -58,15 +73,22 @@ async function requestReset(email) {
   if (!email?.trim()) throw badRequest("Email is required");
   const normalizedEmail = email.trim().toLowerCase();
 
-  const user = await findAuthUserByEmail(normalizedEmail);
-  if (!user) {
-    // Same outward result as the success path — no sent email, but also no
-    // "that account doesn't exist" told to an anonymous caller.
-    return { ok: true };
-  }
+  // The lookup, DB write and email all happen AFTER we answer, so a registered
+  // and an unregistered address take exactly the same time to respond — the
+  // response can't be used to discover which emails have accounts.
+  setImmediate(() => {
+    processResetRequest(normalizedEmail).catch((err) => {
+      console.error("[password-reset] request failed:", err.message);
+    });
+  });
+  return { ok: true };
+}
 
-  // Simple per-email rate limit: skip silently rather than erroring, so the
-  // response still looks identical to a fresh request.
+async function processResetRequest(normalizedEmail) {
+  const user = await findAuthUserByEmail(normalizedEmail);
+  if (!user) return;
+
+  // Per-email cooldown: skip silently.
   const { data: recent, error: recentErr } = await supabase
     .from("password_reset_tokens")
     .select("created_at")
@@ -75,9 +97,7 @@ async function requestReset(email) {
     .limit(1)
     .maybeSingle();
   if (recentErr) throw recentErr;
-  if (recent && Date.now() - new Date(recent.created_at).getTime() < RESEND_COOLDOWN_MS) {
-    return { ok: true };
-  }
+  if (recent && Date.now() - new Date(recent.created_at).getTime() < RESEND_COOLDOWN_MS) return;
 
   const rawToken = crypto.randomBytes(32).toString("base64url");
   const { error: insertErr } = await supabase.from("password_reset_tokens").insert({
@@ -89,7 +109,6 @@ async function requestReset(email) {
   if (insertErr) throw insertErr;
 
   await sendPasswordResetEmail(user.email, resetUrl(rawToken));
-  return { ok: true };
 }
 
 /** Looks up a live (unexpired, unused) token row, or throws a 400 the reset page can show directly. */
@@ -127,11 +146,29 @@ async function resetPassword(rawToken, newPassword) {
 
   const row = await getLiveToken(rawToken);
 
+  // Atomically claim the token BEFORE touching the password: the UPDATE only
+  // matches while used_at is still null, so of two simultaneous requests with
+  // the same link exactly one gets a row back and the other is refused.
+  const claimedAt = new Date().toISOString();
+  const { data: claimed, error: claimErr } = await supabase
+    .from("password_reset_tokens")
+    .update({ used_at: claimedAt })
+    .eq("id", row.id)
+    .is("used_at", null)
+    .select("id");
+  if (claimErr) throw claimErr;
+  if (!claimed || claimed.length === 0) {
+    throw badRequest("This reset link is invalid or has expired. Request a new one.");
+  }
+
   const { error: updateErr } = await supabase.auth.admin.updateUserById(row.user_id, { password: newPassword });
-  if (updateErr) throw Object.assign(new Error(updateErr.message || "Could not update the password"), { status: 500 });
+  if (updateErr) {
+    // Release the claim so the user can retry with the same link.
+    await supabase.from("password_reset_tokens").update({ used_at: null }).eq("id", row.id);
+    throw Object.assign(new Error("Could not update the password"), { status: 500 });
+  }
 
   const now = new Date().toISOString();
-  await supabase.from("password_reset_tokens").update({ used_at: now }).eq("id", row.id);
   // Defense in depth: any other still-live token for this account (e.g. two
   // reset emails requested back to back) is burned too, not just this one.
   await supabase

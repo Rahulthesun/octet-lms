@@ -378,17 +378,22 @@ async function listMyEvents(authUserId) {
 
 /** Outstanding prompts for the dashboard banner (one entry per missing document). */
 async function listMyPending(authUserId) {
-  const events = await listMyEvents(authUserId);
-  const pending = [];
-  for (const e of events) {
-    if (e.hallTicket.open && e.hallTicket.status === "pending") {
-      pending.push({ eventId: e.id, examName: e.name, examDate: e.examDate, kind: "HALL_TICKET", link: `/student/exam-documents/${e.id}?kind=hall-ticket` });
+  try {
+    const events = await listMyEvents(authUserId);
+    const pending = [];
+    for (const e of events) {
+      if (e.hallTicket.open && e.hallTicket.status === "pending") {
+        pending.push({ eventId: e.id, examName: e.name, examDate: e.examDate, kind: "HALL_TICKET", link: `/student/exam-documents/${e.id}?kind=hall-ticket` });
+      }
+      if (e.marksheet.open && e.marksheet.status === "pending") {
+        pending.push({ eventId: e.id, examName: e.name, examDate: e.examDate, kind: "MARKSHEET", link: `/student/exam-documents/${e.id}?kind=marksheet` });
+      }
     }
-    if (e.marksheet.open && e.marksheet.status === "pending") {
-      pending.push({ eventId: e.id, examName: e.name, examDate: e.examDate, kind: "MARKSHEET", link: `/student/exam-documents/${e.id}?kind=marksheet` });
-    }
+    return pending;
+  } catch (err) {
+    if (err.status === 403) return [];
+    throw err;
   }
-  return pending;
 }
 
 async function getMyEvent(authUserId, eventId) {

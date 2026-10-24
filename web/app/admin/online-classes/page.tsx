@@ -16,6 +16,9 @@ import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts, chapterLabel } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
+import { SkeletonCard, Skeleton } from '@/components/ui/Skeleton'
+import { Select } from '@/components/ui/Select'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 const ACCENT = '#5B21B6'
 
@@ -177,7 +180,7 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           {loading ? (
-            <p className="text-sm text-zinc-400">Loading settings…</p>
+            <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-2/3" /></div>
           ) : (
             <>
               <div>
@@ -412,7 +415,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-8 py-5 border-b border-zinc-200 flex items-center justify-between shrink-0">
@@ -433,16 +436,15 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Chapter</label>
-              <select
+              <Select
                 value={chapterId}
                 onChange={(e) => setChapterId(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               >
                 <option value="">Select chapter (optional)…</option>
                 {chapters.map((c) => (
                   <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Topic</label>
@@ -487,7 +489,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
               <UsersIcon className="w-4 h-4 text-zinc-400" />
               Students (batch)
             </label>
-            <select
+            <Select
               value={batchId}
               onChange={(e) => {
                 setBatchId(e.target.value)
@@ -495,14 +497,13 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
                 setStudentSearch('')
                 setShowExtraStudents(false)
               }}
-              className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
             >
               <option value="">Select a batch…</option>
               <option value="ALL">All Students</option>
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
-            </select>
+            </Select>
             {isAllStudents && (
               <p className="text-sm text-zinc-500 mt-2">
                 Every active student is invited, including students added later. Choose a single batch instead to limit it.
@@ -553,7 +554,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 
                     <div className="max-h-56 overflow-y-auto divide-y divide-zinc-100">
                       {loadingEligible ? (
-                        <p className="text-xs text-zinc-400 px-4 py-3">Loading students…</p>
+                        <div className="px-4 py-3 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
                       ) : studentDropdownOptions.length === 0 ? (
                         <p className="text-xs text-zinc-400 px-4 py-3">
                           {studentSearch
@@ -753,24 +754,24 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Students (batch)</label>
-                  <select value={batchId} onChange={(e) => setBatchId(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400">
+                  <Select value={batchId} onChange={(e) => setBatchId(e.target.value)}
+                    className="text-sm">
                     <option value="">Select a batch…</option>
                     <option value="ALL">All Students</option>
                     {batches.map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Chapter</label>
-                  <select value={chapterId} onChange={(e) => setChapterId(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400">
+                  <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)}
+                    className="text-sm">
                     <option value="">Select chapter (optional)…</option>
                     {chapters.map((c) => (
                       <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
             </>
@@ -869,6 +870,7 @@ export default function OnlineClassesPage() {
     if (viewFilter === 'today') return sorted.filter((c) => classDayBucket(c) === 'today')
     return sorted.filter((c) => classDayBucket(c) === 'past')
   }, [sorted, viewFilter])
+  const paging = usePagination(filtered)
 
   async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) {
     const { batchId, chapterId, ...rest } = input
@@ -893,19 +895,43 @@ export default function OnlineClassesPage() {
     })
   }
 
-  async function handleSync(classId: string) {
-    setSyncingId(classId)
+  // Auto-sync attendance for classes that have ended and haven't synced yet
+  useEffect(() => {
+    if (!classes || classes.length === 0) return
+    const now = Date.now()
+    const endedNeedingSync = classes.filter(
+      (c) =>
+        c.status !== 'cancelled' &&
+        c.meetUrl &&
+        new Date(c.scheduledEnd).getTime() <= now &&
+        (!c.attendance || c.attendance.syncStatus === 'AWAITING_ATTENDANCE_SYNC' || c.attendance.syncStatus === 'NOT_STARTED')
+    )
+    if (endedNeedingSync.length === 0) return
+
+    endedNeedingSync.forEach((c) => {
+      syncAttendance(c.id).catch((err) => console.warn(`Auto-sync for class ${c.id} failed:`, err))
+    })
+  }, [classes, syncAttendance])
+
+  async function handleOpenAttendance(cls: OnlineClass) {
+    if (cls.attendance?.sessionId) {
+      setAttendanceSessionId(cls.attendance.sessionId)
+    }
+    // Auto-sync attendance in background when opening attendance
     try {
-      await syncAttendance(classId)
+      const res = await syncAttendance(cls.id)
+      if (res?.attendanceSessionId) {
+        setAttendanceSessionId(res.attendanceSessionId)
+      } else if (res?.session?.id) {
+        setAttendanceSessionId(res.session.id)
+      }
     } catch (e) {
-      console.error(e)
-    } finally {
-      setSyncingId(null)
+      console.warn('Auto-sync attendance failed:', e)
     }
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-zinc-200">
         <div>
           <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Online Classes</p>
@@ -959,7 +985,7 @@ export default function OnlineClassesPage() {
 
       <div className="space-y-3">
         {loading ? (
-          <div className="py-12 text-center text-sm text-zinc-400 bg-white border border-zinc-200 rounded-xl">Loading classes…</div>
+          <SkeletonCard count={3} />
         ) : error ? (
           <div className="py-12 text-center text-sm text-red-600 bg-white border border-zinc-200 rounded-xl">{error}</div>
         ) : filtered.length === 0 ? (
@@ -971,7 +997,7 @@ export default function OnlineClassesPage() {
               : 'No online classes scheduled yet.'}
           </div>
         ) : (
-          filtered.map((cls) => (
+          paging.pageItems.map((cls) => (
             <div
               key={cls.id}
               className="bg-white rounded-xl border border-zinc-200 hover:border-violet-200 hover:shadow-sm transition-all p-5"
@@ -1009,16 +1035,10 @@ export default function OnlineClassesPage() {
                   className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
                   View
                 </button>
-                {cls.attendance && (
-                  <button onClick={() => setAttendanceSessionId(cls.attendance!.sessionId)}
-                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
+                {(cls.attendance || new Date(cls.scheduledEnd).getTime() <= Date.now()) && (
+                  <button onClick={() => handleOpenAttendance(cls)}
+                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer">
                     Attendance
-                  </button>
-                )}
-                {cls.status !== 'cancelled' && cls.meetUrl && (
-                  <button onClick={() => handleSync(cls.id)} disabled={syncingId === cls.id}
-                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-40">
-                    {syncingId === cls.id ? 'Syncing…' : cls.attendance?.syncStatus === 'SYNC_FAILED' ? 'Retry Sync' : 'Sync Attendance'}
                   </button>
                 )}
                 {cls.meetUrl && cls.status !== 'cancelled' && (
@@ -1050,6 +1070,16 @@ export default function OnlineClassesPage() {
           ))
         )}
       </div>
+
+      {!loading && !error && (
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <Pagination
+            page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+            onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="classes"
+            className="border-t-0"
+          />
+        </div>
+      )}
 
       <AnimatePresence>
         {showSchedule && (

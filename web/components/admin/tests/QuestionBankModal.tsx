@@ -175,7 +175,7 @@ export default function QuestionBankModal({ onClose, onImport }: {
       onClick={(e) => { e.stopPropagation(); onClose() }}
     >
       <div
-        className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">

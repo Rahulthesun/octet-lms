@@ -9,6 +9,7 @@ import { useStudentName } from '@/hooks/useStudentName'
 import PersonalTasksWidget from '@/components/shared/PersonalTasksWidget'
 import ExamDocumentsBanner from '@/components/student/ExamDocumentsBanner'
 import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 // ─── Backend shape (api/services/dashboard.service.js → getStudentOverview) ──
 
@@ -199,7 +200,19 @@ export default function StudentDashboard() {
       <GoogleLinkBanner />
 
       {loading ? (
-        <div className="py-24 text-center text-muted text-base">Loading dashboard…</div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+          <Skeleton className="h-44 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        </div>
       ) : error ? (
         <div className="py-24 text-center text-base text-rose-600">{error}</div>
       ) : data ? (

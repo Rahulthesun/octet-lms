@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { authedFetch } from '@/lib/apiClient'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 interface ExamEvent {
   id: string
@@ -83,6 +84,7 @@ export default function ExamsPage() {
   const [pendingOnly, setPendingOnly] = useState(false)
   const [tracking, setTracking] = useState<Tracking | null>(null)
   const [trackingLoading, setTrackingLoading] = useState(false)
+  const trackingPaging = usePagination(tracking?.rows ?? [])
   const [busyAction, setBusyAction] = useState<string | null>(null)
 
   const loadEvents = useCallback(async () => {
@@ -188,7 +190,7 @@ export default function ExamsPage() {
     ev.audience === 'ALL' ? 'All Students' : ev.batchIds.map((b) => batchName[b] ?? b).join(', ')
 
   return (
-    <div className="p-8">
+    <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Exam Documents</h1>
         <p className="text-base text-gray-600 mt-1">
@@ -381,7 +383,7 @@ export default function ExamsPage() {
                 {pendingOnly ? 'Nobody is pending. Every student has submitted.' : 'No students for this exam.'}
               </div>
             ) : (
-              tracking.rows.map((r) => {
+              trackingPaging.pageItems.map((r) => {
                 const sub = tab === 'hall-ticket' ? r.hallTicket : r.marksheet
                 return (
                   <div
@@ -435,6 +437,10 @@ export default function ExamsPage() {
               })
             )}
           </div>
+          <Pagination
+            page={trackingPaging.page} pageCount={trackingPaging.pageCount} pageSize={trackingPaging.pageSize} total={trackingPaging.total}
+            onPageChange={trackingPaging.setPage} onPageSizeChange={trackingPaging.setPageSize} label="students"
+          />
         </div>
       )}
     </div>

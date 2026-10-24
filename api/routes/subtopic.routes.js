@@ -15,7 +15,7 @@ const router  = express.Router();
 const subtopicController = require("../controllers/subtopic.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // POST  /api/subtopics                  → create a subtopic (admin only)
 //   body should include { chapterId, name, ... }

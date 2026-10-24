@@ -279,23 +279,23 @@ export default function StudentDetailPage() {
   }
 
   if (loading) {
-    return <div className="p-8 text-base text-gray-600">Loading student…</div>
+    return <div className="text-base text-gray-600">Loading student…</div>
   }
 
   if (error && !student) {
     return (
-      <div className="p-8">
+      <div>
         <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-base rounded-lg">{error}</div>
       </div>
     )
   }
 
   if (!student) {
-    return <div className="p-8 text-base text-gray-600">Student not found.</div>
+    return <div className="text-base text-gray-600">Student not found.</div>
   }
 
   return (
-    <div className="p-8">
+    <div>
       {/* Back */}
       <Link href="/admin/students"
         className="inline-flex items-center gap-2 text-base text-gray-500 hover:text-primary transition-colors mb-6">
@@ -331,17 +331,17 @@ export default function StudentDetailPage() {
             </p>
           </div>
 
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
             <button
               onClick={toggleBlock}
               disabled={saving}
-              className="px-5 py-2.5 text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-5 py-2.5 text-base border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               {student.blocked ? 'Unblock Student' : 'Block Student'}
             </button>
             <button
               onClick={() => setEditing(!editing)}
-              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-primary text-base hover:bg-gray-50 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-200 text-primary text-base hover:bg-gray-50 transition-colors"
             >
               <IconPencil className="w-4 h-4" />
               Edit Contact Details

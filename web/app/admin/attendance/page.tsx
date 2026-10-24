@@ -4,6 +4,9 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase/client'
+import { Select } from '@/components/ui/Select'
+import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import {
   useBatches,
   useBatchStudents,
@@ -183,7 +186,7 @@ function AddStudentsModal({ grade, batchId, onAdded, onClose }: {
         </div>
 
         {loading ? (
-          <div className="px-6 py-12 text-center text-sm text-zinc-400">Loading…</div>
+          <div className="px-6 py-4 space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
         ) : loadError ? (
           <div className="px-6 py-12 text-center text-sm text-red-600">{loadError}</div>
         ) : eligible.length === 0 ? (
@@ -263,7 +266,7 @@ function StudentGraphModal({ student, onClose }: { student: Student; onClose: ()
         <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400 mb-4">Last 5 sessions</p>
 
         {loading ? (
-          <div className="h-[108px] flex items-center justify-center text-sm text-zinc-400">Loading…</div>
+          <Skeleton className="h-[108px] w-full rounded-lg" />
         ) : error ? (
           <div className="h-[108px] flex items-center justify-center text-sm text-red-600">{error}</div>
         ) : points.length === 0 ? (
@@ -306,6 +309,9 @@ export default function AttendancePage() {
     : (batches.find(b => b.id === selectedBatchId) ?? null)
 
   const { students, refetch: refetchStudents } = useBatchStudents(selectedBatchId, date)
+  const markPaging = usePagination(students)
+  const summaryStudents = useMemo(() => students.filter((s) => s.attendancePct !== null), [students])
+  const summaryPaging = usePagination(summaryStudents)
   const { summary } = useBatchSummary(selectedBatchId)
 
   const hasContext = !!(selectedGrade && selectedBatchId)
@@ -383,7 +389,7 @@ export default function AttendancePage() {
   })
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
+    <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-zinc-200">
@@ -664,16 +670,16 @@ export default function AttendancePage() {
                       Demo — simulate scan
                     </p>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <select
+                      <Select
                         value={selectedStudentIdForScan}
                         onChange={e => setSelectedStudentIdForScan(e.target.value)}
-                        className="flex-1 text-sm rounded-md px-3 py-2 outline-none border border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                        className="flex-1 text-sm"
                       >
                         <option value="">Select student…</option>
                         {students.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
-                      </select>
+                      </Select>
                       <button
                         onClick={handleSimulateScan}
                         disabled={!selectedStudentIdForScan}
@@ -715,8 +721,8 @@ export default function AttendancePage() {
                   />
                 </div>
 
-                <div className="divide-y divide-zinc-100 overflow-y-auto flex-1" style={{ maxHeight: 400 }}>
-                  {students.map(s => {
+                <div className="divide-y divide-zinc-100 flex-1">
+                  {markPaging.pageItems.map(s => {
                     const present = isPresent(s.id)
                     return (
                       <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
@@ -736,6 +742,10 @@ export default function AttendancePage() {
                     )
                   })}
                 </div>
+                <Pagination
+                  page={markPaging.page} pageCount={markPaging.pageCount} pageSize={markPaging.pageSize} total={markPaging.total}
+                  onPageChange={markPaging.setPage} onPageSizeChange={markPaging.setPageSize} label="students"
+                />
               </div>
             </motion.div>
           )}
@@ -778,9 +788,8 @@ export default function AttendancePage() {
                 </div>
 
                 <div className="divide-y divide-zinc-100">
-                  {students.map(s => {
-                    if (s.attendancePct === null) return null
-                    const pct = s.attendancePct
+                  {summaryPaging.pageItems.map(s => {
+                    const pct = s.attendancePct as number
                     const st = s.unblocked ? STATUS.active : statusOf(pct)
                     const isBlocked = !s.unblocked && pct < 75
 
@@ -836,6 +845,10 @@ export default function AttendancePage() {
                     )
                   })}
                 </div>
+                <Pagination
+                  page={summaryPaging.page} pageCount={summaryPaging.pageCount} pageSize={summaryPaging.pageSize} total={summaryPaging.total}
+                  onPageChange={summaryPaging.setPage} onPageSizeChange={summaryPaging.setPageSize} label="students"
+                />
               </div>
             </motion.div>
           )}

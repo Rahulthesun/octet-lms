@@ -25,7 +25,7 @@ const router = express.Router();
 const pdfController = require("../controllers/pdf.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 const allowedContentTypes = new Set([
   "application/pdf",

@@ -13,6 +13,8 @@ import { authedFetch } from '@/lib/apiClient'
 import { imageFromClipboard, imageFromFiles, uploadQuestionImage } from '@/lib/questionImages'
 import QuestionContent from '@/components/shared/QuestionContent'
 import { Watermark, useExamGuard } from '@/components/shared/ExamSecurity'
+import { SkeletonList } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import type { ContentType, OptionKey, QuestionContentFields } from '@/hooks/useTests'
 
 const ACCENT = '#5B21B6'
@@ -76,6 +78,8 @@ interface FieldValue {
 }
 
 interface DraftQuestion {
+  /** Stable identity for this draft — array indexes shift when a draft is removed, so async save results are matched by this instead. */
+  uid: string
   question: FieldValue
   optionA: FieldValue
   optionB: FieldValue
@@ -83,8 +87,10 @@ interface DraftQuestion {
   optionD: FieldValue
   correctOption: OptionKey
   marks: number
-  /** Set once this question has been autosaved to the bank — further edits PATCH it instead of creating a duplicate. */
+  /** Set once this question has its OWN bank row — further edits PATCH it instead of creating a duplicate. Never set to another draft's/pre-existing row. */
   savedId?: string
+  /** Signature of the payload last persisted (or found already in the bank) — identical content is never re-sent. */
+  savedSig?: string
   /** True when the last save attempt found this exact question already existed in the bank (byte-identical content) and skipped it. */
   isDuplicate?: boolean
 }
@@ -93,8 +99,15 @@ function emptyField(): FieldValue {
   return { type: 'text', text: '', imageKey: null, previewUrl: null, imageContentHash: null, imagePerceptualHash: null }
 }
 
+let draftCounter = 0
+function newUid() {
+  draftCounter += 1
+  return `d${Date.now().toString(36)}-${draftCounter}`
+}
+
 function emptyDraft(): DraftQuestion {
   return {
+    uid: newUid(),
     question: emptyField(),
     optionA: emptyField(),
     optionB: emptyField(),
@@ -162,6 +175,7 @@ function bankQuestionToDraft(q: BankQuestion): DraftQuestion {
     }
   }
   return {
+    uid: newUid(),
     question: field(q.questionType, q.questionText, q.questionImageUrl, q.questionImageKey, q.questionImageContentHash, q.questionImagePerceptualHash),
     optionA: field(q.optionAType, q.optionA, q.optionAImageUrl, q.optionAImageKey, q.optionAImageContentHash, q.optionAImagePerceptualHash),
     optionB: field(q.optionBType, q.optionB, q.optionBImageUrl, q.optionBImageKey, q.optionBImageContentHash, q.optionBImagePerceptualHash),
@@ -188,7 +202,9 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   optionD: 'Option D',
 }
 
-function FieldEditor({ label, value, onChange }: { label: string; value: FieldValue; onChange: (v: FieldValue) => void }) {
+// onChange takes an updater (not a value) so an image upload that finishes
+// after other edits builds on the LATEST field/draft, never a stale snapshot.
+function FieldEditor({ label, value, onChange }: { label: string; value: FieldValue; onChange: (update: (prev: FieldValue) => FieldValue) => void }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -222,7 +238,7 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
     setError(null)
     try {
       const uploaded = await uploadQuestionImage(file)
-      onChange({ ...value, imageKey: uploaded.key, previewUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash })
+      onChange((prev) => ({ ...prev, imageKey: uploaded.key, previewUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image upload failed')
     } finally {
@@ -238,12 +254,12 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
         <label className="text-sm font-medium text-zinc-700">{label}</label>
         <div className="flex gap-1 text-xs">
           <button type="button"
-            onClick={() => onChange({ ...value, type: 'text' })}
+            onClick={() => onChange((prev) => ({ ...prev, type: 'text' }))}
             className={`px-2 py-1 rounded-md border ${value.type === 'text' ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-zinc-200 text-zinc-500'}`}>
             Text
           </button>
           <button type="button"
-            onClick={() => onChange({ ...value, type: 'image' })}
+            onClick={() => onChange((prev) => ({ ...prev, type: 'image' }))}
             className={`px-2 py-1 rounded-md border ${value.type === 'image' ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-zinc-200 text-zinc-500'}`}>
             Image
           </button>
@@ -252,7 +268,7 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
       {value.type === 'text' ? (
         <textarea
           value={value.text}
-          onChange={(e) => onChange({ ...value, text: e.target.value })}
+          onChange={(e) => { const text = e.target.value; onChange((prev) => ({ ...prev, text })) }}
           rows={2}
           className="w-full text-sm rounded-lg px-3 py-2 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
           placeholder={`${label} text`}
@@ -299,12 +315,12 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
 function QuestionForm({ draft, index, onChange, onRemove, removable }: {
   draft: DraftQuestion
   index: number
-  onChange: (d: DraftQuestion) => void
+  onChange: (update: (prev: DraftQuestion) => DraftQuestion) => void
   onRemove: () => void
   removable: boolean
 }) {
-  function setField(key: FieldKey, v: FieldValue) {
-    onChange({ ...draft, [key]: v })
+  function setField(key: FieldKey, update: (prev: FieldValue) => FieldValue) {
+    onChange((prev) => ({ ...prev, [key]: update(prev[key]) }))
   }
   return (
     <div className="border border-zinc-200 rounded-xl p-4 space-y-3">
@@ -326,7 +342,7 @@ function QuestionForm({ draft, index, onChange, onRemove, removable }: {
           {(['a', 'b', 'c', 'd'] as const).map((k) => (
             <label key={k} className="flex items-center gap-1 text-sm text-zinc-600 cursor-pointer">
               <input type="radio" name={`correct-${index}`} checked={draft.correctOption === k}
-                onChange={() => onChange({ ...draft, correctOption: k })} className="accent-violet-600" />
+                onChange={() => onChange((prev) => ({ ...prev, correctOption: k }))} className="accent-violet-600" />
               {k.toUpperCase()}
             </label>
           ))}
@@ -334,7 +350,7 @@ function QuestionForm({ draft, index, onChange, onRemove, removable }: {
         <div className="flex items-center gap-2">
           <span className="text-sm text-zinc-700">Marks</span>
           <input type="number" min={1} value={draft.marks}
-            onChange={(e) => onChange({ ...draft, marks: Number(e.target.value) || 1 })}
+            onChange={(e) => { const marks = Number(e.target.value) || 1; onChange((prev) => ({ ...prev, marks })) }}
             className="w-20 text-sm rounded-lg px-2 py-1.5 border border-zinc-300" />
         </div>
       </div>
@@ -362,13 +378,21 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
   const [drafts, setDrafts] = useState<DraftQuestion[]>([emptyDraft()])
   const [error, setError] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const savingRef = useRef(false)
+  const draftsRef = useRef<DraftQuestion[]>(drafts)
+  draftsRef.current = drafts
+  const labelRef = useRef(label)
+  labelRef.current = label
+  // All saves run strictly one after another through this chain, so a draft can
+  // never be POSTed twice (e.g. autosave still in flight when Done is clicked).
+  const saveChain = useRef<Promise<void>>(Promise.resolve())
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function updateDraft(i: number, d: DraftQuestion) {
+  function updateDraft(uid: string, update: (prev: DraftQuestion) => DraftQuestion) {
     // Editing an already-saved question clears its savedId's "up to date"
     // state implicitly — the next autosave tick will PATCH it with the new content.
-    setDrafts((prev) => prev.map((p, idx) => (idx === i ? d : p)))
+    // Keyed by uid + functional so a late image upload never overwrites newer edits
+    // (or the savedId an in-flight save just attached) with a stale snapshot.
+    setDrafts((prev) => prev.map((p) => (p.uid === uid ? update(p) : p)))
   }
 
   function addAnother() {
@@ -381,47 +405,61 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
     setDrafts((prev) => prev.filter((_, idx) => idx !== i))
   }
 
-  // ─── Per-question autosave ───
-  useEffect(() => {
-    const trimmedLabel = label.trim()
-    if (!trimmedLabel) return
-
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-    autosaveTimer.current = setTimeout(async () => {
-      if (savingRef.current) return
-      const toSave = drafts
-        .map((d, i) => ({ d, i }))
-        .filter(({ d }) => validateDraft(d) === null)
-      if (toSave.length === 0) return
-
-      savingRef.current = true
-      setSaveState('saving')
-      try {
-        for (const { d, i } of toSave) {
-          if (!d.savedId) {
-            const result: { ids?: string[]; added?: number } = await authedFetch('/api/question-bank/manual', {
-              method: 'POST',
-              body: JSON.stringify({ label: trimmedLabel, questions: [draftToPayload(d)], sourceTestId: sourceTestId || undefined }),
-            })
-            const newId = result.ids?.[0]
-            const duplicate = (result.added ?? 0) === 0
-            setDrafts((prev) => prev.map((p, idx) => (idx === i ? { ...p, savedId: newId ?? p.savedId, isDuplicate: duplicate } : p)))
+  // ─── Save engine ───
+  // Persists every complete draft whose content differs from what was last
+  // saved. Reads the LATEST drafts at the moment it actually runs (never a
+  // stale snapshot) and is serialized, so each draft produces exactly one bank
+  // row: first save POSTs, every later change PATCHes that same row.
+  function saveAll(): Promise<void> {
+    const run = async () => {
+      const trimmedLabel = labelRef.current.trim()
+      if (!trimmedLabel) return
+      const uids = draftsRef.current.filter((d) => validateDraft(d) === null).map((d) => d.uid)
+      for (const uid of uids) {
+        const d = draftsRef.current.find((x) => x.uid === uid)
+        if (!d || validateDraft(d) !== null) continue
+        const payload = draftToPayload(d)
+        const sig = JSON.stringify(payload)
+        if (d.savedSig === sig) continue
+        let patch: Partial<DraftQuestion>
+        if (d.savedId) {
+          await authedFetch(`/api/question-bank/${d.savedId}`, { method: 'PATCH', body: JSON.stringify(payload) })
+          patch = { savedSig: sig, isDuplicate: false }
+        } else {
+          const result: { ids?: string[]; added?: number } = await authedFetch('/api/question-bank/manual', {
+            method: 'POST',
+            body: JSON.stringify({ label: trimmedLabel, questions: [payload], sourceTestId: sourceTestId || undefined }),
+          })
+          if ((result.added ?? 0) === 0) {
+            // Identical question already exists in the bank: that row belongs to
+            // someone else, so don't adopt it (a later edit would PATCH it).
+            patch = { savedSig: sig, isDuplicate: true, savedId: undefined }
           } else {
-            await authedFetch(`/api/question-bank/${d.savedId}`, {
-              method: 'PATCH',
-              body: JSON.stringify(draftToPayload(d)),
-            })
+            patch = { savedSig: sig, isDuplicate: false, savedId: result.ids?.[0] }
           }
         }
+        setDrafts((prev) => prev.map((p) => (p.uid === uid ? { ...p, ...patch } : p)))
+        draftsRef.current = draftsRef.current.map((p) => (p.uid === uid ? { ...p, ...patch } : p))
+      }
+    }
+    const next = saveChain.current.then(run)
+    saveChain.current = next.catch(() => {})
+    return next
+  }
+
+  useEffect(() => {
+    if (!label.trim()) return
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        await saveAll()
         setSaveState('saved')
         onSaved()
       } catch {
         setSaveState('error')
-      } finally {
-        savingRef.current = false
       }
     }, 1200)
-
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label, drafts])
@@ -448,22 +486,9 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
     // confirms and closes. Flush any not-yet-saved/edited question first.
     setError(null)
     setSaveState('saving')
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     try {
-      for (let i = 0; i < drafts.length; i++) {
-        const d = drafts[i]
-        if (!d.savedId) {
-          const result: { ids?: string[] } = await authedFetch('/api/question-bank/manual', {
-            method: 'POST',
-            body: JSON.stringify({ label: label.trim(), questions: [draftToPayload(d)], sourceTestId: sourceTestId || undefined }),
-          })
-          void result
-        } else {
-          await authedFetch(`/api/question-bank/${d.savedId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(draftToPayload(d)),
-          })
-        }
-      }
+      await saveAll()
       onSaved()
       onClose()
     } catch (e) {
@@ -475,7 +500,7 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => { e.stopPropagation(); onClose() }}>
-      <div className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+      <div className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
@@ -512,8 +537,8 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
 
           <div className="space-y-4">
             {drafts.map((d, i) => (
-              <div key={i} className="relative">
-                {d.savedId && d.isDuplicate && (
+              <div key={d.uid} className="relative">
+                {d.isDuplicate && (
                   <span className="absolute -top-2 right-3 z-10 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                     Already in the bank — not added again
                   </span>
@@ -524,7 +549,7 @@ function AddQuestionsModal({ initialLabel, sourceTestId, onClose, onSaved }: {
                   </span>
                 )}
                 <QuestionForm draft={d} index={i}
-                  onChange={(nd) => updateDraft(i, nd)}
+                  onChange={(fn) => updateDraft(d.uid, fn)}
                   onRemove={() => removeDraft(i)}
                   removable={drafts.length > 1}
                 />
@@ -652,7 +677,7 @@ function EditQuestionModal({ question, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => { e.stopPropagation(); onClose() }}>
-      <div className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+      <div className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
@@ -707,6 +732,7 @@ export default function QuestionBankPage() {
   const [questions, setQuestions] = useState<BankQuestion[]>([])
   const [loadingQuestions, setLoadingQuestions] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<BankQuestion | null>(null)
+  const groupPaging = usePagination(groups)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 250)
@@ -795,7 +821,7 @@ export default function QuestionBankPage() {
   }
 
   return (
-    <div className={`p-8 max-w-6xl mx-auto transition-[filter] duration-150 ${blurred ? 'blur-xl select-none' : ''}`}>
+    <div className={`transition-[filter] duration-150 ${blurred ? 'blur-xl select-none' : ''}`}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Question Bank</h1>
@@ -805,7 +831,7 @@ export default function QuestionBankPage() {
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-[15px] transition-colors w-fit"
           style={{ backgroundColor: ACCENT }}>
           <span className="text-lg leading-none">+</span>
-          Add Questions
+          Add Question Bank
         </button>
       </div>
 
@@ -822,14 +848,14 @@ export default function QuestionBankPage() {
       {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 mb-4">{error}</div>}
 
       {loading ? (
-        <p className="text-sm text-zinc-500 py-8 text-center">Loading...</p>
+        <SkeletonList count={5} />
       ) : groups.length === 0 ? (
         <p className="text-sm text-zinc-500 py-12 text-center bg-white border border-zinc-200 rounded-xl">
           {debounced ? 'No groups match your search.' : 'The question bank is empty. Questions are saved automatically when you schedule an MCQ test, or add them directly here.'}
         </p>
       ) : (
         <div className="bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100">
-          {groups.map((g) => {
+          {groupPaging.pageItems.map((g) => {
             const key = groupKey(g)
             const isOpen = openKey === key
             return (
@@ -929,6 +955,10 @@ export default function QuestionBankPage() {
               </div>
             )
           })}
+          <Pagination
+            page={groupPaging.page} pageCount={groupPaging.pageCount} pageSize={groupPaging.pageSize} total={groupPaging.total}
+            onPageChange={groupPaging.setPage} onPageSizeChange={groupPaging.setPageSize} label="groups"
+          />
         </div>
       )}
 

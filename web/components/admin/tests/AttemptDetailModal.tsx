@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { fetchAdminAttemptDetail, gradeDescriptiveAttempt, type AdminAttemptDetail, type TestSummary } from '@/hooks/useTests'
 import { CheckCircleIcon, XIcon } from './icons'
 import QuestionContent from '@/components/shared/QuestionContent'
+import { Watermark } from '@/components/shared/ExamSecurity'
 
 const ACCENT = '#5B21B6'
 
@@ -54,7 +55,7 @@ export default function AttemptDetailModal({ test, attemptId, onClose, onGraded 
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
-        className="bg-white w-full sm:max-w-2xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-2xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         <div className="px-8 py-5 border-b border-zinc-200 flex items-center justify-between shrink-0">
           <div>
@@ -88,7 +89,8 @@ export default function AttemptDetailModal({ test, attemptId, onClose, onGraded 
               {test.type === 'mcq' && detail.questions && (
                 <div className="space-y-3">
                   {detail.questions.map((q, i) => (
-                    <div key={q.id} className="rounded-lg border border-zinc-200 p-4">
+                    <div key={q.id} className="relative overflow-hidden rounded-lg border border-zinc-200 p-4">
+                      <Watermark lines={['OCTET']} />
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="text-[15px] text-zinc-900 min-w-0">
                           <span className="text-zinc-400 mr-1">Q{i + 1}.</span>

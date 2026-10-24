@@ -88,7 +88,11 @@ async function finalizeMcqAttempt(attempt, test, { autoSubmitted = false } = {})
   const marksAwarded = (answers || []).reduce((sum, a) => sum + Number(a.marks_awarded || 0), 0);
   const now = new Date().toISOString();
 
-  const { data: updated, error } = await supabase
+  // Compare-and-set: only the caller that flips in_progress -> evaluated gets
+  // a row back. A concurrent run (lazy read-path finalize + scheduler + the
+  // student's own submit) matches nothing, so grading and the result email
+  // happen exactly once.
+  const { data: updatedRows, error } = await supabase
     .from("test_attempts")
     .update({
       status: "evaluated",
@@ -99,9 +103,14 @@ async function finalizeMcqAttempt(attempt, test, { autoSubmitted = false } = {})
       evaluated_at: now,
     })
     .eq("id", attempt.id)
-    .select()
-    .single();
+    .eq("status", "in_progress")
+    .select();
   if (error) throw error;
+  if (!updatedRows || updatedRows.length === 0) {
+    const { data: current } = await supabase.from("test_attempts").select("*").eq("id", attempt.id).maybeSingle();
+    return current || attempt;
+  }
+  const updated = updatedRows[0];
 
   const testResultReport = require("./testResultReport.service");
   testResultReport.sendResultReport(attempt.id).catch((err) => {
@@ -225,9 +234,7 @@ async function startAttempt(testId, authUserId) {
     .maybeSingle();
   if (exErr) throw exErr;
 
-  if (existing) {
-    if (existing.status !== "not_started") return existing; // resume — same shuffle re-served
-  }
+  if (existing && existing.status !== "not_started") return existing; // resume — same shuffle re-served
 
   let questionOrder = null;
   if (test.type === "mcq") {
@@ -246,13 +253,40 @@ async function startAttempt(testId, authUserId) {
     max_marks: test.max_marks,
   };
 
-  const { data: attempt, error: upsertErr } = await supabase
+  // Create-or-resume without ever overwriting a running attempt: a double
+  // click / second tab that races this insert hits the unique (test, student)
+  // constraint and is handed the attempt that won, with its original shuffle
+  // and start time intact.
+  if (!existing) {
+    const { data: created, error: insertErr } = await supabase
+      .from("test_attempts")
+      .insert(payload)
+      .select()
+      .single();
+    if (!insertErr) return created;
+    if (insertErr.code !== "23505") throw insertErr;
+    const { data: winner, error: winnerErr } = await supabase
+      .from("test_attempts")
+      .select("*")
+      .eq("test_id", testId)
+      .eq("student_id", student.id)
+      .single();
+    if (winnerErr) throw winnerErr;
+    return winner;
+  }
+
+  // A pre-created "not_started" row: start it only if it is still not started.
+  const { data: started, error: startErr } = await supabase
     .from("test_attempts")
-    .upsert(payload, { onConflict: "test_id,student_id" })
-    .select()
-    .single();
-  if (upsertErr) throw upsertErr;
-  return attempt;
+    .update(payload)
+    .eq("id", existing.id)
+    .eq("status", "not_started")
+    .select();
+  if (startErr) throw startErr;
+  if (started && started.length > 0) return started[0];
+  const { data: current, error: curErr } = await supabase.from("test_attempts").select("*").eq("id", existing.id).single();
+  if (curErr) throw curErr;
+  return current;
 }
 
 // ─── Student: read my attempt (questions in shuffled order, no answers) ───

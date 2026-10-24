@@ -102,24 +102,39 @@ export function useExamGuard(active: boolean) {
 
 /**
  * Translucent tiled watermark over its parent (which must be `position:
- * relative` or similar). Generic/reusable: used during the live exam, and
- * also over admin question-bank/question-paper views.
+ * relative` or similar). Exact match to the PDF Notes watermark:
+ * "Chemistry@OCTET" in `#4B2D8F` tilted at -30 degrees with viewer trace token.
  */
-export function Watermark({ lines }: { lines: string[] }) {
-  // Per-viewer trace token, the same one baked into the content-PDF
-  // watermark (useWatermarkToken() / PDFViewer.tsx drawWatermark()) — so a
-  // leaked screenshot of a question screen can be traced back to whoever
-  // viewed it, exactly like a leaked PDF page can.
+export function Watermark({ lines }: { lines?: string[] }) {
   const viewerToken = useWatermarkToken()
-  const allLines = viewerToken ? [...lines, viewerToken] : lines
-  const cells = Array.from({ length: 24 })
+  const brandText = 'Chemistry@OCTET'
+  
+  // Format matching PDF notes: Chemistry@OCTET · <token>
+  const tokenPart = viewerToken ? ` · ${viewerToken}` : ''
+  const extraLines = (lines || []).filter((l) => l && l !== 'OCTET' && l !== 'Chemistry@OCTET')
+  
+  // Grid of repeating watermark instances. Density/rotation/weight here are
+  // chosen to match drawWatermark() in PDFViewer.tsx as closely as CSS
+  // allows: same brand color (#4B2D8F), same -30deg rotation, same ~0.4
+  // opacity, same bold Inter brand text with a visibly smaller token
+  // alongside it (~55% of the brand font size there, approximated here) —
+  // and the same 5-ish visible tilted rows rather than a dense CSS grid.
+  const cells = Array.from({ length: 35 })
   return (
     <div aria-hidden className="pointer-events-none select-none absolute inset-0 overflow-hidden z-20">
-      <div className="absolute -inset-[25%] grid grid-cols-4 grid-rows-6 place-items-center rotate-[-28deg] opacity-[0.38]">
+      <div className="absolute -inset-[35%] grid grid-cols-5 grid-rows-5 place-items-center rotate-[-30deg] opacity-40">
         {cells.map((_, i) => (
-          <div key={i} className="text-center leading-tight text-black whitespace-nowrap font-bold">
-            {allLines.map((line, j) => (
-              <div key={j} className="text-[13px]">{line}</div>
+          <div
+            key={i}
+            className="text-center leading-tight whitespace-nowrap select-none font-bold tracking-tight"
+            style={{ color: '#4B2D8F', fontFamily: '"Inter","Segoe UI",Arial,sans-serif' }}
+          >
+            <span className="text-base font-bold">
+              {brandText}
+              {tokenPart && <span className="text-[9px] font-bold opacity-90">{tokenPart}</span>}
+            </span>
+            {extraLines.map((line, j) => (
+              <div key={j} className="text-[10px] font-medium opacity-80">{line}</div>
             ))}
           </div>
         ))}
@@ -127,3 +142,4 @@ export function Watermark({ lines }: { lines: string[] }) {
     </div>
   )
 }
+

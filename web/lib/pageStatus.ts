@@ -5,6 +5,7 @@ export type PageStatus = 'production' | 'testing'
 export const PAGE_STATUS: Record<string, PageStatus> = {
   '/admin': 'production',
   '/admin/content': 'production',
+  '/admin/qa-content': 'production',
   '/admin/students': 'production',
   '/admin/attendance': 'production',
   '/admin/tests': 'production',
@@ -16,6 +17,7 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
 
   '/student': 'production',
   '/student/notes': 'production',
+  '/student/practice': 'production',
   '/student/feedback': 'production',
   '/student/courses': 'production',
   '/student/attendance': 'production',

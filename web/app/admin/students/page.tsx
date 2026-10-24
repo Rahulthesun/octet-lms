@@ -9,6 +9,9 @@ import AttendanceReportsTab from '@/components/admin/AttendanceReportsTab'
 import TestReportsTab from '@/components/admin/TestReportsTab'
 import VideoReportsTab from '@/components/admin/VideoReportsTab'
 import { authedFetch } from '@/lib/apiClient'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import Select from '@/components/ui/Select'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -270,10 +273,15 @@ export default function StudentsPage() {
     [students, search, gradeFilter, statusFilter]
   )
 
+  const studentPaging = usePagination(filteredStudents)
+  const rejectedPaging = usePagination(rejectedStudents)
+  const resetStudentPage = studentPaging.setPage
+  useEffect(() => { resetStudentPage(1) }, [search, gradeFilter, statusFilter, resetStudentPage])
+
   const activeFilterCount = (gradeFilter !== 'All' ? 1 : 0) + (statusFilter !== 'All' ? 1 : 0)
 
   return (
-    <div className="p-8">
+    <div>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Students</h1>
@@ -349,7 +357,7 @@ export default function StudentsPage() {
         {activeTab === 'applications' && (
           <motion.div key="applications" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }}>
             {loadingApplications ? (
-              <div className="text-center py-16 text-gray-600 text-base">Loading applications…</div>
+              <SkeletonCard count={3} />
             ) : applications.length === 0 ? (
               <div className="text-center py-16 text-gray-600 text-base">No pending applications.</div>
             ) : (
@@ -470,17 +478,17 @@ export default function StudentsPage() {
                   Access ends on this date and students move to Alumni. Clear a single student&apos;s date in the table to undo it.
                 </p>
               </div>
-              <select
+              <Select
                 value={bulkBatch}
                 onChange={(e) => setBulkBatch(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-base text-gray-700 bg-white outline-none focus:border-primary"
+                wrapperClassName="min-w-[180px]"
                 aria-label="Batch"
               >
                 <option value="">Select batch</option>
                 {batches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
-              </select>
+              </Select>
               <input
                 type="date"
                 value={bulkDate}
@@ -520,14 +528,14 @@ export default function StudentsPage() {
               </div>
               <div className="divide-y divide-gray-100">
                 {loadingStudents ? (
-                  <div className="py-12 text-center text-gray-600 text-base">Loading students…</div>
+                  <div className="p-4"><SkeletonTable rows={6} columns={7} /></div>
                 ) : filteredStudents.length === 0 ? (
                   <div className="py-12 text-center text-gray-600 text-base">No students match your filters.</div>
                 ) : (
-                  filteredStudents.map((s, i) => (
+                  studentPaging.pageItems.map((s, i) => (
                     <div key={s.id}
                       className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_140px_70px_130px_90px_150px_100px_60px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center">
-                      <span className="text-base text-gray-400 font-inter w-10">{i + 1}</span>
+                      <span className="text-base text-gray-400 font-inter w-10">{(studentPaging.page - 1) * studentPaging.pageSize + i + 1}</span>
                       <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none">
                         <div className="w-8 h-8 bg-gray-100 flex items-center justify-center text-primary text-base shrink-0">
                           {initials(s.name)}
@@ -598,11 +606,17 @@ export default function StudentsPage() {
                   ))
                 )}
               </div>
+              <Pagination
+                page={studentPaging.page} pageCount={studentPaging.pageCount} pageSize={studentPaging.pageSize} total={studentPaging.total}
+                onPageChange={studentPaging.setPage} onPageSizeChange={studentPaging.setPageSize} label="students"
+              />
             </div>
 
-            <p className="text-sm text-gray-400 mt-4 text-center">
-              Showing {filteredStudents.length} of {students.length} students
-            </p>
+            {filteredStudents.length !== students.length && (
+              <p className="text-sm text-gray-400 mt-4 text-center">
+                Filtered from {students.length} students in total
+              </p>
+            )}
           </motion.div>
         )}
 
@@ -637,14 +651,14 @@ export default function StudentsPage() {
 
         ) : (
 
-          rejectedStudents.map((s, i) => (
+          rejectedPaging.pageItems.map((s, i) => (
 
             <div
               key={s.id}
               className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_100px_60px] gap-3 px-5 py-4 items-center hover:bg-gray-50"
             >
 
-              <span>{i + 1}</span>
+              <span>{(rejectedPaging.page - 1) * rejectedPaging.pageSize + i + 1}</span>
 
               <div>
                 <p className="text-primary">{s.name}</p>
@@ -679,6 +693,10 @@ export default function StudentsPage() {
 
       </div>
 
+      <Pagination
+        page={rejectedPaging.page} pageCount={rejectedPaging.pageCount} pageSize={rejectedPaging.pageSize} total={rejectedPaging.total}
+        onPageChange={rejectedPaging.setPage} onPageSizeChange={rejectedPaging.setPageSize} label="students"
+      />
     </div>
 
   </motion.div>

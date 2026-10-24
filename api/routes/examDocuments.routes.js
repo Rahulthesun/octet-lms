@@ -15,7 +15,7 @@ const router = express.Router();
 const ctrl = require("../controllers/examDocuments.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // ─── Student (any authenticated student; ownership enforced in the service) ───
 router.get("/me/events", verifyToken, ctrl.myEvents);

@@ -13,6 +13,8 @@ import AttendanceChart, {
   buildAttendanceTrend,
 } from '@/components/shared/AttendanceChart'
 import { downloadAttendanceFile } from '@/hooks/useAttendanceData'
+import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 
 // ─── Auth fetch helper ─────────────────────────────────────────────────────
@@ -552,7 +554,10 @@ function AttendanceStatisticsCard() {
       </div>
 
       {loading ? (
-        <div className="py-10 text-center text-muted text-sm">Loading statistics…</div>
+        <div className="space-y-3 py-2">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-9 w-36" />
+        </div>
       ) : !report || report.totalSessions === 0 ? (
         <div className="py-10 text-center text-muted text-sm">No attendance recorded yet.</div>
       ) : (
@@ -597,6 +602,7 @@ function AttendanceStatisticsCard() {
 function HistoryList() {
   const [open, setOpen] = useState(false)
   const [history, setHistory] = useState<HistoryRecord[]>([])
+  const paging = usePagination(history)
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(false)
   const [error, setError] = useState('')
@@ -647,7 +653,11 @@ function HistoryList() {
             className="overflow-hidden border-t border-[#e2e5ec]"
           >
             {loading && (
-              <div className="px-5 py-6 text-center text-sm text-muted">Loading history…</div>
+              <div className="px-5 py-4 space-y-3">
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </div>
             )}
 
             {!loading && error && (
@@ -660,7 +670,7 @@ function HistoryList() {
 
             {!loading && !error && history.length > 0 && (
               <div className="divide-y divide-[#F4F1F8]">
-                {history.map(record => {
+                {paging.pageItems.map(record => {
                   const triStatus = record.attendanceStatus || record.status
                   const isPresent = triStatus === 'present'
                   const isPartial = triStatus === 'partial'
@@ -710,6 +720,10 @@ function HistoryList() {
                     </div>
                   )
                 })}
+                <Pagination
+                  page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+                  onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="records"
+                />
               </div>
             )}
           </motion.div>

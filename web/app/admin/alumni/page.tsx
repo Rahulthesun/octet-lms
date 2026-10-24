@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { authedFetch } from '@/lib/apiClient'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 
 interface AlumniRow {
   id: string
@@ -308,12 +309,15 @@ function DetailPanel({
 
 export default function AlumniPage() {
   const [rows, setRows] = useState<AlumniRow[]>([])
+  const paging = usePagination(rows)
   const [total, setTotal] = useState(0)
   const [filters, setFilters] = useState<AlumniFilters>({ years: [], batches: [], total: 0 })
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [batch, setBatch] = useState('')
   const [year, setYear] = useState('')
+  const resetPage = paging.setPage
+  useEffect(() => { resetPage(1) }, [search, batch, year, resetPage])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -380,7 +384,7 @@ export default function AlumniPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Alumni</h1>
         <p className="text-base text-gray-600 mt-1">
@@ -440,7 +444,7 @@ export default function AlumniPage() {
               {filters.total === 0 ? 'No alumni yet. Students appear here once their graduation date arrives.' : 'No alumni match your filters.'}
             </div>
           ) : (
-            rows.map((r) => (
+            paging.pageItems.map((r) => (
               <div
                 key={r.id}
                 className="flex flex-wrap lg:grid lg:grid-cols-[1fr_150px_140px_110px_140px_180px] gap-3 px-5 py-4 hover:bg-gray-50 transition-colors items-center"
@@ -473,11 +477,17 @@ export default function AlumniPage() {
             ))
           )}
         </div>
+        <Pagination
+          page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+          onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="alumni"
+        />
       </div>
 
-      <p className="text-sm text-gray-400 mt-4 text-center">
-        Showing {rows.length} of {total} alumni
-      </p>
+      {rows.length !== total && (
+        <p className="text-sm text-gray-400 mt-4 text-center">
+          Showing {rows.length} of {total} alumni
+        </p>
+      )}
 
       <AnimatePresence>
         {openId && (

@@ -32,6 +32,56 @@ const COPY_COLUMNS = [
 // text, etc.) — kept minimal since this runs on every manual add/edit.
 const PERCEPTUAL_SCAN_COLUMNS = ["id", "source_test_title", "created_at", ...FIELDS.map((f) => f.imagePerceptualHash)];
 
+const normStem = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Stricter than the save-time duplicate check (default 8/64 bits): this only
+// hides rows from a listing, so it must not merge two genuinely different
+// screenshots that merely look alike.
+const STEM_PHASH_THRESHOLD = 4;
+
+// Stems at least this long are treated as identifying a single question.
+const MIN_DISTINCTIVE_STEM = 40;
+
+/**
+ * Collapses bank rows that ask the same QUESTION, whatever their options are
+ * (the same stem re-saved with reshuffled/edited options or a different
+ * correct answer is one question to an admin, not two). Matches on the stem
+ * only: normalized text for text stems; image content hash, R2 key, or a
+ * near-identical perceptual hash for image stems. Keeps the first (oldest)
+ * row of each stem, so rows must be passed oldest-first.
+ */
+function dedupeByStem(rows) {
+  const seen = new Set();
+  const keptPhashes = [];
+  const out = [];
+  for (const row of rows || []) {
+    let key = null;
+    if (row.question_type === "image") {
+      key = row.question_image_content_hash
+        ? `i:${row.question_image_content_hash}`
+        : row.question_image_key ? `k:${row.question_image_key}` : null;
+      const phash = row.question_image_perceptual_hash;
+      if (phash && keptPhashes.some((h) => isNearDuplicateImage(h, phash, STEM_PHASH_THRESHOLD))) continue;
+      if (phash) keptPhashes.push(phash);
+    } else if (normStem(row.question_text)) {
+      const stem = normStem(row.question_text);
+      // A long stem identifies one specific question, so reused wording with
+      // different options is a duplicate. A short/generic stem ("Which of the
+      // following is correct?") is legitimately reused across different
+      // questions, so it only counts as a duplicate when the options match too.
+      key = stem.length >= MIN_DISTINCTIVE_STEM
+        ? `t:${stem}`
+        : `t:${stem}|${[row.option_a, row.option_b, row.option_c, row.option_d].map(normStem).join("|")}`;
+    }
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 function badRequest(message) {
   return Object.assign(new Error(message), { status: 400 });
 }
@@ -138,7 +188,7 @@ async function syncFromTest(test, questionRows) {
  * same upsert+ignoreDuplicates so re-submitting the same content never
  * double-stores it.
  */
-async function createManual({ questions, label, createdBy, sourceTestId }) {
+async function createManual({ questions, label, createdBy, sourceTestId, subtopicId }) {
   const list = Array.isArray(questions) ? questions : [];
   if (list.length === 0) throw badRequest("At least one question is required");
   const title = normalizeTitleKey(label);
@@ -155,6 +205,7 @@ async function createManual({ questions, label, createdBy, sourceTestId }) {
       source_test_title: title,
       source_question_id: null,
       created_by: createdBy || null,
+      subtopic_id: subtopicId || null,
     });
   }
   const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
@@ -202,15 +253,25 @@ async function backfillAll() {
 async function listGroups({ search } = {}) {
   let query = supabase
     .from("question_bank")
-    .select("source_test_id, source_test_title, created_at")
-    .order("created_at", { ascending: false });
+    .select("source_test_id, source_test_title, created_at, question_type, question_text, question_image_key, question_image_content_hash, question_image_perceptual_hash")
+    .order("created_at", { ascending: true });
   const term = search ? String(search).replace(/[%_,()]/g, " ").trim() : "";
   if (term) query = query.ilike("source_test_title", `%${term}%`);
   const { data, error } = await query.range(0, 9999);
   if (error) throw error;
 
-  const groups = new Map();
+  // Group first, then collapse same-stem rows per group so the count shown on
+  // the list matches the questions actually listed when the group is opened.
+  const rowsByKey = new Map();
   for (const r of data || []) {
+    const key = r.source_test_id || `title:${normalizeTitleKey(r.source_test_title)}`;
+    if (!rowsByKey.has(key)) rowsByKey.set(key, []);
+    rowsByKey.get(key).push(r);
+  }
+  const deduped = [...rowsByKey.values()].flatMap((rows) => dedupeByStem(rows));
+
+  const groups = new Map();
+  for (const r of deduped) {
     const normalizedTitle = normalizeTitleKey(r.source_test_title);
     // Manual groups (no source_test_id) key off the normalized title so
     // accidental whitespace never splits one group into two. Test-derived
@@ -269,24 +330,8 @@ async function listQuestions({ sourceTestId, title }) {
   const { data, error } = await query;
   if (error) throw error;
 
-  // De-dup TEXT questions that are byte-for-byte identical in wording
-  // (case/whitespace-insensitive) but ended up as separate bank rows, e.g.
-  // the same screenshot re-uploaded under a new R2 key. Image questions
-  // (or questions with any image option) can't be safely compared this way
-  // without perceptual image hashing, so they're left as-is.
-  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-  const seen = new Set();
   const out = [];
-  for (const row of data || []) {
-    const isAllText = [row.question_type, row.option_a_type, row.option_b_type, row.option_c_type, row.option_d_type]
-      .every((t) => t !== "image");
-    if (isAllText) {
-      const dedupKey = [row.question_text, row.option_a, row.option_b, row.option_c, row.option_d]
-        .map(norm)
-        .join("\x1f");
-      if (seen.has(dedupKey)) continue;
-      seen.add(dedupKey);
-    }
+  for (const row of dedupeByStem(data)) {
     out.push({
       bankQuestionId: row.id,
       sourceTestTitle: row.source_test_title,
@@ -394,6 +439,74 @@ async function deleteGroup({ sourceTestId, title }) {
   return { deleted: data.length };
 }
 
+/**
+ * All bank questions tied to one Class (subtopic) — used by both the admin
+ * Q&A/Practice Questions manager and the student practice view. Signed
+ * image URLs included; withKeys only needed for admin editing, so callers
+ * that are student-facing can ignore the extra fields.
+ */
+async function listQuestionsForSubtopic(subtopicId) {
+  if (!subtopicId) throw badRequest("subtopicId is required");
+  const { data, error } = await supabase
+    .from("question_bank")
+    .select("*")
+    .eq("subtopic_id", subtopicId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const out = [];
+  for (const row of data || []) {
+    out.push({
+      bankQuestionId: row.id,
+      correctOption: row.correct_option,
+      marks: Number(row.marks),
+      ...(await serializeQuestion(row, signKey, { withKeys: true })),
+    });
+  }
+  return out;
+}
+
+/**
+ * Copies existing bank questions INTO a Class (subtopic) — a one-way copy,
+ * mirroring the existing "import into a test" semantics
+ * (components/admin/tests/QuestionBankModal.tsx's copyForNewTest()): a NEW
+ * question_bank row is created with subtopic_id set. The original bank
+ * row is completely untouched — this is a copy, not a move.
+ */
+async function copyQuestionsToSubtopic(bankQuestionIds, subtopicId, createdBy) {
+  const ids = [...new Set((bankQuestionIds || []).filter(Boolean))];
+  if (ids.length === 0) throw badRequest("At least one bankQuestionId is required");
+  if (!subtopicId) throw badRequest("subtopicId is required");
+
+  const { data: sources, error: fetchErr } = await supabase
+    .from("question_bank")
+    .select(COPY_COLUMNS.join(", "))
+    .in("id", ids);
+  if (fetchErr) throw fetchErr;
+  if (!sources || sources.length === 0) throw Object.assign(new Error("No matching questions found in bank"), { status: 404 });
+
+  const rows = sources.map((q) => {
+    const copy = Object.fromEntries(COPY_COLUMNS.map((c) => [c, q[c] ?? null]));
+    return {
+      ...copy,
+      content_hash: contentHash(copy),
+      source_test_id: null,
+      source_test_title: "Imported from Question Bank",
+      source_question_id: null,
+      created_by: createdBy || null,
+      subtopic_id: subtopicId,
+    };
+  });
+
+  const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
+  const { data, error } = await supabase
+    .from("question_bank")
+    .upsert(unique, { onConflict: "content_hash", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw error;
+  return { copied: (data || []).length, submitted: sources.length };
+}
+
 /** Which of these bank ids really exist (validates the tracking reference on save). */
 async function existingIds(ids) {
   const wanted = [...new Set((ids || []).filter(Boolean))];
@@ -403,4 +516,9 @@ async function existingIds(ids) {
   return new Set((data || []).map((r) => r.id));
 }
 
-module.exports = { syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds, updateQuestion, renameManualGroup, deleteQuestion, deleteGroup };
+module.exports = {
+  dedupeByStem,
+  syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds,
+  updateQuestion, renameManualGroup, deleteQuestion, deleteGroup,
+  listQuestionsForSubtopic, copyQuestionsToSubtopic,
+};
