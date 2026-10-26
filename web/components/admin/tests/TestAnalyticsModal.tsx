@@ -15,7 +15,7 @@ import {
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 function toChartData(points: AnalyticsPoint[], color?: string): ChartDatum[] {
   return points.map((p) => ({ label: p.label, value: p.value, color }))

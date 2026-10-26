@@ -13,8 +13,8 @@ export default function QaContentAdminPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Q&A / Practice Questions</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Q&A / Practice Questions</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">
             Also available inline on the main{' '}
             <Link href="/admin/content" className="text-violet-700 hover:underline">
               Content Manager

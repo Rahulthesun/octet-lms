@@ -24,11 +24,13 @@ router.get("/me/events/:id", verifyToken, ctrl.myEvent);
 router.post("/me/events/:id/marksheet/manual", verifyToken, ctrl.manualMarks);
 router.post("/me/events/:id/:kind/upload-url", verifyToken, ctrl.uploadUrl);
 router.post("/me/events/:id/:kind/confirm", verifyToken, ctrl.confirmUpload);
+router.delete("/me/events/:id/:kind", verifyToken, ctrl.deleteMySubmission);
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 router.get("/events", verifyToken, adminOnly, ctrl.listEvents);
 router.post("/events", verifyToken, adminOnly, ctrl.createEvent);
 router.put("/events/:id", verifyToken, adminOnly, ctrl.updateEvent);
+router.delete("/events/:id", verifyToken, adminOnly, ctrl.deleteEvent);
 router.post("/events/:id/open-hall-ticket", verifyToken, adminOnly, ctrl.openHallTicket);
 router.post("/events/:id/open-results", verifyToken, adminOnly, ctrl.openResults);
 router.get("/events/:id/tracking", verifyToken, adminOnly, ctrl.tracking);

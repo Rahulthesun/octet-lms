@@ -61,7 +61,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         {/* Decorative background, consistent with student layout */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" aria-hidden>
           <div className="absolute top-[6%] right-[6%] opacity-[0.05]" style={{ transform: 'rotate(-15deg)' }}>
-            <AtomSVG width={220} height={220} color="#7A6B96" />
+            <AtomSVG width={220} height={220} color="#5e4075" />
           </div>
           <div className="absolute bottom-[8%] left-[6%] opacity-[0.05]" style={{ transform: 'rotate(10deg)' }}>
             <FlaskSVG width={170} height={200} color="#64748b" />

@@ -444,18 +444,26 @@ async function bulkImportStudents(studentsArray) {
 }
 
 // ========================= POST /students/:id/approve =========================
-async function approveStudent(id) {
-    // Get pending student
+// Also used to accept a previously REJECTED applicant ("reinstate") — they go
+// through exactly the same steps as a fresh approval, so the result is
+// indistinguishable from approving them in the first place.
+async function approveStudent(id, { fromStatuses = ["PENDING"] } = {}) {
     const { data: student, error: fetchError } = await supabase
         .from("students")
         .select("*")
         .eq("id", id)
-        .eq("status", "PENDING")
-        .single();
-    if (fetchError || !student) throw new Error("Pending student not found");
+        .in("status", fromStatuses)
+        .maybeSingle();
+    if (fetchError) throw fetchError;
+    if (!student) {
+        throw Object.assign(
+            new Error(fromStatuses.includes("REJECTED") ? "Rejected student not found (they may already have been accepted)" : "Pending student not found"),
+            { status: 404 }
+        );
+    }
     const admissionNumber = generateAdmissionNumber();
     const { authUserId, tempPassword, username } = await createStudentAuthUser(student, admissionNumber);
-    // Update student record
+    // Update student record (status filter guards against two admins accepting at once)
     const { data: approved, error: updateError } = await supabase
         .from("students")
         .update({
@@ -466,6 +474,7 @@ async function approveStudent(id) {
             username
         })
         .eq("id", id)
+        .in("status", fromStatuses)
         .select()
         .single();
     if (updateError) throw updateError;
@@ -494,6 +503,12 @@ async function rejectStudent(id, reason) {
         .single();
     if (error) throw error;
     return { success: true, message: "Student rejected", data };
+}
+
+// ========================= POST /students/:id/reinstate =========================
+async function reinstateStudent(id) {
+    const result = await approveStudent(id, { fromStatuses: ["REJECTED"] });
+    return { ...result, message: "Student accepted" };
 }
 
 // ========================= GET /students/batch/:batchId =========================
@@ -537,7 +552,11 @@ async function getDashboardStats() {
     return {
         success: true,
         stats: {
-            total: total.count,
+            // "Students" means active, approved students — the same set the
+            // Student Database tab lists. Pending and rejected applicants are
+            // reported separately and never counted as students.
+            total: approved.count,
+            allRecords: total.count,
             pending: pending.count,
             approved: approved.count,
             rejected: rejected.count,
@@ -548,8 +567,6 @@ async function getDashboardStats() {
 }
 
 async function getStudentByUserId(userId) {
-  console.log("A. Querying for auth_user_id:", userId);
-  
   const { data: student, error } = await supabase
     .from("students")
     .select(`
@@ -565,10 +582,7 @@ async function getStudentByUserId(userId) {
     .eq("auth_user_id", userId)
     .single();
 
-  console.log("B. Query result:", { data: student, error: error });
-
   if (error) {
-    console.log("C. Error code:", error.code);
     if (error.code === "PGRST116") {
       throw Object.assign(new Error(`No student profile found for user ID: ${userId}`), { status: 404 });
     }
@@ -618,6 +632,7 @@ module.exports = {
     bulkImportStudents,
     approveStudent,
     rejectStudent,
+    reinstateStudent,
     getStudentsByBatch,
     getDashboardStats,
     getStudentByUserId,

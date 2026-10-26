@@ -5,8 +5,9 @@ import { motion } from 'framer-motion'
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
 import { sendBroadcast } from '@/hooks/useNotifications'
 import { Select } from '@/components/ui/Select'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
 const labelCls = 'block text-sm font-medium text-zinc-700 mb-2'
 
@@ -138,9 +139,8 @@ export default function ComposeBroadcastModal({ onClose, onSent }: { onClose: ()
 
                         {showExtraStudents && (
                           <div className="mt-3 space-y-2">
-                            <input type="text" value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)}
-                              placeholder="Search students by name…"
-                              className="w-full text-sm rounded-lg px-3.5 py-2.5 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                            <SearchInput value={studentSearch} onChange={setStudentSearch}
+                              placeholder="Search students by name…" size="sm" wrapperClassName="w-full" />
                             <div className="max-h-40 overflow-y-auto border border-zinc-200 rounded-lg divide-y divide-zinc-100">
                               {studentDropdownOptions.length === 0 ? (
                                 <div className="px-3.5 py-3 text-sm text-zinc-400">No matching students.</div>

@@ -97,7 +97,7 @@ interface AttendanceChartProps {
 
 // Categorical palette for pie slices — mirrored by PIE_PALETTE in
 // api/utils/attendanceReportFormat.js so the downloaded PDF uses the same colors.
-export const PIE_PALETTE = ['#5B21B6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#8b5cf6', '#84cc16', '#f97316']
+export const PIE_PALETTE = ['#5e4075', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#8665a5', '#84cc16', '#f97316']
 
 /**
  * Slices that already carry distinct, meaningful colors (Present / Partial /
@@ -256,7 +256,7 @@ export default function AttendanceChart({
   lineData,
   horizontalBars = false,
   defaultColor = '#6b7280',
-  lineColor = '#5B21B6',
+  lineColor = '#5e4075',
   valueSuffix = '',
   height = 260,
   emptyMessage = 'Not enough data yet to show a chart.',
@@ -386,7 +386,7 @@ export default function AttendanceChart({
                   <ReferenceLine y={0} stroke="#000000" strokeWidth={2.5} />
                 )}
                 {showMaxLine && !horizontalBars && (
-                  <ReferenceLine y={referenceValue} stroke="#9333ea" strokeWidth={1.5} strokeDasharray="3 3" />
+                  <ReferenceLine y={referenceValue} stroke="#6f4f8e" strokeWidth={1.5} strokeDasharray="3 3" />
                 )}
                 <Bar
                   dataKey="value"

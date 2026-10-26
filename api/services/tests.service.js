@@ -458,6 +458,12 @@ async function _regradeQuestion(questionId, newCorrectOption, newMarks, newTestM
 
 // ─── Create / list / get / update / delete ─────────────────────────────────
 
+// Small allowance for the time between the admin pressing "Schedule" and the request arriving.
+const PAST_START_GRACE_MS = 2 * 60 * 1000;
+function isPastStart(iso) {
+  return new Date(iso).getTime() < Date.now() - PAST_START_GRACE_MS;
+}
+
 async function createTest({
   title, type, chapterId, subjectId, batchId, allStudents, audience, scheduledStart, scheduledEnd,
   instructions, maxMarks, questionText, createdBy, questions,
@@ -471,6 +477,7 @@ async function createTest({
   batchId = isAllStudents ? null : target.batchIds[0];
   if (!scheduledStart || !scheduledEnd) throw badRequest("Start and end time are required");
   if (new Date(scheduledEnd) <= new Date(scheduledStart)) throw badRequest("End time must be after start time");
+  if (isPastStart(scheduledStart)) throw badRequest("The test cannot start in the past. Pick today or a later date and a future start time");
 
   if (type === "mcq") {
     validateQuestions(questions);
@@ -558,6 +565,15 @@ async function updateTest(testId, updates) {
 
   if (allowed.scheduled_start && allowed.scheduled_end && new Date(allowed.scheduled_end) <= new Date(allowed.scheduled_start)) {
     throw badRequest("End time must be after start time");
+  }
+  if (allowed.scheduled_start && isPastStart(allowed.scheduled_start)) {
+    // A test that already started keeps its own start time; only moving it, or
+    // publishing a draft, into the past is rejected.
+    const { data: current } = await supabase.from("tests").select("scheduled_start, status").eq("id", testId).maybeSingle();
+    const unchanged = current?.scheduled_start && new Date(current.scheduled_start).getTime() === new Date(allowed.scheduled_start).getTime();
+    if (!unchanged || current?.status === "draft") {
+      throw badRequest("The test cannot start in the past. Pick today or a later date and a future start time");
+    }
   }
 
   // Validated BEFORE writing anything — a duplicate-image rejection here

@@ -25,7 +25,7 @@ import AttendanceChart, {
   type ChartDatum,
 } from '@/components/shared/AttendanceChart'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 // ─── Month-picker helpers (mirrors TestReportsTab.tsx's StudentTestReportModal) ─
 

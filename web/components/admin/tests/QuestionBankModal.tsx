@@ -11,8 +11,9 @@ import { authedFetch } from '@/lib/apiClient'
 import QuestionContent from '@/components/shared/QuestionContent'
 import { Watermark } from '@/components/shared/ExamSecurity'
 import type { OptionKey, QuestionContentFields, TestQuestionInput } from '@/hooks/useTests'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 interface BankGroup {
   sourceTestId: string | null
@@ -197,13 +198,7 @@ export default function QuestionBankModal({ onClose, onImport }: {
 
           {!openGroup ? (
             <>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search past tests by name"
-                className="w-full text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <SearchInput value={search} onChange={setSearch} placeholder="Search past tests by name" wrapperClassName="w-full" />
               {loadingGroups ? (
                 <p className="text-sm text-zinc-500 py-6 text-center">Loading...</p>
               ) : groups.length === 0 ? (

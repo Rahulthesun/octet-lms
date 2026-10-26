@@ -13,14 +13,16 @@ import {
   type SyncStatus,
 } from '@/hooks/useOnlineClasses'
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
-import { formatDateInZone, formatTimeInZone, isoToZonedParts, chapterLabel } from '@/lib/helpers'
+import { formatDateInZone, formatTimeInZone, isoToZonedParts, chapterLabel, todayISODate, isPastDate, isPastDateTime } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
 import { SkeletonCard, Skeleton } from '@/components/ui/Skeleton'
 import { Select } from '@/components/ui/Select'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SearchInput from '@/components/ui/SearchInput'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -43,15 +45,6 @@ function CalendarIcon({ className = 'w-5 h-5' }: { className?: string }) {
   )
 }
 
-function SearchIcon({ className = 'w-4 h-4' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none">
-      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function UsersIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none">
@@ -59,6 +52,15 @@ function UsersIcon({ className = 'w-4 h-4' }: { className?: string }) {
       <path d="M2 16c.6-3 2.4-4.5 5-4.5s4.4 1.5 5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       <circle cx="14.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
       <path d="M12.5 11.3c2 .1 3.3 1.4 3.8 3.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function SettingsIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   )
 }
@@ -89,7 +91,7 @@ function StatusBadge({ status }: { status: OnlineClassStatus }) {
 
 const SYNC_STYLE: Partial<Record<SyncStatus, { label: string; fg: string; bg: string }>> = {
   NOT_STARTED: { label: 'Not started', fg: '#71717A', bg: '#F4F4F5' },
-  LIVE: { label: 'Live', fg: '#5B21B6', bg: '#F5F3FF' },
+  LIVE: { label: 'Live', fg: '#5e4075', bg: '#f6f3f9' },
   AWAITING_ATTENDANCE_SYNC: { label: 'Awaiting sync', fg: '#B45309', bg: '#FFFBEB' },
   SYNCED: { label: 'Synced', fg: '#15803D', bg: '#F0FDF4' },
   SYNC_FAILED: { label: 'Sync failed', fg: '#B91C1C', bg: '#FEF2F2' },
@@ -107,7 +109,7 @@ function SyncBadge({ status }: { status: SyncStatus | null }) {
 }
 
 // ─── Online attendance settings modal ──────────────────────────────────────
-// Reached via the ⚙️ button next to "Schedule Online Class" — kept out of
+// Reached via the settings button next to "Schedule Online Class" — kept out of
 // the main flow since it's configured once and rarely touched day to day.
 
 function SettingField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -169,7 +171,9 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-xl leading-none" aria-hidden="true">⚙️</span>
+            <span className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0" style={{ color: ACCENT }} aria-hidden="true">
+              <SettingsIcon className="w-4 h-4" />
+            </span>
             <div>
               <h3 className="text-sm font-semibold text-zinc-900">Online Attendance Settings</h3>
               <p className="text-xs text-zinc-500 mt-0.5">How Google Meet attendance is calculated and synced</p>
@@ -290,13 +294,17 @@ function GoogleAccountPanel() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-zinc-200 bg-white">
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+          className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : status?.reauthRequired ? 'bg-amber-500' : 'bg-zinc-300'}`}
         />
         <div className="min-w-0">
           <p className="text-sm text-zinc-900">
-            {status?.connected ? 'Google account connected' : 'Google account not connected'}
+            {status?.connected
+              ? 'Google account connected'
+              : status?.reauthRequired
+                ? 'Google connection expired'
+                : 'Google account not connected'}
           </p>
-          {status?.connected && status.email && (
+          {status?.email && (status.connected || status.reauthRequired) && (
             <p className="text-xs text-zinc-500 truncate">{status.email}</p>
           )}
         </div>
@@ -310,7 +318,7 @@ function GoogleAccountPanel() {
           }`}
           style={!status?.connected ? { backgroundColor: ACCENT } : undefined}
         >
-          {busy ? 'Working…' : status?.connected ? 'Disconnect' : 'Connect Google Account'}
+          {busy ? 'Working…' : status?.connected ? 'Disconnect' : status?.reauthRequired ? 'Reconnect' : 'Connect Google Account'}
         </button>
       </div>
       {error && (
@@ -382,6 +390,14 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 
   async function handleSubmit() {
     if (!canSubmit) return
+    if (isPastDate(date) || isPastDateTime(date, startTime)) {
+      setError('The class must start in the future. Pick today or a later date and a start time that has not passed.')
+      return
+    }
+    if (endTime <= startTime) {
+      setError('End time must be after the start time.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -470,7 +486,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Date</label>
               <input
-                type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                type="date" value={date} min={todayISODate()} onChange={(e) => setDate(e.target.value)}
                 className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               />
             </div>
@@ -541,14 +557,13 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
                   )}
 
                   <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                    <div className="relative p-2.5 bg-zinc-50 border-b border-zinc-200">
-                      <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
+                    <div className="p-2.5 bg-zinc-50 border-b border-zinc-200">
+                      <SearchInput
                         value={studentSearch}
-                        onChange={(e) => setStudentSearch(e.target.value)}
+                        onChange={setStudentSearch}
                         placeholder="Search students by name…"
-                        className="w-full text-sm rounded-md pl-9 pr-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                        size="sm"
+                        wrapperClassName="w-full"
                       />
                     </div>
 
@@ -647,6 +662,14 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
   const isCancelled = cls.status === 'cancelled'
 
   async function handleSave() {
+    if (isPastDate(date) || isPastDateTime(date, startTime)) {
+      setError('A rescheduled class must start in the future. Pick today or a later date and a start time that has not passed.')
+      return
+    }
+    if (endTime <= startTime) {
+      setError('End time must be after the start time.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -737,7 +760,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Date</label>
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  <input type="date" value={date} min={todayISODate()} onChange={(e) => setDate(e.target.value)}
                     className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
                 <div>
@@ -818,7 +841,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
-type ViewFilter = 'all' | 'past' | 'today'
+type ViewFilter = 'all' | 'past' | 'today' | 'upcoming'
 
 /** Which calendar day (in the CLASS's own timezone) a class falls on, relative to today. */
 function classDayBucket(cls: OnlineClass): 'today' | 'past' | 'future' {
@@ -868,6 +891,7 @@ export default function OnlineClassesPage() {
   const filtered = useMemo(() => {
     if (viewFilter === 'all') return sorted
     if (viewFilter === 'today') return sorted.filter((c) => classDayBucket(c) === 'today')
+    if (viewFilter === 'upcoming') return [...sorted].reverse().filter((c) => classDayBucket(c) === 'future')
     return sorted.filter((c) => classDayBucket(c) === 'past')
   }, [sorted, viewFilter])
   const paging = usePagination(filtered)
@@ -932,18 +956,19 @@ export default function OnlineClassesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-zinc-200">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Online Classes</p>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Schedule &amp; Manage Online Classes</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Online Classes</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Schedule Google Meet classes and track their attendance.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={() => setShowSettings(true)}
             title="Online Attendance Settings"
-            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-300 hover:bg-zinc-100 transition-colors text-xl leading-none"
+            aria-label="Online Attendance Settings"
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
           >
-            <span aria-hidden="true">⚙️</span>
+            <SettingsIcon className="w-[18px] h-[18px]" />
           </button>
           <GoogleAccountPanel />
           <button
@@ -964,20 +989,17 @@ export default function OnlineClassesPage() {
       )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 rounded-lg" role="group" aria-label="Filter classes">
-          {(['all', 'past', 'today'] as ViewFilter[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setViewFilter(v)}
-              aria-pressed={viewFilter === v}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                viewFilter === v ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              {v === 'all' ? 'All' : v === 'past' ? 'Past' : 'Today'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          ariaLabel="Filter classes"
+          value={viewFilter}
+          onChange={setViewFilter}
+          options={[
+            { value: 'today', label: 'Today' },
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'past', label: 'Past' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
         <p className="text-xs text-zinc-400">
           {filtered.length} class{filtered.length === 1 ? '' : 'es'}
         </p>
@@ -994,6 +1016,8 @@ export default function OnlineClassesPage() {
               ? 'No online classes scheduled for today.'
               : viewFilter === 'past'
               ? 'No past online classes.'
+              : viewFilter === 'upcoming'
+              ? 'No upcoming online classes.'
               : 'No online classes scheduled yet.'}
           </div>
         ) : (

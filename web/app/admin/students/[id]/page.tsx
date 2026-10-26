@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useStudentDetail } from '@/hooks/admin/useStudents'
 import { IconDocument, IconClipboard } from '@/components/ui/SvgIcons'
+import { todayISODate } from '@/lib/helpers'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -130,17 +131,20 @@ function EditField({
   value,
   onChange,
   type = 'text',
+  min,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   type?: 'text' | 'date'
+  min?: string
 }) {
   return (
     <div>
       <label className="text-sm text-gray-400 block mb-1">{label}</label>
       <input
         type={type}
+        min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full border border-gray-200 px-3 py-2 text-base text-primary outline-none focus:border-gray-400"
@@ -317,7 +321,7 @@ export default function StudentDetailPage() {
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-2xl text-primary">{student.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">{student.name}</h1>
               {student.class_grade && (
                 <span className="text-sm border border-gray-200 px-2 py-0.5 text-gray-600">{formatGrade(student.class_grade)}</span>
               )}
@@ -403,6 +407,7 @@ export default function StudentDetailPage() {
               <EditField
                 label="Graduation Date (access ends)"
                 type="date"
+                min={todayISODate()}
                 value={form.graduation_date}
                 onChange={(v) => setForm({ ...form, graduation_date: v })}
               />

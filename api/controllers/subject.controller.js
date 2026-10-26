@@ -47,7 +47,7 @@ const getAllSubjects = async (req, res) => {
   try {
     // Default to notes: the video/notes/online-class lists (student + admin)
     // call this without a category and must never see the qa/practice
-    // container subjects (they rendered as duplicate "Q&A"/"Practise
+    // container subjects (they rendered as duplicate "Q&A"/"Practice
     // Questions" rows). Pass ?category=all to get every category.
     const category = req.query.category === "all" ? undefined : req.query.category || "notes";
     const subjects = await subjectService.getAllSubjects(category);

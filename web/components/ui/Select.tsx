@@ -21,7 +21,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const selectClasses = 
   "appearance-none w-full bg-white border border-zinc-200 text-zinc-900 text-sm rounded-xl px-3.5 py-2.5 pr-10 outline-none transition-all duration-150 " +
-  "focus:border-[#5B21B6] focus:ring-2 focus:ring-[#5B21B6]/15 hover:border-zinc-300 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed cursor-pointer"
+  "focus:border-[#5e4075] focus:ring-2 focus:ring-[#5e4075]/15 hover:border-zinc-300 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed cursor-pointer"
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className = '', label, error, children, wrapperClassName = '', ...props }, ref) => {

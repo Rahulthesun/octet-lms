@@ -203,6 +203,18 @@ async function refreshSession(req, res) {
 }
 
 /**
+ * POST /api/attendance/sessions/:sessionId/end
+ * Closes the live session — scans are rejected from this point on.
+ */
+async function endSession(req, res) {
+  try {
+    res.json(await svc.endSession(req.params.sessionId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/**
  * GET /api/attendance/sessions/:sessionId/roster
  * Returns the FULL enrolled roster for that session (name, roll, present,
  * markedAt), defaulting present:false for anyone without a record.
@@ -257,8 +269,8 @@ async function scanQrToken(req, res) {
   }
 
   try {
-    await svc.scanQrToken(qrToken, authUserId);
-    res.json({ success: true });
+    const result = await svc.scanQrToken(qrToken, authUserId);
+    res.json({ success: true, alreadyMarked: !!result?.alreadyMarked });
   } catch (err) {
     handleError(res, err);
     console.log(`[attendance] scanQrToken: error scanning QR token for user ${authUserId}: ${err.message}`)
@@ -633,6 +645,7 @@ module.exports = {
   overrideStudentBlock,
   startSession,
   refreshSession,
+  endSession,
   getRoster,
   manualMark,
   scanQrToken,

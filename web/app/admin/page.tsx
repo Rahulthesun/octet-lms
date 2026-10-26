@@ -222,8 +222,8 @@ export default function AdminDashboard() {
       >
         <div>
           <p className="text-xs font-medium tracking-[0.2em] uppercase text-gray-400 mb-2">{greeting()}</p>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-          {email && <p className="text-base text-gray-500 mt-1.5">{email}</p>}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+          {email && <p className="text-sm sm:text-base text-gray-500 mt-1">{email}</p>}
         </div>
         <p className="text-base text-gray-500 shrink-0">{today}</p>
       </motion.div>

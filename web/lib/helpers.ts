@@ -47,6 +47,35 @@ export function formatDate(date: string): string {
   return `${getOrdinal(day)} ${months[month - 1]} ${year}`;
 }
 
+// ─── Date-picker bounds ───────────────────────────────────────────────────────
+// Built from the device's local wall clock, not toISOString() (which is UTC and
+// is a day behind in IST between midnight and 05:30).
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Today as "YYYY-MM-DD" — use as `min` on scheduling date pickers. */
+export function todayISODate(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** Now as "YYYY-MM-DDTHH:mm" — use as `min` on datetime-local pickers. */
+export function nowISODateTimeLocal(): string {
+  const d = new Date()
+  return `${todayISODate()}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/** True when a "YYYY-MM-DD" value is before today. Empty values are not "past". */
+export function isPastDate(value: string): boolean {
+  return !!value && value < todayISODate()
+}
+
+/** True when "YYYY-MM-DD" + "HH:mm" (24h, local time) is already in the past. */
+export function isPastDateTime(date: string, time: string): boolean {
+  if (!date || !time) return false
+  return new Date(`${date}T${time}:00`).getTime() < Date.now()
+}
+
 // ─── Timezone-aware date/time helpers (online classes) ────────────────────────
 // The event's own `timezone` is always used for display, so what a student
 // or admin sees in the LMS matches the Google Calendar event time exactly —

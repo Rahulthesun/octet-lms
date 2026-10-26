@@ -7,7 +7,7 @@ import { CheckCircleIcon, XIcon } from './icons'
 import QuestionContent from '@/components/shared/QuestionContent'
 import { Watermark } from '@/components/shared/ExamSecurity'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 export default function AttemptDetailModal({ test, attemptId, onClose, onGraded }: {
   test: TestSummary
@@ -78,7 +78,7 @@ export default function AttemptDetailModal({ test, attemptId, onClose, onGraded 
               </div>
 
               {detail.marksAwarded !== null && (
-                <div className="rounded-xl px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#F5F3FF' }}>
+                <div className="rounded-xl px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#f6f3f9' }}>
                   <span className="text-sm text-zinc-600">Score</span>
                   <span className="text-xl font-inter font-bold" style={{ color: ACCENT }}>
                     {detail.marksAwarded} / {detail.maxMarks}

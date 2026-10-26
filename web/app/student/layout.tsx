@@ -18,6 +18,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }, [pathname])
 
   const isExamRunner = /^\/student\/tests\/[^/]+\/exam/.test(pathname || '')
+  // Viewport-height workspaces that manage their own layout.
+  const fullBleed = /^\/student\/(courses|feedback)\/?$/.test(pathname || '')
 
   if (isExamRunner) {
     return (
@@ -36,19 +38,19 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           {/* Chemistry SVG background layer */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" aria-hidden>
             <div className="absolute top-[4%] right-[3%] opacity-[0.05]" style={{ transform: 'rotate(-15deg)' }}>
-              <AtomSVG width={200} height={200} color="#7A6B96" />
+              <AtomSVG width={200} height={200} color="#5e4075" />
             </div>
             <div className="absolute bottom-[6%] left-[8%] opacity-[0.05]" style={{ transform: 'rotate(10deg)' }}>
               <FlaskSVG width={155} height={185} color="#64748b" />
             </div>
             <div className="absolute top-[32%] left-[4%] opacity-[0.05]" style={{ transform: 'rotate(-12deg)' }}>
-              <BeakerSVG width={150} height={175} color="#7A6B96" />
+              <BeakerSVG width={150} height={175} color="#5e4075" />
             </div>
             <div className="absolute top-[55%] right-[5%] opacity-[0.05]" style={{ transform: 'rotate(-8deg)' }}>
               <MicroscopeSVG width={170} height={185} color="#64748b" />
             </div>
             <div className="absolute bottom-[18%] right-[22%] opacity-[0.05]" style={{ transform: 'rotate(6deg)' }}>
-              <CompoundSVG width={185} height={145} color="#7A6B96" />
+              <CompoundSVG width={185} height={145} color="#5e4075" />
             </div>
             <div className="absolute top-[42%] right-[18%] opacity-[0.05]" style={{ transform: 'rotate(12deg)' }}>
               <TestTubeSVG width={95} height={175} color="#64748b" />
@@ -106,7 +108,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             </header>
 
             <main className="flex-1 h-full overflow-y-auto bg-transparent" data-lenis-prevent>
-              {children}
+              {/* Same content container as the admin portal, so page headers
+                  sit in exactly the same place on every page. */}
+              {fullBleed ? children : (
+                <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                  {children}
+                </div>
+              )}
             </main>
           </div>
         </div>

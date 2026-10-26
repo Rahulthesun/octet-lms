@@ -50,7 +50,7 @@ const handle = (fn) => async (req, res) => {
 async function getOrCreateCategorySubject(category, grade) {
   const g = Number(grade) === 11 ? 11 : 12;
   const cat = category === "practice" ? "practice" : "qa";
-  const name = cat === "qa" ? "Q&A" : "Practise Questions";
+  const name = cat === "qa" ? "Q&A" : "Practice Questions";
 
   const { data: existing } = await supabase
     .from("subjects")
@@ -59,7 +59,14 @@ async function getOrCreateCategorySubject(category, grade) {
     .eq("grade", g)
     .maybeSingle();
 
-  if (existing) return existing;
+  if (existing) {
+    // Rows created before the spelling fix were named "Practise Questions".
+    if (existing.name !== name) {
+      const { data: renamed } = await supabase.from("subjects").update({ name }).eq("id", existing.id).select().maybeSingle();
+      if (renamed) return renamed;
+    }
+    return existing;
+  }
 
   const { data: created, error } = await supabase
     .from("subjects")

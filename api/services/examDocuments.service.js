@@ -112,16 +112,21 @@ function windowFor(event, kind) {
 
 // ─── Admin: events ───────────────────────────────────────────────────────────
 
+async function assertBatchesExist(batchIds) {
+  const { data, error } = await supabase.from("batches").select("id").in("id", batchIds);
+  if (error) throw error;
+  if ((data || []).length !== batchIds.length) throw badRequest("One or more batches do not exist");
+}
+
 async function createEvent({ name, examDate, allStudents, batchIds, audience }, createdBy) {
   if (!name?.trim()) throw badRequest("Exam name is required");
   if (!examDate || !/^\d{4}-\d{2}-\d{2}$/.test(examDate)) throw badRequest("A valid exam date (YYYY-MM-DD) is required");
+  if (examDate < todayInTz()) throw badRequest("The exam date cannot be in the past");
 
   const target = audienceService.normalizeAudience({ audience, allStudents, batchIds });
   if (target.audience === "BATCH") {
     if (target.batchIds.length === 0) throw badRequest("Choose All Students or at least one batch");
-    const { data, error } = await supabase.from("batches").select("id").in("id", target.batchIds);
-    if (error) throw error;
-    if ((data || []).length !== target.batchIds.length) throw badRequest("One or more batches do not exist");
+    await assertBatchesExist(target.batchIds);
   }
 
   const { data, error } = await supabase
@@ -146,19 +151,42 @@ async function updateEvent(eventId, { name, examDate, allStudents, batchIds, aud
     if (!name.trim()) throw badRequest("Exam name is required");
     patch.name = name.trim();
   }
-  if (examDate !== undefined) {
+  if (examDate !== undefined && examDate !== event.exam_date) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) throw badRequest("A valid exam date (YYYY-MM-DD) is required");
+    if (examDate < todayInTz()) throw badRequest("The exam date cannot be moved into the past");
+    if (event.results_opened_at && examDate >= todayInTz()) {
+      throw badRequest("The results window is already open, so the exam date must stay in the past");
+    }
     patch.exam_date = examDate;
   }
   if (allStudents !== undefined || batchIds !== undefined || audience !== undefined) {
     const target = audienceService.normalizeAudience({ audience, allStudents, batchIds });
-    if (target.audience === "BATCH" && target.batchIds.length === 0) throw badRequest("Choose All Students or at least one batch");
+    if (target.audience === "BATCH") {
+      if (target.batchIds.length === 0) throw badRequest("Choose All Students or at least one batch");
+      await assertBatchesExist(target.batchIds);
+    }
     patch.audience = target.audience;
     patch.batch_ids = target.batchIds;
   }
   const { data, error } = await supabase.from("exam_events").update(patch).eq("id", event.id).select().single();
   if (error) throw error;
   return mapEvent(data);
+}
+
+/** Deletes an exam event together with every submission and uploaded file for it. */
+async function deleteEvent(eventId) {
+  const event = await getEventOrThrow(eventId);
+  const { data: subs, error: subErr } = await supabase
+    .from("exam_submissions")
+    .select("file_key")
+    .eq("exam_event_id", event.id);
+  if (subErr) throw subErr;
+
+  const { error } = await supabase.from("exam_events").delete().eq("id", event.id);
+  if (error) throw error;
+
+  await Promise.all((subs || []).map((s) => deleteObjectQuietly(s.file_key)));
+  return { deleted: true, submissionsRemoved: (subs || []).length };
 }
 
 async function listEvents() {
@@ -528,6 +556,27 @@ async function confirmUpload(authUserId, eventId, kindParam, { key, fileName }) 
   return mapSubmission(data);
 }
 
+/** Lets a student withdraw a wrong submission (while the window is open) so they can submit the right one. */
+async function deleteMySubmission(authUserId, eventId, kindParam) {
+  const kind = parseKind(kindParam);
+  const { student } = await assertCanSubmit(authUserId, eventId, kind);
+
+  const { data: existing, error: findErr } = await supabase
+    .from("exam_submissions")
+    .select("id, file_key")
+    .eq("exam_event_id", eventId)
+    .eq("student_id", student.id)
+    .eq("kind", kind)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (!existing) throw notFound("There is no submission to remove");
+
+  const { error } = await supabase.from("exam_submissions").delete().eq("id", existing.id);
+  if (error) throw error;
+  await deleteObjectQuietly(existing.file_key);
+  return { status: "pending" };
+}
+
 /** Marksheet alternative: the student types their marks instead of uploading a file. */
 async function submitManualMarks(authUserId, eventId, { marksObtained, maxMarks, grade, remarks }) {
   const { student } = await assertCanSubmit(authUserId, eventId, "MARKSHEET");
@@ -580,6 +629,8 @@ module.exports = {
   ALLOWED_TYPES,
   createEvent,
   updateEvent,
+  deleteEvent,
+  deleteMySubmission,
   listEvents,
   openHallTicketWindow,
   openResultsWindow,

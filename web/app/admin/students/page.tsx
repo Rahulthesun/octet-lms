@@ -12,6 +12,9 @@ import { authedFetch } from '@/lib/apiClient'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import Select from '@/components/ui/Select'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SearchInput from '@/components/ui/SearchInput'
+import ConfirmDialog, { SummaryRow } from '@/components/ui/ConfirmDialog'
+import { btnPrimarySm, btnSecondarySm } from '@/components/ui/buttonStyles'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,6 +150,7 @@ export default function StudentsPage() {
     error,
     approveStudent,
     rejectStudent,
+    reinstateStudent,
     setBlocked,
     setGraduationDate,
     bulkSetGraduationDate,
@@ -273,8 +277,40 @@ export default function StudentsPage() {
     [students, search, gradeFilter, statusFilter]
   )
 
+  const [rejectedSearch, setRejectedSearch] = useState('')
+  const [acceptTarget, setAcceptTarget] = useState<(typeof rejectedStudents)[number] | null>(null)
+  const [accepting, setAccepting] = useState(false)
+  const [acceptError, setAcceptError] = useState<string | null>(null)
+  const [rejectedNotice, setRejectedNotice] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const filteredRejected = useMemo(() => {
+    const q = rejectedSearch.trim().toLowerCase()
+    if (!q) return rejectedStudents
+    return rejectedStudents.filter((s) =>
+      [s.name, s.email, s.mobile_number, s.preferred_batch, s.class_grade]
+        .some((v) => (v ?? '').toString().toLowerCase().includes(q))
+    )
+  }, [rejectedStudents, rejectedSearch])
+
+  const confirmAccept = async () => {
+    if (!acceptTarget) return
+    setAccepting(true)
+    setAcceptError(null)
+    try {
+      await reinstateStudent(acceptTarget.id)
+      setRejectedNotice({ ok: true, text: `${acceptTarget.name} was accepted and moved to the Student Database. Login details were emailed to them.` })
+      setAcceptTarget(null)
+    } catch (e) {
+      setAcceptError(e instanceof Error ? e.message : 'Could not accept this student')
+    } finally {
+      setAccepting(false)
+    }
+  }
+
   const studentPaging = usePagination(filteredStudents)
-  const rejectedPaging = usePagination(rejectedStudents)
+  const rejectedPaging = usePagination(filteredRejected)
+  const resetRejectedPage = rejectedPaging.setPage
+  useEffect(() => { resetRejectedPage(1) }, [rejectedSearch, resetRejectedPage])
   const resetStudentPage = studentPaging.setPage
   useEffect(() => { resetStudentPage(1) }, [search, gradeFilter, statusFilter, resetStudentPage])
 
@@ -284,8 +320,8 @@ export default function StudentsPage() {
     <div>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Students</h1>
-        <p className="text-base text-gray-600 mt-1">Verify applications and manage the student database.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Students</h1>
+        <p className="text-sm sm:text-base text-gray-500 mt-1">Verify applications and manage the student database.</p>
       </div>
 
       {error && (
@@ -391,15 +427,12 @@ export default function StudentsPage() {
             {/* Search + Filter row */}
             <div className="space-y-3 mb-6">
               <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1 ">
-                  <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none">
-                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.3" />
-                    <path d="M 11,11 L 14,14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>
-                  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name, roll, or email…"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full text-base text-gray-800 placeholder-gray-400 outline-none focus:border-gray-400 bg-transparent" />
-                </div>
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search name, roll, or email…"
+                  wrapperClassName="flex-1 sm:max-w-xl"
+                />
 
                 <button
                   onClick={() => setFilterOpen((o) => !o)}
@@ -491,6 +524,7 @@ export default function StudentsPage() {
               </Select>
               <input
                 type="date"
+                min={todayIso}
                 value={bulkDate}
                 onChange={(e) => setBulkDate(e.target.value)}
                 className="px-3 py-2 border border-gray-200 rounded-lg text-base text-gray-700 font-inter outline-none focus:border-primary"
@@ -574,6 +608,7 @@ export default function StudentsPage() {
                       <div className="hidden lg:block">
                         <input
                           type="date"
+                          min={todayIso}
                           key={`${s.id}-${s.graduation_date ?? 'none'}`}
                           defaultValue={s.graduation_date ? s.graduation_date.slice(0, 10) : ''}
                           onBlur={(e) => {
@@ -629,24 +664,35 @@ export default function StudentsPage() {
     transition={{ duration: 0.22 }}
   >
 
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+      <SearchInput
+        value={rejectedSearch}
+        onChange={setRejectedSearch}
+        placeholder="Search rejected students by name, email, phone or batch…"
+        wrapperClassName="flex-1 sm:max-w-xl"
+      />
+      {rejectedNotice && (
+        <p className={`text-sm ${rejectedNotice.ok ? 'text-green-700' : 'text-red-600'}`} role="status">{rejectedNotice.text}</p>
+      )}
+    </div>
+
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
 
-      <div className="hidden lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_100px_60px] gap-3 px-5 py-3 text-base text-gray-600 border-b border-gray-200 bg-gray-50">
-        <span>ID</span>
+      <div className="hidden lg:grid lg:grid-cols-[40px_1fr_70px_140px_100px_190px] gap-3 px-5 py-3 text-sm text-gray-600 border-b border-gray-200 bg-gray-50">
+        <span>#</span>
         <span>Student</span>
-        <span>Roll</span>
         <span>Grade</span>
         <span>Batch</span>
         <span>Status</span>
-        <span className="text-center">View</span>
+        <span className="text-right">Actions</span>
       </div>
 
       <div className="divide-y divide-gray-100">
 
-        {rejectedStudents.length === 0 ? (
+        {filteredRejected.length === 0 ? (
 
           <div className="py-12 text-center text-gray-500">
-            No rejected students.
+            {rejectedStudents.length === 0 ? 'No rejected students.' : `No rejected students match "${rejectedSearch}".`}
           </div>
 
         ) : (
@@ -655,36 +701,40 @@ export default function StudentsPage() {
 
             <div
               key={s.id}
-              className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_160px_70px_140px_100px_60px] gap-3 px-5 py-4 items-center hover:bg-gray-50"
+              className="flex flex-wrap lg:grid lg:grid-cols-[40px_1fr_70px_140px_100px_190px] gap-3 px-5 py-4 items-center hover:bg-gray-50"
             >
 
-              <span>{(rejectedPaging.page - 1) * rejectedPaging.pageSize + i + 1}</span>
+              <span className="text-sm text-gray-500 font-inter">{(rejectedPaging.page - 1) * rejectedPaging.pageSize + i + 1}</span>
 
-              <div>
-                <p className="text-primary">{s.name}</p>
-                <p>{s.email}</p>
-                <p>{s.mobile_number}</p>
+              <div className="min-w-0 flex-1 lg:flex-none">
+                <p className="text-base text-gray-900 truncate">{s.name}</p>
+                <p className="text-sm text-gray-500 truncate">{s.email}</p>
+                {s.mobile_number && <p className="text-sm text-gray-500">{s.mobile_number}</p>}
               </div>
 
-              <span>{s.admission_number || "-"}</span>
+              <span className="text-sm text-gray-600">{s.class_grade || "-"}</span>
 
-              <span>{s.class_grade || "-"}</span>
+              <span className="text-sm text-gray-600">{s.preferred_batch || "-"}</span>
 
-              <span>{s.preferred_batch || "-"}</span>
-
-              <span className="text-red-600">
+              <span className="inline-flex w-fit items-center gap-1.5 text-sm px-2.5 py-0.5 rounded-full bg-red-50 text-red-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                 Rejected
               </span>
 
-            <div className="flex justify-center">
-              <Link
-                href={`/admin/students/${s.id}`}
-                title="Show Details"
-                className="w-9 h-9 border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-primary transition-all rounded-lg"
-              >
-                <span className="text-xl leading-none">⋮</span>
-              </Link>
-            </div>
+              <div className="flex items-center gap-2 lg:justify-end w-full lg:w-auto">
+                <button
+                  onClick={() => { setAcceptTarget(s); setAcceptError(null) }}
+                  className={btnPrimarySm}
+                >
+                  Accept
+                </button>
+                <Link
+                  href={`/admin/students/${s.id}`}
+                  className={btnSecondarySm}
+                >
+                  View
+                </Link>
+              </div>
             </div>
 
           ))
@@ -738,6 +788,25 @@ export default function StudentsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={!!acceptTarget}
+        title={`Accept ${acceptTarget?.name ?? 'this student'}?`}
+        description="They will be approved exactly like a new application: an admission number and login are created, they are added to their batch, and a welcome email with their password is sent."
+        confirmLabel="Accept student"
+        busy={accepting}
+        error={acceptError}
+        onConfirm={confirmAccept}
+        onCancel={() => setAcceptTarget(null)}
+      >
+        {acceptTarget && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-2">
+            <SummaryRow label="Email" value={acceptTarget.email} />
+            {acceptTarget.mobile_number && <SummaryRow label="Phone" value={acceptTarget.mobile_number} />}
+            <SummaryRow label="Batch" value={acceptTarget.preferred_batch || '-'} />
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

@@ -13,8 +13,11 @@ import { CalendarIcon, ClockIcon, UploadIcon, CheckCircleIcon, TrashIcon, Report
 import ViewQuestionsModal from '@/components/admin/tests/ViewQuestionsModal'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SegmentedControl from '@/components/ui/SegmentedControl'
+import PageHeader from '@/components/ui/PageHeader'
+import { btnPrimary, btnSecondary } from '@/components/ui/buttonStyles'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 function windowOf(test: TestSummary): 'upcoming' | 'live' | 'ended' {
   const now = Date.now()
@@ -332,29 +335,25 @@ export default function AdminTestsPage() {
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Tests</h1>
-          <p className="text-[15px] text-zinc-500 mt-1">Schedule MCQ and descriptive tests, and grade student answers.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/question-bank"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
-            Question Bank
-          </Link>
-          <button onClick={() => setShowOverallAnalytics(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-300 text-violet-700 text-[15px] hover:bg-violet-50 transition-colors w-fit">
-            <ReportIcon className="w-4 h-4" />
-            Tests Report
-          </button>
-          <Link href="/admin/tests/new"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-[15px] transition-colors w-fit"
-            style={{ backgroundColor: ACCENT }}>
-            <ClockIcon className="w-4 h-4" />
-            Schedule New Test
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Tests"
+        subtitle="Schedule MCQ and descriptive tests, and grade student answers."
+        actions={
+          <>
+            <Link href="/admin/question-bank" className={btnSecondary}>
+              Question Bank
+            </Link>
+            <button onClick={() => setShowOverallAnalytics(true)} className={btnSecondary}>
+              <ReportIcon className="w-4 h-4" />
+              Tests Report
+            </button>
+            <Link href="/admin/tests/new" className={btnPrimary}>
+              <ClockIcon className="w-4 h-4" />
+              Schedule New Test
+            </Link>
+          </>
+        }
+      />
 
       {showOverallAnalytics && (
         <OverallAnalyticsModal onClose={() => setShowOverallAnalytics(false)} />
@@ -369,28 +368,17 @@ export default function AdminTestsPage() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        <button onClick={() => setBatchFilter('')}
-          className={`px-3.5 py-1.5 text-sm rounded-full border transition-colors ${
-            !batchFilter ? 'text-white border-transparent' : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'
-          }`} style={!batchFilter ? { backgroundColor: ACCENT } : undefined}>
-          All batches
-        </button>
-        <button onClick={() => setBatchFilter('ALL')}
-          className={`px-3.5 py-1.5 text-sm rounded-full border transition-colors ${
-            batchFilter === 'ALL' ? 'text-white border-transparent' : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'
-          }`} style={batchFilter === 'ALL' ? { backgroundColor: ACCENT } : undefined}>
-          All Students
-        </button>
-        {batches.map((b) => (
-          <button key={b.id} onClick={() => setBatchFilter(b.id)}
-            className={`px-3.5 py-1.5 text-sm rounded-full border transition-colors ${
-              batchFilter === b.id ? 'text-white border-transparent' : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'
-            }`} style={batchFilter === b.id ? { backgroundColor: ACCENT } : undefined}>
-            {b.name}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        className="mb-6"
+        ariaLabel="Filter tests by batch"
+        value={batchFilter}
+        onChange={setBatchFilter}
+        options={[
+          { value: '', label: 'All batches' },
+          { value: 'ALL', label: 'All Students' },
+          ...batches.map((b) => ({ value: b.id, label: b.name })),
+        ]}
+      />
 
       {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 mb-4">{error}</div>}
       {loading && <SkeletonCard count={3} />}

@@ -137,6 +137,11 @@ export async function uploadExamFile(
   })
 }
 
+/** Withdraws the student's submission for this document (only while its window is open). */
+export async function deleteExamSubmission(eventId: string, kind: ExamKind) {
+  return authedFetch(`/api/exam-documents/me/events/${eventId}/${kind}`, { method: 'DELETE' })
+}
+
 export async function submitManualMarks(
   eventId: string,
   marks: { marksObtained: number; maxMarks: number; grade?: string; remarks?: string }

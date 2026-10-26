@@ -5,6 +5,8 @@
 
 import Link from 'next/link'
 import { useMyExamEvents, type MySubmission } from '@/hooks/useExamDocuments'
+import PageHeader from '@/components/ui/PageHeader'
+import { btnPrimary } from '@/components/ui/buttonStyles'
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -29,13 +31,11 @@ export default function StudentExamDocumentsPage() {
   const { events, loading, error } = useMyExamEvents()
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl md:text-4xl text-primary mb-1">Exam documents</h1>
-        <p className="text-muted text-base">
-          Upload your hall ticket before each board exam and your marksheet after the results.
-        </p>
-      </div>
+    <div className="max-w-3xl">
+      <PageHeader
+        title="Exam Documents"
+        subtitle="Upload your hall ticket before each board exam and your marksheet after the results."
+      />
 
       {loading && <p className="text-base text-muted py-8 text-center">Loading...</p>}
       {error && <div className="px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-base">{error}</div>}
@@ -48,14 +48,14 @@ export default function StudentExamDocumentsPage() {
           <div key={ev.id} className="bg-white rounded-2xl shadow-sm p-5">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-xl text-primary">{ev.name}</h2>
-                <p className="text-base text-muted">Exam date: {formatDate(ev.examDate)}</p>
+                <h2 className="text-lg font-semibold text-gray-900">{ev.name}</h2>
+                <p className="text-sm text-muted">Exam date: {formatDate(ev.examDate)}</p>
               </div>
               <Link
                 href={`/student/exam-documents/${ev.id}?kind=${
                   ev.marksheet.open && ev.marksheet.status === 'pending' ? 'marksheet' : 'hall-ticket'
                 }`}
-                className="px-5 py-2 text-base bg-primary text-white rounded-lg hover:opacity-90"
+                className={btnPrimary}
               >
                 Open
               </Link>

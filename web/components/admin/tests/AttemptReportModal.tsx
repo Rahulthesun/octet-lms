@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { fetchAdminAttemptDetail, type AdminAttemptDetail, type TestSummary } from '@/hooks/useTests'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 function formatDuration(seconds: number) {
   const mins = Math.floor(seconds / 60)
@@ -74,7 +74,7 @@ export default function AttemptReportModal({ test, attemptId, rank, totalAttempt
 
           {detail && (
             <>
-              <div className="rounded-xl px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#F5F3FF' }}>
+              <div className="rounded-xl px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#f6f3f9' }}>
                 <span className="text-sm text-zinc-600">Score</span>
                 <span className="text-xl font-inter font-bold" style={{ color: ACCENT }}>
                   {detail.marksAwarded !== null ? `${detail.marksAwarded} / ${detail.maxMarks}` : 'Not graded'}{pct !== null && ` (${pct}%)`}

@@ -77,13 +77,9 @@ function expiresFromNow(seconds) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
-/** "YYYY-MM-DD" for today, in server local time */
+/** "YYYY-MM-DD" for today in the institution's timezone (the server itself runs in UTC). */
 function todayDateString() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return todayInTz();
 }
 
 /** Pull the day-of-month out of a "YYYY-MM-DD" string without any Date/timezone drift */
@@ -98,12 +94,103 @@ const DEFAULT_REFRESH_INTERVAL = 45; // seconds — long enough to absorb real s
 const QR_EXPIRY_GRACE_SECONDS = 8; // absorbs clock skew between client/server and the last few seconds of network
 // latency on a scan that was captured right at rotation; small enough to not meaningfully weaken the anti-sharing rotation.
 
+// ─── QR tokens ───────────────────────────────────────────────────────────────
+// The QR shown on the admin screen is "OCTET-ATT.<sessionId>.<window>.<sig>",
+// where <window> is the current refresh window (floor(now / interval)) and
+// <sig> is an HMAC of the two. Because the token is derived from the clock
+// rather than stored-and-replaced, every admin tab/projector showing the same
+// session displays the same code, and a code captured just before rotation is
+// still accepted for one more window instead of failing as "expired".
+//
+// Whether the session is still OPEN is tracked separately in
+// attendance_sessions.expires_at, which acts as a lease: the admin screen
+// renews it on every refresh, and "End session" sets it to the past.
+
+const QR_PREFIX = "OCTET-ATT";
+const SESSION_LEASE_WINDOWS = 3; // admin screen may miss up to two refreshes (sleeping laptop, flaky Wi-Fi) before scans stop
+
+function qrSecret() {
+  return process.env.ATTENDANCE_QR_SECRET || process.env.WATERMARK_SECRET || process.env.GOOGLE_OAUTH_STATE_SECRET || null;
+}
+
+function qrSignature(sessionId, windowIndex) {
+  return crypto
+    .createHmac("sha256", qrSecret())
+    .update(`attendance-qr:${sessionId}:${windowIndex}`)
+    .digest("base64url")
+    .slice(0, 22);
+}
+
+function currentQrWindow(intervalSeconds, at = Date.now()) {
+  return Math.floor(at / (intervalSeconds * 1000));
+}
+
+/** The QR payload for this session right now, plus when it rotates. */
+function currentQrToken(sessionId, intervalSeconds) {
+  const windowIndex = currentQrWindow(intervalSeconds);
+  const rotatesAt = new Date((windowIndex + 1) * intervalSeconds * 1000).toISOString();
+  if (!qrSecret()) {
+    // No signing secret configured: fall back to a random token stored on the row.
+    return { qrToken: generateQrToken(), rotatesAt, signed: false };
+  }
+  return { qrToken: `${QR_PREFIX}.${sessionId}.${windowIndex}.${qrSignature(sessionId, windowIndex)}`, rotatesAt, signed: true };
+}
+
+/** Returns { sessionId, windowIndex } for a well-formed, correctly signed token, else null. */
+function parseSignedQrToken(token) {
+  if (typeof token !== "string" || !qrSecret()) return null;
+  const parts = token.trim().split(".");
+  if (parts.length !== 4 || parts[0] !== QR_PREFIX) return null;
+  const [, sessionId, windowStr, sig] = parts;
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId) || !/^\d+$/.test(windowStr)) return null;
+  const windowIndex = Number(windowStr);
+  const expected = Buffer.from(qrSignature(sessionId, windowIndex));
+  const given = Buffer.from(sig);
+  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) return null;
+  return { sessionId, windowIndex };
+}
+
+function sessionLeaseExpiry(intervalSeconds) {
+  return expiresFromNow(intervalSeconds * SESSION_LEASE_WINDOWS);
+}
+
+/** A QR session is open while its lease (expires_at) has not run out. */
+function isSessionOpen(session) {
+  return !!session?.expires_at && new Date(session.expires_at).getTime() + QR_EXPIRY_GRACE_SECONDS * 1000 >= Date.now();
+}
+
+// ─── Which sessions count toward attendance percentages ─────────────────────
+// A session only counts once attendance has actually been taken for it:
+//   - never a future-dated session (online classes create theirs up front);
+//   - a Google Meet session only after its attendance sync has run (or once
+//     it has any attendance rows, e.g. a QR session that a class later adopted).
+// Otherwise every student would be "absent" from classes that haven't happened
+// or were never measured, dragging every percentage towards zero.
+const MEASURED_MEET_STATUSES = new Set(["SYNCED", "MANUALLY_REVIEWED"]);
+const COUNTABLE_SESSION_COLS = "date, source, sync_status";
+
+async function filterCountableSessions(sessions) {
+  const today = todayDateString();
+  const held = (sessions || []).filter((s) => !s.date || s.date <= today);
+  const unmeasured = held.filter((s) => s.source === "GOOGLE_MEET" && !MEASURED_MEET_STATUSES.has(s.sync_status));
+  if (unmeasured.length === 0) return held;
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .select("session_id")
+    .in("session_id", unmeasured.map((s) => s.id));
+  if (error) throw error;
+  const withRecords = new Set((data || []).map((r) => r.session_id));
+  const skip = new Set(unmeasured.filter((s) => !withRecords.has(s.id)).map((s) => s.id));
+  return held.filter((s) => !skip.has(s.id));
+}
+
 const WEEKDAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** True if a batch's `days` field (e.g. "Tue/Thu/Sat") includes today's weekday. */
+/** True if a batch's `days` field (e.g. "Tue/Thu/Sat") includes today's weekday (institution timezone). */
 function isBatchDayToday(daysStr) {
   if (!daysStr) return false;
-  const today = WEEKDAY_ABBR[new Date().getDay()];
+  const [y, m, d] = todayInTz().split("-").map(Number);
+  const today = WEEKDAY_ABBR[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return daysStr.split("/").map((s) => s.trim()).includes(today);
 }
 
@@ -228,12 +315,13 @@ async function getBatchStudents(batchId) {
   const studentIds = enrollments.map((e) => e.student_id);
 
   // 2. All sessions that count for this batch (its own + All Students sessions)
-  const { data: sessions, error: sessErr } = await applyBatchSessionScope(
-    supabase.from("attendance_sessions").select("id"),
+  const { data: rawSessions, error: sessErr } = await applyBatchSessionScope(
+    supabase.from("attendance_sessions").select(`id, ${COUNTABLE_SESSION_COLS}`),
     batchId
   );
 
   if (sessErr) throw sessErr;
+  const sessions = await filterCountableSessions(rawSessions);
 
   const totalSessions = sessions?.length || 0;
   const sessionIds = (sessions || []).map((s) => s.id);
@@ -427,6 +515,7 @@ async function getTodayRoster(batchId) {
           refreshIntervalSeconds:  session.refresh_interval_seconds,
           createdAt:               session.created_at,
           source:                  session.source || "OFFLINE",
+          live:                    isSessionOpen(session),
         }
       : null,
     totalStudents: roster.length,
@@ -449,12 +538,13 @@ async function getBatchSummary(batchId) {
   const rosterIds = new Set(rosterStudents.map((s) => s.id));
   const totalStudents = rosterStudents.length;
 
-  const { data: sessions, error: sessErr } = await applyBatchSessionScope(
-    supabase.from("attendance_sessions").select("id, date"),
+  const { data: allBatchSessions, error: sessErr } = await applyBatchSessionScope(
+    supabase.from("attendance_sessions").select(`id, ${COUNTABLE_SESSION_COLS}`),
     batchId
   ).order("date", { ascending: false });
 
   if (sessErr) throw sessErr;
+  const sessions = await filterCountableSessions(allBatchSessions);
 
   const totalSessions = sessions?.length || 0;
   const sessionIds = (sessions || []).map((s) => s.id);
@@ -475,7 +565,7 @@ async function getBatchSummary(batchId) {
   }
 
   const todayStr = todayDateString();
-  const todaySession = (sessions || []).find((s) => s.date === todayStr);
+  const todaySession = (allBatchSessions || []).find((s) => s.date === todayStr);
 
   let presentToday = 0;
   if (todaySession) {
@@ -594,12 +684,40 @@ async function setStudentOverride(studentId, batchId, unblocked) {
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
+/** Opens (or keeps open) a session's lease and returns the QR it should display right now. */
+async function openSessionLease(session) {
+  const interval = session.refresh_interval_seconds || DEFAULT_REFRESH_INTERVAL;
+  const { qrToken, rotatesAt } = currentQrToken(session.id, interval);
+  const { error } = await supabase
+    .from("attendance_sessions")
+    .update({ qr_token: qrToken, expires_at: sessionLeaseExpiry(interval) })
+    .eq("id", session.id);
+  if (error) throw error;
+  return { qrToken, expiresAt: rotatesAt, refreshIntervalSeconds: interval };
+}
+
+async function countMarkedPresent(sessionId) {
+  const { count, error } = await supabase
+    .from("attendance_records")
+    .select("student_id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .eq("present", true);
+  if (error) throw error;
+  return count || 0;
+}
+
 /**
- * POST /sessions — idempotent.
- * If a session already exists for (batch_id, date), return it.
+ * POST /sessions — idempotent. There is one session per (batch, date), so
+ * starting again the same day resumes that session (and re-opens it if it
+ * was ended). `alreadyMarked` tells the admin screen how many students were
+ * marked before this start, so a resumed session never looks like a bug.
  */
 async function startSession(batchId, date) {
   await assertBatchExists(batchId);
+
+  if (date !== todayDateString()) {
+    throw Object.assign(new Error("A live QR session can only be started for today's date"), { status: 400 });
+  }
 
   // Check existing (an All Students session is unique per date)
   let existingQuery = supabase.from("attendance_sessions").select("*").eq("date", date);
@@ -608,17 +726,15 @@ async function startSession(batchId, date) {
 
   if (findErr) throw findErr;
   if (existing) {
+    const lease = await openSessionLease(existing);
     return {
-      sessionId:              existing.id,
-      qrToken:                existing.qr_token,
-      expiresAt:              existing.expires_at,
-      refreshIntervalSeconds: existing.refresh_interval_seconds,
+      sessionId:     existing.id,
+      ...lease,
+      resumed:       true,
+      alreadyMarked: await countMarkedPresent(existing.id),
+      source:        existing.source || "OFFLINE",
     };
   }
-
-  // Create new
-  const qrToken   = generateQrToken();
-  const expiresAt = expiresFromNow(DEFAULT_REFRESH_INTERVAL);
 
   const { data, error } = await supabase
     .from("attendance_sessions")
@@ -626,8 +742,8 @@ async function startSession(batchId, date) {
       batch_id:                 isAll(batchId) ? null : batchId,
       audience:                 isAll(batchId) ? "ALL" : "BATCH",
       date,
-      qr_token:                 qrToken,
-      expires_at:               expiresAt,
+      qr_token:                 generateQrToken(),
+      expires_at:               sessionLeaseExpiry(DEFAULT_REFRESH_INTERVAL),
       refresh_interval_seconds: DEFAULT_REFRESH_INTERVAL,
     })
     .select("*")
@@ -635,38 +751,41 @@ async function startSession(batchId, date) {
 
   if (error) throw error;
 
-  return {
-    sessionId:              data.id,
-    qrToken:                data.qr_token,
-    expiresAt:              data.expires_at,
-    refreshIntervalSeconds: data.refresh_interval_seconds,
-  };
+  const lease = await openSessionLease(data);
+  return { sessionId: data.id, ...lease, resumed: false, alreadyMarked: 0, source: data.source || "OFFLINE" };
 }
 
 /**
- * POST /sessions/:sessionId/refresh — rotate QR token.
+ * POST /sessions/:sessionId/refresh — called by the admin screen at every
+ * rotation: returns the current QR and renews the session's open lease.
  */
 async function refreshSession(sessionId) {
   const { data: session, error: findErr } = await supabase
     .from("attendance_sessions")
-    .select("id, refresh_interval_seconds")
+    .select("id, refresh_interval_seconds, date")
     .eq("id", sessionId)
     .maybeSingle();
 
   if (findErr) throw findErr;
   if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
+  if (session.date !== todayDateString()) {
+    throw Object.assign(new Error("This session was for an earlier day and has closed"), { status: 410 });
+  }
 
-  const qrToken   = generateQrToken();
-  const expiresAt = expiresFromNow(session.refresh_interval_seconds);
+  return openSessionLease(session);
+}
 
-  const { error } = await supabase
+/** POST /sessions/:sessionId/end — closes the session so no further scans are accepted. */
+async function endSession(sessionId) {
+  const { data, error } = await supabase
     .from("attendance_sessions")
-    .update({ qr_token: qrToken, expires_at: expiresAt })
-    .eq("id", sessionId);
-
+    .update({ expires_at: new Date(Date.now() - (QR_EXPIRY_GRACE_SECONDS + 1) * 1000).toISOString() })
+    .eq("id", sessionId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
-
-  return { qrToken, expiresAt };
+  if (!data) throw Object.assign(new Error("Session not found"), { status: 404 });
+  return { presentCount: await countMarkedPresent(sessionId) };
 }
 
 // ─── Roster ───────────────────────────────────────────────────────────────────
@@ -697,7 +816,7 @@ async function getRoster(sessionId) {
     const studentIds = students.map((e) => e.student_id);
     const { data: records, error: recErr } = await supabase
       .from("attendance_records")
-      .select("student_id, present, marked_at, final_status, duration_minutes")
+      .select("student_id, present, marked_at, final_status, duration_minutes, synced_at")
       .eq("session_id", sessionId)
       .in("student_id", studentIds);
 
@@ -719,6 +838,8 @@ async function getRoster(sessionId) {
       status:    effectiveStatus(record),
       durationMinutes: record?.duration_minutes ?? null,
       markedAt:  record?.marked_at || null,
+      // How the mark got there — lets the admin see when a row came from a Google Meet sync rather than a scan.
+      markedVia: !record ? null : record.synced_at ? "GOOGLE_MEET" : "QR_OR_MANUAL",
     };
   });
 }
@@ -749,7 +870,14 @@ async function manualMark(sessionId, studentId, present) {
   const { error } = await supabase
     .from("attendance_records")
     .upsert(
-      { session_id: sessionId, student_id: studentId, present, marked_at: new Date().toISOString() },
+      {
+        session_id: sessionId,
+        student_id: studentId,
+        present,
+        status: present ? "present" : "absent",
+        final_status: present ? "present" : "absent",
+        marked_at: new Date().toISOString(),
+      },
       { onConflict: "session_id,student_id" }
     );
 
@@ -777,19 +905,35 @@ async function scanQrToken(qrToken, authUserId) {
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student profile not found"), { status: 404 });
 
-  // 2. Find the active session for this token (not expired)
-  const { data: session, error: sessErr } = await supabase
-    .from("attendance_sessions")
-    .select("id, batch_id, audience, expires_at")
-    .eq("qr_token", qrToken)
-    .maybeSingle();
+  // 2. Resolve the session the QR belongs to
+  const sessionCols = "id, batch_id, audience, expires_at, refresh_interval_seconds, date";
+  const signed = parseSignedQrToken(qrToken);
+  let session;
+  if (signed) {
+    const { data, error } = await supabase.from("attendance_sessions").select(sessionCols).eq("id", signed.sessionId).maybeSingle();
+    if (error) throw error;
+    session = data;
+  } else {
+    // Unsigned / legacy token: must match the one currently stored on the session.
+    const { data, error } = await supabase.from("attendance_sessions").select(sessionCols).eq("qr_token", String(qrToken).trim()).maybeSingle();
+    if (error) throw error;
+    session = data;
+  }
+  if (!session) {
+    throw Object.assign(new Error("This is not a valid attendance QR code. Scan the code shown on your teacher's screen."), { status: 400 });
+  }
 
-  if (sessErr) throw sessErr;
-  if (!session) throw Object.assign(new Error("Invalid or expired QR token"), { status: 400 });
-
-  // 3. Check token expiry (with a small grace window — see QR_EXPIRY_GRACE_SECONDS above)
-  if (new Date(session.expires_at).getTime() + QR_EXPIRY_GRACE_SECONDS * 1000 < Date.now()) {
-    throw Object.assign(new Error("QR token has expired"), { status: 400 });
+  // 3. The session must still be open, and the code must be the current or the previous one
+  if (!isSessionOpen(session) || session.date !== todayDateString()) {
+    throw Object.assign(new Error("This attendance session has ended. Ask your teacher to start it again."), { status: 400 });
+  }
+  if (signed) {
+    const interval = session.refresh_interval_seconds || DEFAULT_REFRESH_INTERVAL;
+    const validUntil = (signed.windowIndex + 2) * interval * 1000 + QR_EXPIRY_GRACE_SECONDS * 1000;
+    const nowWindow = currentQrWindow(interval);
+    if (Date.now() > validUntil || signed.windowIndex > nowWindow + 1) {
+      throw Object.assign(new Error("This QR code has already refreshed. Scan the new code on the screen."), { status: 400 });
+    }
   }
 
   // 4. Check enrollment — an All Students session admits every active student
@@ -806,19 +950,35 @@ async function scanQrToken(qrToken, authUserId) {
 
     if (enrErr) throw enrErr;
     if (!enrollment) {
-      throw Object.assign(new Error("Student not enrolled in this batch"), { status: 403 });
+      throw Object.assign(new Error("You are not enrolled in the batch this session is for."), { status: 403 });
     }
   }
+
+  const { data: already } = await supabase
+    .from("attendance_records")
+    .select("present")
+    .eq("session_id", session.id)
+    .eq("student_id", student.id)
+    .maybeSingle();
+  if (already?.present === true) return { alreadyMarked: true };
 
   // 5. Mark present (upsert — idempotent if they scan twice)
   const { error: markErr } = await supabase
     .from("attendance_records")
     .upsert(
-      { session_id: session.id, student_id: student.id, present: true, marked_at: new Date().toISOString() },
+      {
+        session_id: session.id,
+        student_id: student.id,
+        present: true,
+        status: "present",
+        final_status: "present",
+        marked_at: new Date().toISOString(),
+      },
       { onConflict: "session_id,student_id" }
     );
 
   if (markErr) throw markErr;
+  return { alreadyMarked: false };
 }
 
 // ─── Online-class session linking (used by onlineClasses.service.js and
@@ -1174,12 +1334,13 @@ async function getMyAttendanceSummary(authUserId) {
 
   // Own batches' sessions plus All Students sessions — each session once,
   // however many batches the student is in.
-  const { data: sessions, error: sessErr } = await supabase
+  const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id")
+    .select(`id, ${COUNTABLE_SESSION_COLS}`)
     .or(sessionScopeFilter(batchIds));
 
   if (sessErr) throw sessErr;
+  const sessions = await filterCountableSessions(rawSessions);
 
   const totalSessions = sessions?.length || 0;
   const sessionIds = (sessions || []).map((s) => s.id);
@@ -1352,12 +1513,14 @@ async function getMyTodaySchedule(authUserId) {
   const todayStr = todayDateString();
   const { data: sessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("batch_id")
-    .in("batch_id", batchIds)
+    .select("batch_id, audience, expires_at")
+    .or(sessionScopeFilter(batchIds))
     .eq("date", todayStr);
 
   if (sessErr) throw sessErr;
-  const liveBatchIds = new Set((sessions || []).map((s) => s.batch_id));
+  const openSessions = (sessions || []).filter(isSessionOpen);
+  const allStudentsLive = openSessions.some((s) => s.audience === "ALL");
+  const liveBatchIds = new Set(openSessions.map((s) => s.batch_id));
 
   const classes = (batches || [])
     .filter((b) => isBatchDayToday(b.days))
@@ -1369,7 +1532,7 @@ async function getMyTodaySchedule(authUserId) {
       deliveryType: (b.delivery_type || "OFFLINE").toLowerCase(),
       meetLink:     b.meet_link || null,
       location:     b.location || null,
-      sessionLive:  liveBatchIds.has(b.id),
+      sessionLive:  allStudentsLive || liveBatchIds.has(b.id),
     }));
 
   return { classes };
@@ -1403,11 +1566,12 @@ async function getAttendancePercentagesForStudents(studentIds) {
 
   // Every session that could count for anyone in the list: their batches'
   // sessions plus All Students sessions (which count once for everybody).
-  const { data: sessions, error: sessErr } = await supabase
+  const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, batch_id, audience")
+    .select(`id, batch_id, audience, ${COUNTABLE_SESSION_COLS}`)
     .or(sessionScopeFilter(Array.from(allBatchIds)));
   if (sessErr) throw sessErr;
+  const sessions = await filterCountableSessions(rawSessions);
 
   const sessionIdsByBatch = {};
   const allStudentsSessionIds = [];
@@ -1738,9 +1902,12 @@ module.exports = {
   setStudentOverride,
   startSession,
   refreshSession,
+  endSession,
   getRoster,
   manualMark,
   scanQrToken,
+  parseSignedQrToken,
+  currentQrToken,
   getOrCreateSessionForOnlineClass,
   detachSessionFromOnlineClass,
   getSessionByOnlineClassId,

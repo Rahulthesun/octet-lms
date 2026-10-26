@@ -7,6 +7,7 @@ import { useMyTests, type StudentTestListItem } from '@/hooks/useTests'
 import DescriptiveAnswerPanel from '@/components/student/tests/DescriptiveAnswerPanel'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -131,12 +132,12 @@ export default function StudentTestsPage() {
   ]
 
   return (
-    <div className="p-6 lg:p-6 max-w-7xl mx-auto">
+    <div>
       {/* Heading + compact stats, side by side */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <h1 className="text-3xl md:text-4xl text-primary mb-1">Tests</h1>
-          <p className="text-muted text-base">Attempt live tests and track your results</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Tests</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Attempt live tests and track your results</p>
         </motion.div>
 
         {/* Summary tiles, compact and colour-stroked, parallel to the heading (values come from the API) */}
@@ -155,16 +156,18 @@ export default function StudentTestsPage() {
         </motion.div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-5">
-        {(['all', 'live', 'upcoming', 'ended'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-md text-[15px] capitalize transition-all duration-150 ${
-              filter === f ? 'bg-brand text-white' : 'bg-white border border-border text-primary hover:bg-accent1/50'
-            }`}>
-            {f === 'live' ? 'Live now' : f}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        className="mb-5"
+        ariaLabel="Filter tests"
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'all', label: 'All' },
+          { value: 'live', label: 'Live now' },
+          { value: 'upcoming', label: 'Upcoming' },
+          { value: 'ended', label: 'Ended' },
+        ]}
+      />
 
       {error && <p className="text-rose-600 text-[15px] mb-4">{error}</p>}
       {loading && <SkeletonCard count={3} />}

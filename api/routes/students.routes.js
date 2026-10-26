@@ -121,6 +121,9 @@ router.post("/:id/approve", verifyToken, adminOnly, studentController.approveStu
 // POST   /api/students/:id/reject    → reject a pending student (with optional reason) — admin only
 router.post("/:id/reject", verifyToken, adminOnly, studentController.rejectStudent);
 
+// Accept a previously rejected applicant — runs the full approval flow.
+router.post("/:id/reinstate", verifyToken, adminOnly, studentController.reinstateStudent);
+
 // ======================== Additional Utilities ========================
 
 // GET    /api/students/batch/:batchId   → list students by batch (MORNING/EVENING/NIGHT) — admin only

@@ -15,6 +15,8 @@ import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer
 import { getSession } from "@/lib/auth";
 import { QaCategorySection, QaUnitContentPanel, type SelectedQaUnit } from "@/components/admin/qa/QaCategorySection";
 import { SkeletonList } from "@/components/ui/Skeleton";
+import SearchInput from '@/components/ui/SearchInput'
+import { btnAddRow, btnPrimary } from '@/components/ui/buttonStyles'
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
 
@@ -117,20 +119,6 @@ function formatBytes(bytes: number, decimals = 2) {
   );
 }
   */
-}
-
-function SearchIcon({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none">
-      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M 10.5,10.5 L 14,14"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 function PlusIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
@@ -1052,7 +1040,7 @@ export default function ContentPage() {
       <div className="shrink-0 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="shrink-0">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
               Content Manager
             </h1>
           </div>
@@ -1079,24 +1067,7 @@ export default function ContentPage() {
 
       {/* ── Search bar ── */}
       <div className="shrink-0 px-6 pb-3">
-        <div className="relative w-full max-w-xl">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chapters or files…"
-            className="w-full bg-transparent border border-gray-300 rounded-full pl-10 pr-4 py-2 text-base text-gray-700 placeholder-gray-400 outline-none focus:border-primary"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-            >
-              <IconClose className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search chapters or files…" />
       </div>
 
       {/* ── Two-panel body ── */}
@@ -1130,10 +1101,10 @@ export default function ContentPage() {
             </div>
             <button
               onClick={openAddSubject}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition hover:bg-primary/90 cursor-pointer shrink-0"
+              className={`${btnPrimary} shrink-0`}
             >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add
+              <PlusIcon className="h-4 w-4" />
+              Add Subject
             </button>
           </div>
 
@@ -1155,7 +1126,7 @@ export default function ContentPage() {
               </div>
             ) : visibleSubjects.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-base">
-                {`No subjects in Class ${activeGrade} yet — click "+ Add" above to create one.`}
+                {`No subjects in Class ${activeGrade} yet — click "Add Subject" above to create one.`}
               </div>
             ) : (
               visibleSubjects.map((subject) => {
@@ -1614,7 +1585,7 @@ export default function ContentPage() {
                                     setAddingChapterToSubject(subject.id);
                                     setNewChapterName("");
                                   }}
-                                  className="mx-4 mb-3 mt-1 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 py-2.5 text-sm text-gray-400 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
+                                  className={`${btnAddRow} mx-4 mb-3 mt-1 !w-[calc(100%-2rem)]`}
                                 >
                                   <PlusIcon className="h-4 w-4" />
                                   Add Chapter
@@ -1635,7 +1606,7 @@ export default function ContentPage() {
                 categories (Subject → Unit → Class), not PDF/video subjects. ── */}
             {([
               { key: "qa" as const, label: "Q&A" },
-              { key: "practice" as const, label: "Practise Questions" },
+              { key: "practice" as const, label: "Practice Questions" },
             ]).map(({ key, label }) => {
               const open = openCategoryId === key;
               return (

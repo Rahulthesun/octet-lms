@@ -319,13 +319,13 @@ export function StudentQaSection({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[#e2e5ec] border-l-4 border-l-[#5B21B6] shadow-[0_2px_12px_rgba(15,23,42,0.06)] overflow-hidden">
+    <div className="bg-white rounded-lg border border-[#e2e5ec] border-l-4 border-l-[#5e4075] shadow-[0_2px_12px_rgba(15,23,42,0.06)] overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F4F1F8] transition-colors cursor-pointer"
       >
         <Chevron open={open} className="w-4 h-4 text-muted shrink-0" />
-        <span className="text-[#5B21B6] shrink-0 font-bold">
+        <span className="text-[#5e4075] shrink-0 font-bold">
           <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
             <path
               d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4H5a2 2 0 01-2-2V5z"

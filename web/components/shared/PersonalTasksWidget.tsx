@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { authedFetch } from '@/lib/apiClient'
+import { nowISODateTimeLocal } from '@/lib/helpers'
 
 interface PersonalTask {
   id: string
@@ -108,6 +109,10 @@ export default function PersonalTasksWidget({
   async function addTask() {
     const trimmed = content.trim()
     if (!trimmed || adding) return
+    if (showReminder && dueAt && new Date(dueAt).getTime() < Date.now()) {
+      setError('The reminder time has already passed. Pick a time in the future.')
+      return
+    }
     setAdding(true)
     setError(null)
     try {
@@ -208,6 +213,7 @@ export default function PersonalTasksWidget({
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2.5">
             <input
               type="datetime-local"
+              min={nowISODateTimeLocal()}
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
               className={`text-sm bg-transparent outline-none ${mutedClassName}`}

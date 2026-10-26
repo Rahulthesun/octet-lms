@@ -16,8 +16,9 @@ import { Watermark, useExamGuard } from '@/components/shared/ExamSecurity'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import type { ContentType, OptionKey, QuestionContentFields } from '@/hooks/useTests'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 interface BankGroup {
   sourceTestId: string | null
@@ -824,7 +825,7 @@ export default function QuestionBankPage() {
     <div className={`transition-[filter] duration-150 ${blurred ? 'blur-xl select-none' : ''}`}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Question Bank</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Question Bank</h1>
           <p className="text-[15px] text-zinc-500 mt-1">Every question saved from past tests, plus any added here directly.</p>
         </div>
         <button onClick={() => setShowAdd(true)}
@@ -836,13 +837,7 @@ export default function QuestionBankPage() {
       </div>
 
       <div className="mb-6">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by label"
-          className="w-full sm:max-w-sm text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-        />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by label" />
       </div>
 
       {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 mb-4">{error}</div>}

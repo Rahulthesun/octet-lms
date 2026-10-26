@@ -61,6 +61,8 @@ export interface EligibleStudent {
 export interface AttendanceEntry {
   studentId: string
   present: boolean
+  markedAt?: string | null
+  markedVia?: 'GOOGLE_MEET' | 'QR_OR_MANUAL' | null
 }
 
 export interface TrendPoint {
@@ -404,33 +406,102 @@ export async function downloadAttendanceFile(path: string, filename: string) {
 // of firing automatically whenever this hook is mounted/active, so merely
 // opening the QR tab no longer creates a phantom attendance_sessions row.
 
-export function useAttendanceSession(batchId: string | null, date: string, active: boolean) {
+// The live session survives a page refresh: while it is running, its batch
+// and date are kept in localStorage and the page re-opens it on load. It only
+// stops when the admin presses "End session" (which also closes it server-side).
+
+export interface LiveQrContext {
+  grade: string
+  batchId: string
+  date: string
+}
+
+const LIVE_QR_KEY = 'octet:live-qr-session'
+
+export function readLiveQrContext(): LiveQrContext | null {
+  try {
+    const raw = localStorage.getItem(LIVE_QR_KEY)
+    return raw ? (JSON.parse(raw) as LiveQrContext) : null
+  } catch {
+    return null
+  }
+}
+
+function writeLiveQrContext(ctx: LiveQrContext | null) {
+  try {
+    if (ctx) localStorage.setItem(LIVE_QR_KEY, JSON.stringify(ctx))
+    else localStorage.removeItem(LIVE_QR_KEY)
+  } catch {
+    // storage unavailable (private mode) — the session still works, it just won't auto-resume
+  }
+}
+
+export function useAttendanceSession(batchId: string | null, date: string, active: boolean, grade: string | null) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [qrToken, setQrToken] = useState('')
-  const [refreshSeconds, setRefreshSeconds] = useState(30)
-  const [countdown, setCountdown] = useState(30)
+  const [refreshSeconds, setRefreshSeconds] = useState(45)
+  const [rotatesAt, setRotatesAt] = useState<number>(0)
+  const [countdown, setCountdown] = useState(45)
   const [error, setError] = useState<string | null>(null)
   const [started, setStarted] = useState(false)
+  const [resumedWithMarked, setResumedWithMarked] = useState(0)
 
-  const startSession = useCallback(() => setStarted(true), [])
-  const stopSession = useCallback(() => {
-    setStarted(false)
-    setSessionId(null)
-    setQrToken('')
-  }, [])
-
+  // Resume automatically if this batch/date was live when the page was last open.
   useEffect(() => {
-    setStarted(false)
+    const live = readLiveQrContext()
+    setStarted(!!live && live.batchId === batchId && live.date === date)
     setSessionId(null)
     setQrToken('')
+    setError(null)
+    setResumedWithMarked(0)
   }, [batchId, date])
 
-  useEffect(() => {
-    if (!active || !batchId || !started) {
-      return
+  const startSession = useCallback(() => {
+    if (!batchId) return
+    writeLiveQrContext({ grade: grade ?? '', batchId, date })
+    setStarted(true)
+  }, [batchId, date, grade])
+
+  const stopSession = useCallback(async () => {
+    const id = sessionId
+    writeLiveQrContext(null)
+    setStarted(false)
+    setSessionId(null)
+    setQrToken('')
+    setResumedWithMarked(0)
+    if (id) {
+      await authedFetch(`/api/attendance/sessions/${id}/end`, { method: 'POST' }).catch(() => {})
     }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!active || !batchId || !started) return
     let cancelled = false
-    let refreshTimer: ReturnType<typeof setInterval>
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    function apply(d: { qrToken: string; expiresAt: string; refreshIntervalSeconds: number }) {
+      setQrToken(d.qrToken)
+      setRefreshSeconds(d.refreshIntervalSeconds)
+      setRotatesAt(new Date(d.expiresAt).getTime())
+      setError(null)
+    }
+
+    // The server decides when the code rotates; fetch the new one right at that moment.
+    function scheduleNext(id: string, expiresAt: string) {
+      const wait = Math.max(500, new Date(expiresAt).getTime() - Date.now() + 250)
+      timer = setTimeout(async () => {
+        try {
+          const r = await authedFetch(`/api/attendance/sessions/${id}/refresh`, { method: 'POST' })
+          if (cancelled) return
+          apply(r)
+          scheduleNext(id, r.expiresAt)
+        } catch (e: unknown) {
+          if (cancelled) return
+          setError(e instanceof Error ? e.message : 'Failed to refresh QR code')
+          timer = setTimeout(() => scheduleNext(id, new Date().toISOString()), 3000)
+        }
+      }, wait)
+    }
 
     authedFetch(`/api/attendance/sessions`, {
       method: 'POST',
@@ -440,39 +511,32 @@ export function useAttendanceSession(batchId: string | null, date: string, activ
         if (cancelled) return
         const session = d.session
         setSessionId(session.sessionId)
-        setQrToken(session.qrToken)
-        setRefreshSeconds(session.refreshIntervalSeconds)
-        setCountdown(session.refreshIntervalSeconds)
-
-        refreshTimer = setInterval(async () => {
-          try {
-            const r = await authedFetch(`/api/attendance/sessions/${session.sessionId}/refresh`, {
-              method: 'POST',
-            })
-            if (!cancelled) {
-              setQrToken(r.qrToken)
-              setCountdown(session.refreshIntervalSeconds)
-            }
-          } catch (e: unknown) {
-            if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to refresh QR code')
-          }
-        }, session.refreshIntervalSeconds * 1000)
+        setResumedWithMarked(session.resumed ? session.alreadyMarked ?? 0 : 0)
+        apply(session)
+        scheduleNext(session.sessionId, session.expiresAt)
       })
-      .catch((e: Error) => { if (!cancelled) setError(e.message) })
+      .catch((e: Error) => {
+        if (cancelled) return
+        setError(e.message)
+        setStarted(false)
+        writeLiveQrContext(null)
+      })
 
     return () => {
       cancelled = true
-      if (refreshTimer) clearInterval(refreshTimer)
+      if (timer) clearTimeout(timer)
     }
   }, [active, batchId, date, started])
 
   useEffect(() => {
-    if (!active || !started) return
-    const t = setInterval(() => setCountdown(p => (p > 0 ? p - 1 : refreshSeconds)), 1000)
+    if (!active || !started || !rotatesAt) return
+    const tick = () => setCountdown(Math.max(0, Math.ceil((rotatesAt - Date.now()) / 1000)))
+    tick()
+    const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [active, started, refreshSeconds])
+  }, [active, started, rotatesAt])
 
-  return { sessionId, qrToken, countdown, refreshSeconds, error, started, startSession, stopSession }
+  return { sessionId, qrToken, countdown, refreshSeconds, error, started, startSession, stopSession, resumedWithMarked }
 }
 
 // ─── Roster: present/absent for the active session, polled ───────────────────

@@ -31,7 +31,7 @@ export default function VideoReportPage() {
   const selected = videos.find((v) => v.videoId === selectedVideoId)
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="max-w-5xl">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
         <button
           onClick={() => router.push('/student/courses')}
@@ -42,8 +42,8 @@ export default function VideoReportPage() {
           </svg>
           Back to Video Lessons
         </button>
-        <h1 className="text-3xl md:text-4xl text-primary mb-1">Video Report</h1>
-        <p className="text-muted text-base">Your own watch-time, session, and engagement statistics</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Video Report</h1>
+        <p className="text-sm sm:text-base text-gray-500 mt-1">Your own watch-time, session, and engagement statistics</p>
       </motion.div>
 
       {videosLoading && <p className="text-muted text-[15px]">Loading your watched lessons…</p>}

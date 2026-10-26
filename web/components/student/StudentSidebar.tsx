@@ -178,7 +178,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
             <ChemistryOctetLogo size={44} />
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="text-base text-[15px] text-[#7A6B96] whitespace-nowrap leading-tight">
+            <p className="text-base text-[15px] text-[#5e4075] whitespace-nowrap leading-tight">
               Chemistry<span className="text-[#64748b]">@OCTET</span>
             </p>
           </div>
@@ -211,8 +211,8 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
                 href={item.href}
                 className={`relative flex items-center h-12 transition-colors group ${
                   collapsed
-                    ? `w-full justify-center border-l-2 ${active ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'}`
-                    : `w-full px-4 gap-3 border-l-2 ${active ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'}`
+                    ? `w-full justify-center border-l-2 ${active ? 'border-[#5e4075] bg-[#F4F1F8] text-[#5e4075]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#5e4075]'}`
+                    : `w-full px-4 gap-3 border-l-2 ${active ? 'border-[#5e4075] bg-[#F4F1F8] text-[#5e4075]' : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#5e4075]'}`
                 }`}
               >
                 {item.icon}
@@ -222,7 +222,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
                 )}
 
                 {collapsed && (
-                  <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#7A6B96] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#5e4075] text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                     {item.label}
                   </span>
                 )}
@@ -242,7 +242,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
     collapsed ? (
       <button
         onClick={exitGuestMode}
-        className="relative group w-full h-12 flex items-center justify-center border-l-2 border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96] transition-colors"
+        className="relative group w-full h-12 flex items-center justify-center border-l-2 border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#5e4075] transition-colors"
         title="Switch back to admin"
       >
         <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
@@ -272,8 +272,8 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
     href="/student/notifications"
     className={`relative flex items-center h-12 w-full border-l-2 transition-colors group ${
       isActive('/student/notifications')
-        ? 'border-[#7A6B96] bg-[#F4F1F8] text-[#7A6B96]'
-        : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#7A6B96]'
+        ? 'border-[#5e4075] bg-[#F4F1F8] text-[#5e4075]'
+        : 'border-transparent text-[#64748b] hover:bg-[#F4F1F8] hover:text-[#5e4075]'
     } ${collapsed ? 'justify-center' : 'gap-3 px-4'}`}
   >
     <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
@@ -326,7 +326,7 @@ export default function StudentSidebar({ collapsed, onToggle }: StudentSidebarPr
     }`}
   >
     {/* Avatar */}
-    <div className="w-8 h-8 rounded-full bg-[#7A6B96] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+    <div className="w-8 h-8 rounded-full bg-[#5e4075] flex items-center justify-center text-white text-sm font-semibold shrink-0">
       {studentName?.[0]?.toUpperCase() ?? 'S'}
     </div>
 

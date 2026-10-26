@@ -22,11 +22,11 @@ const TYPE_LABEL: Record<NotificationType, string> = {
 }
 
 const TYPE_DOT: Record<NotificationType, string> = {
-  announcement: '#5B21B6',
+  announcement: '#5e4075',
   assignment_due: '#D97706',
   video_uploaded: '#0284C7',
   test_result: '#16A34A',
-  test_scheduled: '#5B21B6',
+  test_scheduled: '#5e4075',
   test_reminder: '#DC2626',
   exam_hall_ticket: '#0F766E',
   exam_marksheet: '#0F766E',
@@ -45,7 +45,7 @@ function timeAgo(iso: string) {
 }
 
 export default function NotificationInbox({
-  notifications, loading, error, onMarkRead, onMarkAllRead, accent = '#5B21B6',
+  notifications, loading, error, onMarkRead, onMarkAllRead, accent = '#5e4075',
 }: {
   notifications: NotificationItem[]
   loading: boolean

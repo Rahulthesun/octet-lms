@@ -106,7 +106,12 @@ export interface Subject {
 export interface GoogleAccountStatus {
   connected: boolean
   email: string | null
+  /** A Google account was linked but Google has revoked/expired its access. */
+  reauthRequired?: boolean
 }
+
+/** Fired when a request learns the Google connection is gone, so every status panel re-checks. */
+export const GOOGLE_STATUS_CHANGED_EVENT = 'octet:google-status-changed'
 
 export interface AttendanceSettings {
   presentThreshold: number
@@ -148,6 +153,9 @@ export function useAdminOnlineClasses() {
     const d = await authedFetch('/api/online-classes', {
       method: 'POST',
       body: JSON.stringify({ ...input, idempotencyKey }),
+    }).catch((e: Error) => {
+      if (/google/i.test(e.message)) window.dispatchEvent(new Event(GOOGLE_STATUS_CHANGED_EVENT))
+      throw e
     })
     setClasses((prev) => [d.class, ...prev])
     return d.class as OnlineClass
@@ -253,6 +261,11 @@ export function useGoogleAccountStatus() {
   }, [])
 
   useEffect(() => { refetch() }, [refetch])
+
+  useEffect(() => {
+    window.addEventListener(GOOGLE_STATUS_CHANGED_EVENT, refetch)
+    return () => window.removeEventListener(GOOGLE_STATUS_CHANGED_EVENT, refetch)
+  }, [refetch])
 
   const connect = useCallback(async () => {
     const d = await authedFetch('/api/google/connect-url')

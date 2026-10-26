@@ -17,11 +17,11 @@ import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
 import QuestionBankModal from './QuestionBankModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
-import { chapterLabel } from '@/lib/helpers'
+import { chapterLabel, todayISODate, isPastDate } from '@/lib/helpers'
 import Select from '@/components/ui/Select'
 import { Watermark } from '@/components/shared/ExamSecurity'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
 const labelCls = 'block text-sm font-medium text-zinc-700 mb-2'
 
@@ -143,6 +143,8 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
   const [draftId, setDraftId] = useState<string | null>(testId ? null : searchParams.get('draft'))
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const hydratedRef = useRef(false)
+  // An existing test keeps its original start even if it is already in the past (e.g. editing questions).
+  const [originalStart, setOriginalStart] = useState<string | null>(null)
 
   // ─── Unfinished drafts from a previous visit (closed tab, crash, etc.) ───
   // Only relevant on a fresh "create" page load — not mid-edit, and not when
@@ -190,6 +192,7 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
     setType(test.type)
     setChapterId(test.chapterId || '')
     setBatchId(test.audience === 'ALL' ? 'ALL' : (test.batchId || ''))
+    if (isEditMode) setOriginalStart(test.scheduledStart ? new Date(test.scheduledStart).toISOString() : null)
     setDate(isoToLocalDate(test.scheduledStart))
     setStartTime(isoToLocalTime(test.scheduledStart))
     setEndTime(isoToLocalTime(test.scheduledEnd))
@@ -265,6 +268,9 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
     if (!batchId) p.push('Choose a batch or All Students')
     if (!date || !startTime || !endTime) p.push('Set the date, start and end time')
     else if (scheduledEnd <= scheduledStart) p.push('End time must be after start time')
+    else if (scheduledStart !== originalStart && new Date(scheduledStart).getTime() < Date.now()) {
+      p.push(isPastDate(date) ? 'The test date is in the past — pick today or a later date' : 'The start time has already passed — pick a later time')
+    }
     if (type === 'mcq') {
       if (questions.length === 0) p.push('Add at least one question')
       questions.forEach((q, i) => {
@@ -274,7 +280,7 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
       duplicateQuestionIndexes.forEach((i) => p.push(`Question ${i + 1} is an exact duplicate of an earlier question — remove or change one of them`))
     }
     return p
-  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, type, questions, duplicateQuestionIndexes])
+  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, originalStart, type, questions, duplicateQuestionIndexes])
 
   // Builds the same shape createTest/updateTest/draft endpoints all take, from current form state.
   function buildInput(): CreateTestInput {
@@ -374,7 +380,7 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <Link href="/admin/tests" className="text-sm text-zinc-500 hover:text-violet-700">Back to tests</Link>
-            <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 mt-2">{isEditMode ? 'Edit Test' : 'Schedule New Test'}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 mt-2">{isEditMode ? 'Edit Test' : 'Schedule New Test'}</h1>
             <p className="text-[15px] text-zinc-500 mt-1">MCQ tests auto-grade instantly; descriptive tests are graded manually.</p>
           </div>
           {!isEditMode && saveState !== 'idle' && (
@@ -458,7 +464,14 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
               <label className={labelCls} htmlFor="t-date">Date</label>
-              <input id="t-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+              <input
+                id="t-date"
+                type="date"
+                value={date}
+                min={originalStart && isoToLocalDate(originalStart) < todayISODate() ? isoToLocalDate(originalStart) : todayISODate()}
+                onChange={(e) => setDate(e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls} htmlFor="t-start">Start time</label>

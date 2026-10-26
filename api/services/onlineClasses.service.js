@@ -30,6 +30,8 @@ const audienceService = require("./audience.service");
 const { hasGraduated, todayInTz } = require("../utils/graduation");
 
 const DEFAULT_TIMEZONE = process.env.LMS_TIMEZONE || "Asia/Kolkata";
+// Small allowance for the time between the admin pressing "Schedule" and the request arriving.
+const PAST_START_GRACE_MS = 2 * 60 * 1000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -214,6 +216,9 @@ async function scheduleOnlineClass(adminUserId, {
   if (new Date(endIso) <= new Date(startIso)) {
     throw Object.assign(new Error("End time must be after start time"), { status: 400 });
   }
+  if (new Date(startIso).getTime() < Date.now() - PAST_START_GRACE_MS) {
+    throw Object.assign(new Error("A class cannot be scheduled in the past. Pick today or a later date and a future start time"), { status: 400 });
+  }
 
   if (batchId) await assertBatchExists(batchId);
 
@@ -352,6 +357,13 @@ async function rescheduleOnlineClass(adminUserId, classId, {
 
   if (new Date(endIso) <= new Date(startIso)) {
     throw Object.assign(new Error("End time must be after start time"), { status: 400 });
+  }
+  if (
+    timeChanged &&
+    new Date(startIso).getTime() !== new Date(row.scheduled_start).getTime() &&
+    new Date(startIso).getTime() < Date.now() - PAST_START_GRACE_MS
+  ) {
+    throw Object.assign(new Error("A class cannot be moved into the past. Pick today or a later date and a future start time"), { status: 400 });
   }
 
   // Audience/batch change is optional — if none of these were sent, keep the

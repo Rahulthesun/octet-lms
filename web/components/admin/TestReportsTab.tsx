@@ -19,8 +19,9 @@ import { useStudents } from '@/hooks/admin/useStudents'
 import { useStudentTestReport, downloadStudentTestReportPdf } from '@/hooks/useTests'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 // Score-band color coding: Emerald (high), Amber (mid), Red (low),
 // Jet Black (absent downward bar below zero line).
@@ -304,12 +305,11 @@ export default function TestReportsTab() {
     <div>
       <p className="text-sm text-zinc-500 mb-4">Select a student to view their consolidated monthly test report.</p>
 
-      <input
-        type="text"
+      <SearchInput
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={setSearch}
         placeholder="Search by name, admission number, or email…"
-        className="w-full sm:w-80 mb-4 px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-200"
+        wrapperClassName="w-full max-w-xl mb-4"
       />
 
       <div className="border border-zinc-200 rounded-lg overflow-x-auto bg-white">

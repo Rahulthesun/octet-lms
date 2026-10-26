@@ -255,6 +255,15 @@ exports.approveStudent = async (req, res) => {
   }
 };
 
+exports.reinstateStudent = async (req, res) => {
+  try {
+    const result = await studentService.reinstateStudent(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ success: false, error: error.message });
+  }
+};
+
 exports.rejectStudent = async (req, res) => {
   try {
     const result = await studentService.rejectStudent(req.params.id, req.body.reason);
@@ -295,10 +304,6 @@ exports.getProfilebyUserID = async (req, res) => {
     const userEmail = req.user?.email;
     const userMetadata = req.user?.user_metadata;
 
-    console.log("1. User ID from JWT:", authenticatedUserId);
-    console.log("2. User role:", userRole);
-    console.log("3. Full req.user:", req.user);
-
     if (!authenticatedUserId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
@@ -316,7 +321,6 @@ exports.getProfilebyUserID = async (req, res) => {
 
     // Regular student — fetch from students table
     const profile = await studentService.getStudentByUserId(authenticatedUserId);
-    console.log("3. Profile returned:", profile);
 
     if (!profile) {
       return res.status(404).json({ error: "Student profile not found" });

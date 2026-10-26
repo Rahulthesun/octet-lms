@@ -127,7 +127,7 @@ export default function Pagination({
                 onClick={() => onPageChange(p)}
                 aria-current={p === page ? 'page' : undefined}
                 className={`${btn} font-inter cursor-pointer ${
-                  p === page ? 'text-white border-transparent bg-[#5B21B6]' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                  p === page ? 'text-white border-transparent bg-[#5e4075]' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
                 }`}
               >
                 {p}

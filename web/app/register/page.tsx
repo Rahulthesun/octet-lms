@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AtomSVG, CompoundSVG } from '@/components/ui/PencilSVGs'
 import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
+import { todayISODate } from '@/lib/helpers'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -319,6 +320,7 @@ export default function RegisterPage() {
                       <input
                         name="date_of_birth"
                         type="date"
+                        max={todayISODate()}
                         value={form.date_of_birth}
                         onChange={handleChange}
                         className={inputClass}

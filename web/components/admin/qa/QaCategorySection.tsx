@@ -8,8 +8,9 @@ import { Watermark } from '@/components/shared/ExamSecurity'
 import { TrashIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import type { OptionKey } from '@/hooks/useTests'
 import Select from '@/components/ui/Select'
+import { btnAddRow, btnPrimarySm, btnSecondarySm, PlusIcon as AddPlusIcon } from '@/components/ui/buttonStyles'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 export type Category = 'qa' | 'practice'
 
@@ -295,7 +296,7 @@ export function QaCategorySection({
           <p className="text-xs text-zinc-400 py-3 pl-4">Loading units…</p>
         ) : units.length === 0 ? (
           <p className="text-xs text-zinc-400 py-3 pl-4">
-            No units yet in Class {activeGrade}. Click &quot;+ Add Unit&quot; below.
+            No units yet in Class {activeGrade}. Click &quot;Add Unit&quot; below.
           </p>
         ) : (
           units.map((unit, idx) => {
@@ -376,7 +377,7 @@ export function QaCategorySection({
       {/* Add Unit Inline Form (renamed from "Add subject") */}
       <div className="pt-1">
         {showAddUnitInput ? (
-          <div className="flex items-center gap-2 p-2 bg-zinc-50 rounded-xl border border-zinc-200">
+          <div className="flex items-center gap-2 p-2 bg-violet-50/40 rounded-lg border border-violet-200">
             <input
               autoFocus
               type="text"
@@ -387,32 +388,29 @@ export function QaCategorySection({
                 if (e.key === 'Enter') handleAddUnit()
                 if (e.key === 'Escape') setShowAddUnitInput(false)
               }}
-              className="text-xs rounded-lg px-3 py-1.5 border border-zinc-300 bg-white flex-1 outline-none focus:border-violet-500"
+              className="text-sm rounded-lg px-3 py-2 border border-zinc-300 bg-white flex-1 outline-none focus:border-violet-500"
             />
             <button
               onClick={handleAddUnit}
               disabled={addingUnit || !newUnitName.trim()}
-              className="text-xs px-3.5 py-1.5 rounded-lg text-white font-medium disabled:opacity-50 cursor-pointer"
-              style={{ backgroundColor: ACCENT }}
+              className={btnPrimarySm}
             >
-              {addingUnit ? 'Adding…' : '+ Add Unit'}
+              {addingUnit ? 'Adding…' : 'Add'}
             </button>
             <button
               onClick={() => {
                 setShowAddUnitInput(false)
                 setNewUnitName('')
               }}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-100 cursor-pointer"
+              className={btnSecondarySm}
             >
               Cancel
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => setShowAddUnitInput(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-violet-700 bg-violet-50/70 border border-dashed border-violet-200 rounded-xl hover:bg-violet-100/60 transition-colors cursor-pointer"
-          >
-            + Add Unit
+          <button onClick={() => setShowAddUnitInput(true)} className={btnAddRow}>
+            <AddPlusIcon className="w-4 h-4" />
+            Add Unit
           </button>
         )}
       </div>

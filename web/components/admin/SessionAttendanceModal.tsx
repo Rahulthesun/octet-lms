@@ -17,7 +17,7 @@ import {
 } from '@/hooks/useAttendanceData'
 import { Select } from '@/components/ui/Select'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 const STATUS_STYLE: Record<AttendanceTriState, { label: string; fg: string; bg: string }> = {
   present: { label: 'Present', fg: '#15803D', bg: '#F0FDF4' },

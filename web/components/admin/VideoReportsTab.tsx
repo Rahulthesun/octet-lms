@@ -10,7 +10,7 @@ import { DropOffChart, EngagementHeatmap, formatDuration } from '@/components/sh
 import { Select } from '@/components/ui/Select'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 function pctColor(pct: number | null) {
   if (pct === null) return '#9CA3AF'

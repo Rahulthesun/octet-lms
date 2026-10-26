@@ -6,6 +6,7 @@ import { useMyOnlineClasses, type OnlineClass } from '@/hooks/useOnlineClasses'
 import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
 import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
 import { SkeletonCard } from '@/components/ui/Skeleton'
+import PageHeader from '@/components/ui/PageHeader'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -188,10 +189,13 @@ export default function StudentClassesPage() {
   }, [classes, selectedDate])
 
   return (
-    <div className="p-5 lg:p-8 max-w-screen mx-auto pb-10 space-y-5">
+    <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h1 className="text-3xl text-primary mb-1">Online Classes</h1>
-        <p className="text-muted text-base">Join your scheduled Google Meet classes, or browse the calendar below</p>
+        <PageHeader
+          className="!mb-0"
+          title="Online Classes"
+          subtitle="Join your scheduled Google Meet classes, or browse the calendar below"
+        />
       </motion.div>
 
       <GoogleLinkBanner />

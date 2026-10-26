@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase/client'
-import { Select } from '@/components/ui/Select'
 import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import {
@@ -15,8 +14,10 @@ import {
   useRoster,
   useStudentTrend,
   useBatchSummary,
+  readLiveQrContext,
 } from '../../../hooks/useAttendanceData'
 import type { Student } from '../../../hooks/useAttendanceData'
+import { todayISODate } from '@/lib/helpers'
 
 // ─── Shared fetch helper for the few mutations this page calls directly ──────
 const API_BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
@@ -73,7 +74,7 @@ const STATUS = {
   warning:   { text: 'Warning',   fg: '#B45309', bg: '#FFFBEB', dot: '#D97706' },
   good:      { text: 'Good',      fg: '#15803D', bg: '#F0FDF4', dot: '#16A34A' },
   excellent: { text: 'Excellent', fg: '#0F766E', bg: '#F0FDFA', dot: '#0D9488' },
-  active:    { text: 'Active',    fg: '#5B21B6', bg: '#F5F3FF', dot: '#7C3AED' },
+  active:    { text: 'Active',    fg: '#5e4075', bg: '#f6f3f9', dot: '#6f4f8e' },
 }
 
 function statusOf(pct: number) {
@@ -84,7 +85,7 @@ function statusOf(pct: number) {
 }
 
 // Accent — used only for primary actions, dark enough for white text to pass contrast
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 // ─── Countdown ring ───────────────────────────────────────────────────────────
 
@@ -292,7 +293,7 @@ export default function AttendancePage() {
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null)
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
   const [activeSection, setSection] = useState<Section>('qr')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => todayISODate())
   const [addingBatch, setAddingBatch] = useState(false)
   const [newBatchName, setNewBatchName] = useState('')
   const [newBatchMode, setNewBatchMode] = useState<'online' | 'offline'>('offline')
@@ -300,7 +301,18 @@ export default function AttendancePage() {
   const [newBatchLocation, setNewBatchLocation] = useState('')
   const [showAddStudents, setShowAddStudents] = useState(false)
   const [graphStudent, setGraphStudent] = useState<Student | null>(null)
-  const [selectedStudentIdForScan, setSelectedStudentIdForScan] = useState('')
+  const [markingId, setMarkingId] = useState<string | null>(null)
+  const [markError, setMarkError] = useState<string | null>(null)
+
+  // Re-open a QR session that was live when the page was refreshed or closed.
+  useEffect(() => {
+    const live = readLiveQrContext()
+    if (!live) return
+    if (live.date !== todayISODate()) return
+    setSelectedGrade(live.grade || (live.batchId === ALL_STUDENTS_ID ? 'All students' : GRADES[0]))
+    setSelectedBatchId(live.batchId)
+    setDate(live.date)
+  }, [])
 
   const { batches, addBatch } = useBatches(selectedGrade)
   const isAllStudents = selectedBatchId === ALL_STUDENTS_ID
@@ -316,13 +328,49 @@ export default function AttendancePage() {
 
   const hasContext = !!(selectedGrade && selectedBatchId)
   const qrActive = activeSection === 'qr' && hasContext
-  const isToday = date === new Date().toISOString().slice(0, 10)
+  const isToday = date === todayISODate()
 
   const {
     sessionId, qrToken, countdown, refreshSeconds, error: sessionError,
-    started, startSession, stopSession,
-  } = useAttendanceSession(selectedBatchId, date, qrActive)
+    started, startSession, stopSession, resumedWithMarked,
+  } = useAttendanceSession(selectedBatchId, date, qrActive, selectedGrade)
   const { entries, refetch: refetchRoster } = useRoster(sessionId)
+
+  // Closing or reloading the tab is safe (the session resumes), but warn so it isn't done by accident mid-class.
+  useEffect(() => {
+    if (!started) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [started])
+
+  /** Leaving a live session's batch/date: ask, and end it so students can't keep scanning an unattended code. */
+  function confirmLeaveLiveSession(): boolean {
+    if (!started) return true
+    if (!window.confirm('A live QR session is running for this batch. End it and switch?')) return false
+    void stopSession()
+    return true
+  }
+
+  async function handleEndSession() {
+    if (!window.confirm('End this attendance session? Students will no longer be able to scan the QR code. Anyone not marked stays absent.')) return
+    await stopSession()
+    refetchStudents()
+  }
+
+  async function handleManualMark(studentId: string, present: boolean) {
+    if (!sessionId) return
+    setMarkingId(studentId)
+    setMarkError(null)
+    try {
+      await manualMark(sessionId, studentId, present)
+      refetchRoster()
+    } catch (e) {
+      setMarkError(e instanceof Error ? e.message : 'Could not update attendance')
+    } finally {
+      setMarkingId(null)
+    }
+  }
 
   async function handleAddBatch() {
     const name = newBatchName.trim()
@@ -339,20 +387,15 @@ export default function AttendancePage() {
   }
 
   function handleGradeSelect(g: string) {
+    if (g !== selectedGrade && !confirmLeaveLiveSession()) return
     setSelectedGrade(g)
     setSelectedBatchId(null)
     setAddingBatch(false)
   }
 
-  async function handleSimulateScan() {
-    if (!selectedStudentIdForScan || !sessionId) return
-    try {
-      await manualMark(sessionId, selectedStudentIdForScan, true)
-      refetchRoster()
-      setSelectedStudentIdForScan('')
-    } catch (e) {
-      console.error(e)
-    }
+  function handleBatchSelect(id: string) {
+    if (id !== selectedBatchId && !confirmLeaveLiveSession()) return
+    setSelectedBatchId(id)
   }
 
   async function handleToggleUnblock(s: Student) {
@@ -370,6 +413,7 @@ export default function AttendancePage() {
     [entries]
   )
   const isPresent = (id: string) => presentIds.has(id)
+  const entryById = useMemo(() => new Map(entries.map(e => [e.studentId, e])), [entries])
   const presentCount = students.filter(s => presentIds.has(s.id)).length
 
   const stats = useMemo(() => {
@@ -392,15 +436,20 @@ export default function AttendancePage() {
     <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-zinc-200">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Attendance</p>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Session Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Attendance</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Run a live QR session for a batch and track who is present.</p>
         </div>
         <input
           type="date"
           value={date}
-          onChange={e => setDate(e.target.value)}
+          min={todayISODate()}
+          aria-label="Session date"
+          onChange={e => {
+            if (!e.target.value || e.target.value === date || !confirmLeaveLiveSession()) return
+            setDate(e.target.value)
+          }}
           className="text-sm border border-zinc-300 rounded-md px-3 py-2 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 w-full sm:w-auto"
         />
       </div>
@@ -426,7 +475,10 @@ export default function AttendancePage() {
               </button>
             ))}
             <button
-              onClick={() => { setSelectedGrade('All students'); setSelectedBatchId(ALL_STUDENTS_ID); setAddingBatch(false) }}
+              onClick={() => {
+                if (!isAllStudents && !confirmLeaveLiveSession()) return
+                setSelectedGrade('All students'); setSelectedBatchId(ALL_STUDENTS_ID); setAddingBatch(false)
+              }}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 isAllStudents ? 'text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
               }`}
@@ -450,7 +502,7 @@ export default function AttendancePage() {
                 {batches.map(b => (
                   <button
                     key={b.id}
-                    onClick={() => setSelectedBatchId(b.id)}
+                    onClick={() => handleBatchSelect(b.id)}
                     className={`px-3 py-1.5 rounded-md text-sm transition-colors border flex items-center gap-1.5 ${
                       selectedBatchId === b.id
                         ? 'bg-zinc-900 text-white border-zinc-900 font-medium'
@@ -546,10 +598,10 @@ export default function AttendancePage() {
                   <button
                     key={s}
                     onClick={() => setSection(s)}
-                    className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    className={`px-4 sm:px-5 py-2.5 text-base border-b-2 -mb-px transition-colors ${
                       activeSection === s
-                        ? 'border-zinc-900 text-zinc-900'
-                        : 'border-transparent text-zinc-400 hover:text-zinc-700'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-600 hover:text-gray-800'
                     }`}
                   >
                     {s === 'qr' ? 'QR Attendance' : 'Summary'}
@@ -633,14 +685,18 @@ export default function AttendancePage() {
                     style={{ width: 220, height: 220 }}
                     className="flex flex-col items-center justify-center gap-4 border border-dashed border-zinc-300 rounded-xl"
                   >
-                    <p className="text-xs text-zinc-400 text-center px-6">No live session yet for this date</p>
+                    <p className="text-xs text-zinc-400 text-center px-6">
+                      {isToday ? 'No live session running for this batch' : 'Live sessions can only run on today’s date'}
+                    </p>
                     <button
                       onClick={startSession}
-                      className="px-4 py-2 text-white text-sm rounded-md transition-colors"
+                      disabled={!isToday}
+                      className="px-4 py-2 text-white text-sm rounded-md transition-colors disabled:opacity-40"
                       style={{ backgroundColor: ACCENT }}
                     >
                       Start Live Session
                     </button>
+                    {sessionError && <p className="text-xs text-red-600 text-center px-4">{sessionError}</p>}
                   </div>
                 )}
 
@@ -649,47 +705,39 @@ export default function AttendancePage() {
                     <p className="text-xs text-red-600 text-center">{sessionError}</p>
                   ) : (
                     <p className="text-zinc-500 text-xs text-center">
-                      Refreshes in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan to mark attendance
+                      New code in <span className="text-zinc-900 font-mono font-medium">{countdown}s</span> · Students scan with the Attendance page in the student portal
                     </p>
                   )
                 )}
 
                 {started && (
-                  <button
-                    onClick={stopSession}
-                    className="text-xs text-zinc-400 hover:text-zinc-700 underline"
-                  >
-                    End session view
-                  </button>
+                  <div role="status" className="w-full flex items-start gap-2.5 text-xs px-3.5 py-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                    <svg className="w-4 h-4 shrink-0 mt-px" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M10 3.5 17.5 16.5h-15L10 3.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                      <path d="M10 8.5v3.5M10 14.2v.3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                    <span>
+                      <strong className="font-semibold">Session is live — keep this screen open.</strong>{' '}
+                      If the page is refreshed or closed by mistake, the session reopens automatically when you come back.
+                      It only closes when you press <strong className="font-semibold">End session</strong>.
+                    </span>
+                  </div>
                 )}
 
-                {/* Demo simulator */}
+                {started && resumedWithMarked > 0 && (
+                  <p className="w-full text-xs px-3.5 py-2.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-100">
+                    Resumed today&apos;s session — {resumedWithMarked} student{resumedWithMarked !== 1 ? 's were' : ' was'} already
+                    marked present earlier today (by a scan, a manual mark or an online-class sync). Use the roster to correct anyone marked by mistake.
+                  </p>
+                )}
+
                 {started && (
-                  <div className="w-full pt-5 border-t border-zinc-200 space-y-2">
-                    <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400">
-                      Demo — simulate scan
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Select
-                        value={selectedStudentIdForScan}
-                        onChange={e => setSelectedStudentIdForScan(e.target.value)}
-                        className="flex-1 text-sm"
-                      >
-                        <option value="">Select student…</option>
-                        {students.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </Select>
-                      <button
-                        onClick={handleSimulateScan}
-                        disabled={!selectedStudentIdForScan}
-                        className="px-4 py-2 text-white text-sm rounded-md disabled:opacity-40 transition-colors whitespace-nowrap"
-                        style={{ backgroundColor: ACCENT }}
-                      >
-                        Mark present
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    onClick={handleEndSession}
+                    className="px-4 py-2 text-sm font-medium rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
+                    End session
+                  </button>
                 )}
               </div>
 
@@ -721,23 +769,44 @@ export default function AttendancePage() {
                   />
                 </div>
 
+                {markError && <p className="px-5 py-2 text-xs text-red-600 border-b border-zinc-100">{markError}</p>}
+                {!sessionId && students.length > 0 && (
+                  <p className="px-5 py-2.5 text-xs text-zinc-500 border-b border-zinc-100">
+                    Start the live session to take attendance. Students who don&apos;t scan stay absent.
+                  </p>
+                )}
+
                 <div className="divide-y divide-zinc-100 flex-1">
                   {markPaging.pageItems.map(s => {
                     const present = isPresent(s.id)
+                    const viaMeet = entryById.get(s.id)?.markedVia === 'GOOGLE_MEET'
                     return (
-                      <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
+                      <div key={s.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-zinc-50 transition-colors">
                         <div className="min-w-0">
                           <p className="text-sm text-zinc-900 truncate">{s.name}</p>
                           <p className="text-xs text-zinc-500 font-mono">{s.roll}</p>
                         </div>
-                        <span
-                          className="text-xs px-2.5 py-0.5 rounded-full font-medium shrink-0"
-                          style={present
-                            ? { backgroundColor: '#F0FDF4', color: '#15803D' }
-                            : { backgroundColor: '#F4F4F5', color: '#71717A' }}
-                        >
-                          {present ? 'Present' : 'Absent'}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                            style={present
+                              ? { backgroundColor: '#F0FDF4', color: '#15803D' }
+                              : { backgroundColor: '#F4F4F5', color: '#71717A' }}
+                            title={viaMeet ? 'From the Google Meet attendance sync' : undefined}
+                          >
+                            {present ? (viaMeet ? 'Present · Meet' : 'Present') : 'Absent'}
+                          </span>
+                          {sessionId && (
+                            <button
+                              onClick={() => handleManualMark(s.id, !present)}
+                              disabled={markingId === s.id}
+                              className="text-[11px] px-2 py-0.5 rounded-md border border-zinc-200 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-40 transition-colors"
+                              title={present ? 'Mark this student absent' : 'Mark this student present (e.g. no phone)'}
+                            >
+                              {markingId === s.id ? '…' : present ? 'Mark absent' : 'Mark present'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

@@ -142,14 +142,14 @@ export default function AdminProfilePage() {
   }
 
   const activityPaging = usePagination(activityLog)
-  const ACCENT = '#5B21B6'
+  const ACCENT = '#5e4075'
   const tableMissing = !!settingsError && /test_settings/i.test(settingsError)
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Profile &amp; Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Admin Profile &amp; Settings</h1>
         <p className="text-sm sm:text-base text-gray-500 mt-1">Manage your account details, platform defaults, and activity history.</p>
       </div>
 
@@ -159,7 +159,7 @@ export default function AdminProfilePage() {
           onClick={() => setActiveTab('profile')}
           className={`pb-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'profile'
-              ? 'border-[#5B21B6] text-[#5B21B6]'
+              ? 'border-[#5e4075] text-[#5e4075]'
               : 'border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
@@ -169,7 +169,7 @@ export default function AdminProfilePage() {
           onClick={() => setActiveTab('settings')}
           className={`pb-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'settings'
-              ? 'border-[#5B21B6] text-[#5B21B6]'
+              ? 'border-[#5e4075] text-[#5e4075]'
               : 'border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
@@ -179,7 +179,7 @@ export default function AdminProfilePage() {
           onClick={() => setActiveTab('activity')}
           className={`pb-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'activity'
-              ? 'border-[#5B21B6] text-[#5B21B6]'
+              ? 'border-[#5e4075] text-[#5e4075]'
               : 'border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
