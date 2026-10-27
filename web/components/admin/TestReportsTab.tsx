@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { todayISODate } from '@/lib/helpers'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStudents } from '@/hooks/admin/useStudents'
 import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf } from '@/hooks/useTests'
@@ -44,7 +45,7 @@ const ABSENT_MARKER_VALUE = -10
 const ABSENT_MARKER_COLOR = '#18181b'
 
 function currentMonthStr() {
-  return new Date().toISOString().slice(0, 7) // YYYY-MM
+  return todayISODate().slice(0, 7) // YYYY-MM, local (IST) — not UTC
 }
 
 function monthLabel(month: string) {

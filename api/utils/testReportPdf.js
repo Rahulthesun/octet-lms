@@ -12,18 +12,18 @@
 const { drawStatisticsChart, drawTable } = require("./attendanceReportFormat");
 const { drawOctetEmblem } = require("./octetEmblem");
 
-// 0-34 -> red, 35-79 -> orange, 80-100 -> green. Mirrors scoreBandColor() in
-// web/components/admin/TestReportsTab.tsx so the on-screen chart and the
-// downloaded PDF's chart use the exact same score-band colors.
+// 0-39 -> red, 40-74 -> amber, 75-100 -> emerald. Same cut-offs and colors as
+// scoreBandColor() in web/components/admin/TestReportsTab.tsx so the on-screen
+// chart and every downloaded PDF agree on what a score's color means.
 const SCORE_BAND_COLORS = {
-  low: "#d03b3b",
-  mid: "#fab219",
-  high: "#0ca30c",
+  low: "#dc2626",
+  mid: "#d97706",
+  high: "#059669",
 };
 
 function scoreBandColor(pct) {
-  if (pct < 35) return SCORE_BAND_COLORS.low;
-  if (pct < 80) return SCORE_BAND_COLORS.mid;
+  if (pct < 40) return SCORE_BAND_COLORS.low;
+  if (pct < 75) return SCORE_BAND_COLORS.mid;
   return SCORE_BAND_COLORS.high;
 }
 
@@ -73,9 +73,9 @@ function buildStudentTestReportPdf(doc, report) {
 
   const barData = scorePoints;
   const pieData = [
-    { label: "0-34%", value: points.filter((p) => (p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0) < 35).length, color: SCORE_BAND_COLORS.low },
-    { label: "35-79%", value: points.filter((p) => { const pct = p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0; return pct >= 35 && pct < 80; }).length, color: SCORE_BAND_COLORS.mid },
-    { label: "80-100%", value: points.filter((p) => (p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0) >= 80).length, color: SCORE_BAND_COLORS.high },
+    { label: "0-39%", value: points.filter((p) => (p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0) < 40).length, color: SCORE_BAND_COLORS.low },
+    { label: "40-74%", value: points.filter((p) => { const pct = p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0; return pct >= 40 && pct < 75; }).length, color: SCORE_BAND_COLORS.mid },
+    { label: "75-100%", value: points.filter((p) => (p.maxMarks > 0 ? (p.marksAwarded / p.maxMarks) * 100 : 0) >= 75).length, color: SCORE_BAND_COLORS.high },
   ];
   const lineData = scorePoints;
 
@@ -87,7 +87,7 @@ function buildStudentTestReportPdf(doc, report) {
       lineData,
       valueSuffix: "%",
       color: "#5B21B6",
-      description: "Score (%) on each test taken this month, colored by score band (red < 35%, orange 35-79%, green 80-100%).",
+      description: "Score (%) on each test taken this month, colored by score band (red below 40%, amber 40-74%, green 75-100%).",
       axisLabels: { x: "Date", y: "Score %" },
     });
   } else {
@@ -116,4 +116,4 @@ function buildStudentTestReportPdf(doc, report) {
   }
 }
 
-module.exports = { buildStudentTestReportPdf, scoreBandColor };
+module.exports = { buildStudentTestReportPdf, scoreBandColor, SCORE_BAND_COLORS };

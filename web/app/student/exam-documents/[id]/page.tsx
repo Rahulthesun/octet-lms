@@ -71,7 +71,7 @@ function ImagePreview({ src, name, onClose }: { src: string; name: string; onClo
   )
 }
 
-function SubmissionSummary({ sub, onDelete }: { sub: MySubmission; onDelete: () => void }) {
+function SubmissionSummary({ sub, onDelete }: { sub: MySubmission; onDelete?: () => void }) {
   if (sub.status !== 'submitted') return null
   return (
     <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
@@ -93,10 +93,10 @@ function SubmissionSummary({ sub, onDelete }: { sub: MySubmission; onDelete: () 
               View
             </a>
           )}
-          <button onClick={onDelete} className={btnDangerSm}>Delete</button>
+          {onDelete && <button onClick={onDelete} className={btnDangerSm}>Delete</button>}
         </div>
       </div>
-      <p className="text-xs text-green-700 mt-2">Wrong document? Delete it, or choose a new file below to replace it.</p>
+      {onDelete && <p className="text-xs text-green-700 mt-2">Wrong document? Delete it, or choose a new file below to replace it.</p>}
     </div>
   )
 }
@@ -407,7 +407,12 @@ function ExamDocumentContent() {
 
   const hallCard = (
     <Card key="hall" title="Hall ticket" sub="Upload a clear photo or PDF of your hall ticket." highlight={focus === 'hall-ticket'}>
-      {!event.hallTicket.open ? (
+      {event.hallTicket.closed ? (
+        <>
+          <SubmissionSummary sub={event.hallTicket} />
+          <p className="text-base text-muted">The hall ticket window for this exam has closed.</p>
+        </>
+      ) : !event.hallTicket.open ? (
         <p className="text-base text-muted">Hall ticket uploads have not been opened for this exam yet.</p>
       ) : (
         <>
@@ -420,7 +425,12 @@ function ExamDocumentContent() {
 
   const marksCard = (
     <Card key="marks" title="12th marksheet" sub="Upload your marksheet, or type in your marks." highlight={focus === 'marksheet'}>
-      {!event.marksheet.open ? (
+      {event.marksheet.closed ? (
+        <>
+          <SubmissionSummary sub={event.marksheet} />
+          <p className="text-base text-muted">The marksheet window for this exam has closed.</p>
+        </>
+      ) : !event.marksheet.open ? (
         <p className="text-base text-muted">Results have not been opened for this exam yet.</p>
       ) : (
         <>

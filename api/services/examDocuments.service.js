@@ -27,6 +27,8 @@ const BUCKET = process.env.R2_BUCKET_NAME;
 const KINDS = { "hall-ticket": "HALL_TICKET", marksheet: "MARKSHEET" };
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const UPLOAD_URL_TTL_SECONDS = 10 * 60;
+// How long the marksheet window stays open after the admin opens results.
+const RESULTS_WINDOW_DAYS = 30;
 const ALLOWED_TYPES = {
   "image/jpeg": ["jpg", "jpeg"],
   "image/png": ["png"],
@@ -53,6 +55,25 @@ function kindSlug(kind) {
   return kind === "HALL_TICKET" ? "hall-ticket" : "marksheet";
 }
 
+/** Last local date (inclusive) on which `kind` can still be submitted, or null if never opened. */
+function closesOn(event, kind) {
+  if (kind === "HALL_TICKET") return event.hall_ticket_opened_at ? event.exam_date : null;
+  if (!event.results_opened_at) return null;
+  const opened = new Date(event.results_opened_at);
+  return todayInTz(new Date(opened.getTime() + RESULTS_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+}
+
+/**
+ * "not_open" until the admin opens the window, "open" while students can
+ * submit/replace/delete, "closed" afterwards: the hall ticket closes once the
+ * exam date has passed, the marksheet RESULTS_WINDOW_DAYS after results open.
+ */
+function windowState(event, kind, today = todayInTz()) {
+  const opened = kind === "HALL_TICKET" ? event.hall_ticket_opened_at : event.results_opened_at;
+  if (!opened) return "not_open";
+  return today > closesOn(event, kind) ? "closed" : "open";
+}
+
 function mapEvent(e) {
   return {
     id: e.id,
@@ -62,6 +83,8 @@ function mapEvent(e) {
     batchIds: e.batch_ids || [],
     hallTicketOpenedAt: e.hall_ticket_opened_at,
     resultsOpenedAt: e.results_opened_at,
+    hallTicketClosesOn: closesOn(e, "HALL_TICKET"),
+    resultsClosesOn: closesOn(e, "MARKSHEET"),
     createdAt: e.created_at,
   };
 }
@@ -106,9 +129,6 @@ async function isStudentTargeted(event, studentId) {
   return (data || []).length > 0;
 }
 
-function windowFor(event, kind) {
-  return kind === "HALL_TICKET" ? event.hall_ticket_opened_at : event.results_opened_at;
-}
 
 // ─── Admin: events ───────────────────────────────────────────────────────────
 
@@ -153,9 +173,12 @@ async function updateEvent(eventId, { name, examDate, allStudents, batchIds, aud
   }
   if (examDate !== undefined && examDate !== event.exam_date) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) throw badRequest("A valid exam date (YYYY-MM-DD) is required");
-    if (examDate < todayInTz()) throw badRequest("The exam date cannot be moved into the past");
-    if (event.results_opened_at && examDate >= todayInTz()) {
-      throw badRequest("The results window is already open, so the exam date must stay in the past");
+    // Once results are open the exam has happened, so the date may only be
+    // corrected to another past date; before that it can't move into the past.
+    if (event.results_opened_at) {
+      if (examDate >= todayInTz()) throw badRequest("The results window is already open, so the exam date must stay in the past");
+    } else if (examDate < todayInTz()) {
+      throw badRequest("The exam date cannot be moved into the past");
     }
     patch.exam_date = examDate;
   }
@@ -290,7 +313,7 @@ async function signedGetUrl(key, fileName) {
   );
 }
 
-async function mapSubmission(s) {
+async function mapSubmission(s, { withUrl = true } = {}) {
   if (!s) return { status: "pending" };
   return {
     status: "submitted",
@@ -303,7 +326,7 @@ async function mapSubmission(s) {
     grade: s.grade,
     remarks: s.remarks,
     submittedAt: s.submitted_at,
-    fileUrl: s.file_key ? await signedGetUrl(s.file_key, s.file_name) : null,
+    fileUrl: withUrl && s.file_key ? await signedGetUrl(s.file_key, s.file_name) : null,
   };
 }
 
@@ -376,32 +399,52 @@ async function getTracking(eventId, { kind, pendingOnly } = {}) {
 
 // ─── Student: what is asked of me ────────────────────────────────────────────
 
-/** Events (with an open window) that apply to this student, with their submission state. */
-async function listMyEvents(authUserId) {
+/**
+ * Events (with a window that has been opened) that apply to this student,
+ * with their submission state. Batch membership is read once up front, and
+ * signed file links are only generated when `withUrls` is set (the detail
+ * page) — the list and dashboard banner never need them.
+ */
+async function listMyEvents(authUserId, { eventId = null, withUrls = false } = {}) {
   const student = await getStudentByAuthId(authUserId);
-  const { data: events, error } = await supabase
+  let query = supabase
     .from("exam_events")
     .select("*")
     .or("hall_ticket_opened_at.not.is.null,results_opened_at.not.is.null")
     .order("exam_date", { ascending: false });
+  if (eventId) query = query.eq("id", eventId);
+  const { data: events, error } = await query;
   if (error) throw error;
+  if (!events || events.length === 0) return [];
 
-  const { data: subs, error: subErr } = await supabase.from("exam_submissions").select("*").eq("student_id", student.id);
+  const [{ data: enrollments, error: enrErr }, { data: subs, error: subErr }] = await Promise.all([
+    supabase.from("batch_enrollments").select("batch_id").eq("student_id", student.id),
+    supabase.from("exam_submissions").select("*").eq("student_id", student.id).in("exam_event_id", events.map((e) => e.id)),
+  ]);
+  if (enrErr) throw enrErr;
   if (subErr) throw subErr;
+  const myBatches = new Set((enrollments || []).map((r) => r.batch_id));
   const subKey = new Map((subs || []).map((s) => [`${s.exam_event_id}:${s.kind}`, s]));
+  const today = todayInTz();
 
-  const result = [];
-  for (const e of events || []) {
-    if (!(await isStudentTargeted(e, student.id))) continue;
-    const hall = subKey.get(`${e.id}:HALL_TICKET`);
-    const marks = subKey.get(`${e.id}:MARKSHEET`);
-    result.push({
+  const targeted = events.filter((e) => e.audience === "ALL" || (e.batch_ids || []).some((id) => myBatches.has(id)));
+  return Promise.all(targeted.map(async (e) => {
+    const hallState = windowState(e, "HALL_TICKET", today);
+    const marksState = windowState(e, "MARKSHEET", today);
+    return {
       ...mapEvent(e),
-      hallTicket: { open: !!e.hall_ticket_opened_at, ...(await mapSubmission(hall)) },
-      marksheet: { open: !!e.results_opened_at, ...(await mapSubmission(marks)) },
-    });
-  }
-  return result;
+      hallTicket: {
+        open: hallState === "open",
+        closed: hallState === "closed",
+        ...(await mapSubmission(subKey.get(`${e.id}:HALL_TICKET`), { withUrl: withUrls })),
+      },
+      marksheet: {
+        open: marksState === "open",
+        closed: marksState === "closed",
+        ...(await mapSubmission(subKey.get(`${e.id}:MARKSHEET`), { withUrl: withUrls })),
+      },
+    };
+  }));
 }
 
 /** Outstanding prompts for the dashboard banner (one entry per missing document). */
@@ -425,8 +468,9 @@ async function listMyPending(authUserId) {
 }
 
 async function getMyEvent(authUserId, eventId) {
-  const events = await listMyEvents(authUserId);
-  const found = events.find((e) => e.id === eventId);
+  if (!/^[0-9a-f-]{36}$/i.test(String(eventId))) throw notFound("Exam event not found");
+  const events = await listMyEvents(authUserId, { eventId, withUrls: true });
+  const found = events[0];
   if (!found) throw notFound("Exam event not found");
   return found;
 }
@@ -444,9 +488,10 @@ async function assertCanSubmit(authUserId, eventId, kind) {
   const student = await getStudentByAuthId(authUserId);
   const event = await getEventOrThrow(eventId);
   if (!(await isStudentTargeted(event, student.id))) throw forbidden("This exam is not assigned to you");
-  if (!windowFor(event, kind)) {
-    throw forbidden(kind === "HALL_TICKET" ? "The hall ticket window is not open yet" : "The results window is not open yet");
-  }
+  const state = windowState(event, kind);
+  const label = kind === "HALL_TICKET" ? "hall ticket" : "results";
+  if (state === "not_open") throw forbidden(`The ${label} window is not open yet`);
+  if (state === "closed") throw forbidden(`The ${label} window has closed`);
   return { student, event };
 }
 
@@ -626,6 +671,7 @@ async function submitManualMarks(authUserId, eventId, { marksObtained, maxMarks,
 
 module.exports = {
   MAX_FILE_BYTES,
+  windowState,
   ALLOWED_TYPES,
   createEvent,
   updateEvent,

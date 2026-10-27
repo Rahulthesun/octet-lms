@@ -12,7 +12,7 @@
  */
 
 const { CHART_STATUS_COLORS, NEVER_JOINED_COLOR, drawTable } = require("./attendanceReportFormat");
-const { scoreBandColor } = require("./testReportPdf");
+const { scoreBandColor, SCORE_BAND_COLORS } = require("./testReportPdf");
 const { drawOctetEmblem, COPYRIGHT_NOTICE } = require("./octetEmblem");
 
 const ACCENT = "#5e4075";
@@ -235,9 +235,9 @@ function drawMonthPage(doc, report, m) {
   doc.font("Helvetica").fontSize(7).fillColor("#71717a").text("X-axis: Date of month    Y-axis: Score %", x, y, { width, align: "center" });
   y += 11;
   drawLegend(doc, x + 30, y, [
-    { color: "#0ca30c", label: "80–100% strong" },
-    { color: "#fab219", label: "35–79% average" },
-    { color: "#d03b3b", label: "below 35% needs work" },
+    { color: SCORE_BAND_COLORS.high, label: "75–100% strong" },
+    { color: SCORE_BAND_COLORS.mid, label: "40–74% average" },
+    { color: SCORE_BAND_COLORS.low, label: "below 40% needs work" },
     { color: NEVER_JOINED_COLOR, label: "absent (below axis)" },
   ]);
   y += 12;
