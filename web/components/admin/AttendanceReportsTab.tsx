@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { todayISODate } from '@/lib/helpers'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   useBatches,
@@ -31,7 +32,7 @@ const ACCENT = '#5e4075'
 // ─── Month-picker helpers (mirrors TestReportsTab.tsx's StudentTestReportModal) ─
 
 function currentMonthStr() {
-  return new Date().toISOString().slice(0, 7) // YYYY-MM
+  return todayISODate().slice(0, 7) // YYYY-MM, local (IST) — not UTC
 }
 
 function monthLabel(month: string) {
@@ -61,6 +62,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
   const [sendingReport, setSendingReport] = useState(false)
   const [sendReportMessage, setSendReportMessage] = useState<string | null>(null)
   const [month, setMonth] = useState(currentMonthStr())
+  useEffect(() => { setSendReportMessage(null) }, [month])
   const [downloadingProgress, setDownloadingProgress] = useState(false)
 
   async function downloadProgressReport() {
@@ -80,13 +82,14 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
     setSendingReport(true)
     setSendReportMessage(null)
     try {
-      const now = new Date()
+      // Sends the month currently shown in the picker, not always this month.
+      const [year, monthNum] = month.split('-').map(Number)
       const res = await authedFetch(`/api/parent-reports/students/${studentId}/send`, {
         method: 'POST',
-        body: JSON.stringify({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+        body: JSON.stringify({ year, month: monthNum }),
       })
       if (res.status === 'already_sent') {
-        setSendReportMessage('Already emailed this month.')
+        setSendReportMessage(`${monthLabel(month)} report was already emailed.`)
       } else if (res.status === 'skipped_no_recipients') {
         setSendReportMessage('No father, mother, or student email on file — nothing to send to.')
       } else if (res.status === 'sent') {
@@ -299,7 +302,7 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
             disabled={!report || sendingReport}
             className="w-full py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
           >
-            {sendingReport ? 'Sending…' : "Email this month's report to parents & student"}
+            {sendingReport ? 'Sending…' : `Email ${monthLabel(month)} report to parents & student`}
           </button>
           {sendReportMessage && (
             <p className="text-xs text-zinc-500 text-center">{sendReportMessage}</p>
@@ -546,7 +549,7 @@ function BatchStudentList({ batch, onBack, onOpenStudentReport, onOpenBatchRepor
   onOpenStudentReport: (studentId: string) => void
   onOpenBatchReport: () => void
 }) {
-  const { students, loading, error } = useBatchStudents(batch.id, new Date().toISOString().slice(0, 10))
+  const { students, loading, error } = useBatchStudents(batch.id, todayISODate())
   const paging = usePagination(students)
 
   return (

@@ -13,8 +13,8 @@ function formatDate(iso: string) {
 }
 
 function StatusPill({ label, sub }: { label: string; sub: MySubmission }) {
-  const text = !sub.open ? 'Not open yet' : sub.status === 'submitted' ? 'Submitted' : 'Pending'
-  const cls = !sub.open
+  const text = sub.status === 'submitted' ? 'Submitted' : sub.closed ? 'Closed' : !sub.open ? 'Not open yet' : 'Pending'
+  const cls = sub.status !== 'submitted' && !sub.open
     ? 'bg-gray-100 text-gray-600'
     : sub.status === 'submitted'
       ? 'bg-green-50 text-green-700'

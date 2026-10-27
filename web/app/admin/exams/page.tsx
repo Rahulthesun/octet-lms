@@ -27,6 +27,8 @@ interface ExamEvent {
   batchIds: string[]
   hallTicketOpenedAt: string | null
   resultsOpenedAt: string | null
+  hallTicketClosesOn: string | null
+  resultsClosesOn: string | null
   targetedCount: number
   hallTicketSubmitted: number
   marksheetSubmitted: number
@@ -443,7 +445,11 @@ export default function ExamsPage() {
                     disabled={!!ev.hallTicketOpenedAt || examPassed || busyAction === `${ev.id}:open-hall-ticket`}
                     className={btnPrimary}
                   >
-                    {ev.hallTicketOpenedAt ? `Hall ticket window open since ${formatDate(ev.hallTicketOpenedAt)}` : 'Open hall ticket window'}
+                    {!ev.hallTicketOpenedAt
+                      ? 'Open hall ticket window'
+                      : ev.hallTicketClosesOn && ev.hallTicketClosesOn < today
+                        ? `Hall ticket window closed on ${formatDate(ev.hallTicketClosesOn)}`
+                        : `Hall ticket window open until ${formatDate(ev.hallTicketClosesOn ?? ev.examDate)}`}
                   </button>
                   <button
                     onClick={() => openWindow(ev, 'open-results')}
@@ -451,7 +457,11 @@ export default function ExamsPage() {
                     title={!examPassed ? 'Available after the exam date has passed' : undefined}
                     className={btnSecondary}
                   >
-                    {ev.resultsOpenedAt ? `Results window open since ${formatDate(ev.resultsOpenedAt)}` : 'Open results window'}
+                    {!ev.resultsOpenedAt
+                      ? 'Open results window'
+                      : ev.resultsClosesOn && ev.resultsClosesOn < today
+                        ? `Results window closed on ${formatDate(ev.resultsClosesOn)}`
+                        : `Results window open until ${formatDate(ev.resultsClosesOn ?? ev.resultsOpenedAt)}`}
                   </button>
                   <button
                     onClick={() => {

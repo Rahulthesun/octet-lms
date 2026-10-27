@@ -19,6 +19,8 @@ export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
 
 export interface MySubmission {
   open: boolean
+  /** The window was opened and has since closed — the submission is read-only. */
+  closed?: boolean
   status: 'submitted' | 'pending'
   entryMode?: 'UPLOAD' | 'MANUAL'
   fileName?: string | null
@@ -35,6 +37,9 @@ export interface MyExamEvent {
   examDate: string
   hallTicketOpenedAt: string | null
   resultsOpenedAt: string | null
+  /** Last date (YYYY-MM-DD, inclusive) each window accepts submissions. */
+  hallTicketClosesOn?: string | null
+  resultsClosesOn?: string | null
   hallTicket: MySubmission
   marksheet: MySubmission
 }

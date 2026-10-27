@@ -14,6 +14,8 @@ const attendanceService = require("./attendance.service");
 const testsService = require("./tests.service");
 const { signKey } = require("./questionImages.service");
 const { serializeQuestion } = require("../utils/mcqQuestion");
+const { zonedTimeToUtcIso } = require("../utils/timezone");
+const { TIMEZONE, todayInTz } = require("../utils/graduation");
 
 function badRequest(message) {
   return Object.assign(new Error(message), { status: 400 });
@@ -586,8 +588,9 @@ async function gradeDescriptiveAttempt(testId, attemptId, { marksAwarded, feedba
  *  - absentDates: the day-of-month for every test the student was targeted
  *    by but has no attempt row for at all (never started it) — a
  *    pragmatic "a test was scheduled for them and they didn't attempt it"
- *    definition of absence.
- * `month` is a "YYYY-MM" string.
+ *    definition of absence. A test that hasn't ended yet is never absent.
+ * `month` is a "YYYY-MM" string; month boundaries and every date/day in the
+ * result are in the institution's timezone, not UTC.
  */
 async function getStudentMonthlyReport(studentId, month) {
   const { data: student, error: studentErr } = await supabase
@@ -601,15 +604,19 @@ async function getStudentMonthlyReport(studentId, month) {
   const m = /^(\d{4})-(\d{2})$/.exec(month || "");
   if (!m) throw badRequest("month must be in YYYY-MM format");
   const year = Number(m[1]);
-  const monthIdx = Number(m[2]) - 1; // 0-based
-  const rangeStart = new Date(Date.UTC(year, monthIdx, 1));
-  const rangeEnd = new Date(Date.UTC(year, monthIdx + 1, 1));
+  const monthNum = Number(m[2]);
+  const nextMonth = monthNum === 12 ? `${year + 1}-01` : `${year}-${String(monthNum + 1).padStart(2, "0")}`;
+  const rangeStart = new Date(zonedTimeToUtcIso(`${month}-01`, "00:00", TIMEZONE));
+  const rangeEnd = new Date(zonedTimeToUtcIso(`${nextMonth}-01`, "00:00", TIMEZONE));
+  // Local calendar date ("YYYY-MM-DD") of an instant, in the institution's timezone.
+  const localDate = (d) => todayInTz(d);
+  const now = new Date();
 
   const batchIds = await attendanceService.getStudentBatchIds(studentId);
 
   let query = supabase
     .from("tests")
-    .select("id, title, audience, batch_id, scheduled_start, max_marks")
+    .select("id, title, audience, batch_id, scheduled_start, scheduled_end, max_marks")
     .gte("scheduled_start", rangeStart.toISOString())
     .lt("scheduled_start", rangeEnd.toISOString())
     .neq("status", "cancelled");
@@ -639,15 +646,19 @@ async function getStudentMonthlyReport(studentId, month) {
   for (const test of tests || []) {
     const attempt = attemptsByTestId.get(test.id);
     const testDate = new Date(test.scheduled_start);
-    const dayOfMonth = testDate.getUTCDate();
+    // Plot every test on the day it was scheduled (local time), so the graph's
+    // date always matches the test's date, not when the answer was submitted.
+    const date = localDate(testDate);
+    const dayOfMonth = Number(date.slice(8, 10));
 
     if (!attempt) {
-      // Targeted by this test but never even started an attempt.
-      absentDates.push(dayOfMonth);
+      // Targeted by this test but never even started an attempt — only
+      // counts as absent once the test is over (upcoming/running tests don't).
+      const end = new Date(test.scheduled_end || test.scheduled_start);
+      if (end <= now) absentDates.push(dayOfMonth);
       continue;
     }
     if (attempt.status === "evaluated" && attempt.marks_awarded !== null && attempt.max_marks) {
-      const date = (attempt.submitted_at ? new Date(attempt.submitted_at) : testDate).toISOString().slice(0, 10);
       points.push({
         date,
         day: dayOfMonth,
