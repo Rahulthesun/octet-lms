@@ -10,6 +10,7 @@
  */
 
 const { drawStatisticsChart, drawTable } = require("./attendanceReportFormat");
+const { drawOctetEmblem } = require("./octetEmblem");
 
 // 0-34 -> red, 35-79 -> orange, 80-100 -> green. Mirrors scoreBandColor() in
 // web/components/admin/TestReportsTab.tsx so the on-screen chart and the
@@ -35,12 +36,17 @@ function monthLabel(month) {
 function buildStudentTestReportPdf(doc, report) {
   const { student, month, points, absentDates } = report;
 
-  doc.font("Helvetica-Bold").fontSize(18).text("Student Test Report");
+  const left = doc.page.margins.left;
+  const top = doc.y;
+  drawOctetEmblem(doc, left + 24, top + 24, 48);
+  doc.font("Helvetica-Bold").fontSize(18).text("Student Test Report", left + 60, top + 6);
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#dc2626").text(student.name, left + 60);
+  doc.fillColor("black");
+  doc.x = left;
+  doc.y = Math.max(doc.y, top + 54);
   doc.moveDown(0.5);
 
-  doc.font("Helvetica").fontSize(11);
-  doc.text(`Name: ${student.name}`);
-  doc.text(`Month: ${monthLabel(month)}`);
+  doc.font("Helvetica-Bold").fontSize(13).text(`Octetians — Tests Performance Graph for the Month of ${monthLabel(month)}`);
   doc.moveDown(0.5);
 
   const totalTests = points.length;

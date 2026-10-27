@@ -7,6 +7,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+const { drawOctetEmblem } = require("./octetEmblem");
+
 // ─── CSV ─────────────────────────────────────────────────────────────────────
 
 function csvEscape(value) {
@@ -184,7 +186,23 @@ function drawLegend(doc, x, y, width, items) {
   return cy + 14;
 }
 
-function drawBarChartVertical(doc, { x, y, width, height, data, valueSuffix }) {
+/** Solid black Y-axis with tick labels at 0, half and max, at the chart's left edge. */
+function drawYAxis(doc, { x, top, baseline, maxValue, valueSuffix }) {
+  doc.moveTo(x, top).lineTo(x, baseline).strokeColor("#18181b").lineWidth(1.2).stroke();
+  doc.fontSize(7).font("Helvetica").fillColor("#71717a");
+  [0, maxValue / 2, maxValue].forEach((v) => {
+    const ty = baseline - (v / maxValue) * (baseline - top);
+    doc.moveTo(x - 3, ty).lineTo(x, ty).strokeColor("#18181b").lineWidth(0.8).stroke();
+    doc.text(`${Math.round(v)}${valueSuffix || ""}`, x - 30, ty - 3.5, { width: 26, align: "right", lineBreak: false });
+  });
+  doc.fillColor("black").lineWidth(1);
+}
+
+const Y_AXIS_SPACE = 30;
+
+function drawBarChartVertical(doc, { x: chartX, y, width: chartWidth, height, data, valueSuffix }) {
+  const x = chartX + Y_AXIS_SPACE;
+  const width = chartWidth - Y_AXIS_SPACE;
   const maxValue = Math.max(1, ...data.map((d) => d.value));
   const axisSpace = 16;
   const labelSpace = 14;
@@ -193,7 +211,8 @@ function drawBarChartVertical(doc, { x, y, width, height, data, valueSuffix }) {
   const slot = width / data.length;
   const barWidth = Math.min(56, slot * 0.5);
 
-  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#e4e4e7").lineWidth(1).stroke();
+  drawYAxis(doc, { x, top: baseline - plotHeight, baseline, maxValue, valueSuffix });
+  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#18181b").lineWidth(1.5).stroke();
 
   data.forEach((d, i) => {
     const barHeight = (d.value / maxValue) * plotHeight;
@@ -281,14 +300,17 @@ function drawPieChart(doc, { x, y, width, height, data: rawData, valueSuffix }) 
   drawLegend(doc, x + r * 2 + 24, y + height / 2 - legendItems.length * 8, width - (r * 2 + 24), legendItems);
 }
 
-function drawLineChart(doc, { x, y, width, height, data, valueSuffix, color }) {
+function drawLineChart(doc, { x: chartX, y, width: chartWidth, height, data, valueSuffix, color }) {
+  const x = chartX + Y_AXIS_SPACE;
+  const width = chartWidth - Y_AXIS_SPACE;
   const axisSpace = 16;
   const labelSpace = 12;
   const plotHeight = height - axisSpace - labelSpace;
   const baseline = y + plotHeight + axisSpace;
   const maxValue = 100; // percentage scale, fixed 0-100 to match the on-screen chart
 
-  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#e4e4e7").lineWidth(1).stroke();
+  drawYAxis(doc, { x, top: baseline - plotHeight, baseline, maxValue, valueSuffix: "%" });
+  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#18181b").lineWidth(1.5).stroke();
 
   if (data.length < 2) {
     doc.fontSize(9).fillColor("#a1a1aa").text("Not enough data yet", x, y + plotHeight / 2, { width, align: "center" });
@@ -423,11 +445,16 @@ function drawTable(doc, { headers, rows, colWidths, startX = doc.page.margins.le
 function buildStudentReportPdf(doc, report, chartType = "bar") {
   const type = normalizeChartType(chartType);
 
-  doc.font("Helvetica-Bold").fontSize(18).text("Student Attendance Report");
+  const top = doc.y;
+  drawOctetEmblem(doc, doc.page.margins.left + 24, top + 24, 48);
+  doc.font("Helvetica-Bold").fontSize(18).text("Student Attendance Report", doc.page.margins.left + 60, top + 6);
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#dc2626").text(report.student.name, doc.page.margins.left + 60);
+  doc.fillColor("black");
+  doc.x = doc.page.margins.left;
+  doc.y = Math.max(doc.y, top + 54);
   doc.moveDown(0.5);
 
   doc.font("Helvetica").fontSize(11);
-  doc.text(`Name: ${report.student.name}`);
   doc.text(`Roll No: ${report.student.roll || "—"}`);
   if (report.student.grade) doc.text(`Grade: ${report.student.grade}`);
   if (report.student.batch) doc.text(`Registered Batch: ${report.student.batch}`);

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStudents } from '@/hooks/admin/useStudents'
-import { useStudentTestReport, downloadStudentTestReportPdf } from '@/hooks/useTests'
+import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf } from '@/hooks/useTests'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import SearchInput from '@/components/ui/SearchInput'
@@ -68,7 +68,20 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
   const [month, setMonth] = useState(currentMonthStr())
   const [chartType, setChartType] = useState<AttendanceChartType>('bar')
   const [downloading, setDownloading] = useState(false)
+  const [downloadingProgress, setDownloadingProgress] = useState(false)
   const { report, loading, error } = useStudentTestReport(studentId, month)
+  const year = Number(month.slice(0, 4))
+
+  async function downloadProgressReport() {
+    setDownloadingProgress(true)
+    try {
+      await downloadStudentProgressReportPdf(studentId, year, `progress_report_${studentName.replace(/\s+/g, '_')}_${year}.pdf`)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDownloadingProgress(false)
+    }
+  }
 
   async function downloadPdf() {
     setDownloading(true)
@@ -161,7 +174,7 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
           <div>
             <h3 className="text-sm font-semibold text-zinc-900">Test Report</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{studentName}</p>
+            <p className="text-base font-bold text-red-600 mt-0.5">{studentName}</p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
         </div>
@@ -220,6 +233,8 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
                 barAxisLabels={{ x: 'Date of month', y: 'Score %' }}
                 lineAxisLabels={{ x: 'Date of month', y: 'Score %' }}
                 showMaxLine
+                showEmblem
+                title={`Octetians — Tests Performance Graph for the Month of ${monthLabel(month)}`}
                 height={300}
                 emptyMessage="No evaluated test attempts for this student in this month."
                 description="Each evaluated test attempt's score for this student this month, normalized to a 0–100% scale. Black bars below the axis = absent (a test was scheduled but not attempted). Dates with neither are skipped."
@@ -265,14 +280,21 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
           ) : null}
         </div>
 
-        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0">
+        <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 shrink-0 flex flex-col sm:flex-row gap-2">
           <button
             onClick={downloadPdf}
             disabled={!report || downloading}
-            className="w-full py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
+            className="flex-1 py-2.5 text-sm font-medium text-white rounded-md disabled:opacity-40 transition-colors"
             style={{ backgroundColor: ACCENT }}
           >
             {downloading ? 'Preparing…' : 'Download PDF'}
+          </button>
+          <button
+            onClick={downloadProgressReport}
+            disabled={downloadingProgress}
+            className="flex-1 py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
+          >
+            {downloadingProgress ? 'Preparing…' : `Progress Report ${year} (12 months)`}
           </button>
         </div>
       </motion.div>

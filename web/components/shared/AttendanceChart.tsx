@@ -30,6 +30,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { IconBarChart, IconPieChart, IconLineChart } from '@/components/ui/SvgIcons'
+import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
 
 export type AttendanceChartType = 'bar' | 'pie' | 'line'
 
@@ -93,6 +94,10 @@ interface AttendanceChartProps {
    */
   showMaxLine?: boolean
   referenceValue?: number
+  /** Bold heading printed above the chart, e.g. "Tests Performance Graph for the Month of October 2026". */
+  title?: string
+  /** Shows the Chemistry@OCTET emblem beside the heading — every student-facing graph carries it. */
+  showEmblem?: boolean
 }
 
 // Categorical palette for pie slices — mirrored by PIE_PALETTE in
@@ -265,6 +270,8 @@ export default function AttendanceChart({
   description,
   showMaxLine = false,
   referenceValue = 100,
+  title,
+  showEmblem = false,
 }: AttendanceChartProps) {
   const gradientId = useId()
 
@@ -298,6 +305,12 @@ export default function AttendanceChart({
 
   return (
     <div>
+      {(title || showEmblem) && (
+        <div className="flex items-center gap-3 mb-3">
+          {showEmblem && <ChemistryOctetLogo size={48} static className="shrink-0" />}
+          {title && <h4 className="text-base font-bold text-zinc-900 leading-snug">{title}</h4>}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-1.5">
         <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Statistics</p>
         <ChartTypeToggle type={type} onTypeChange={onTypeChange} />
@@ -365,8 +378,8 @@ export default function AttendanceChart({
                       ticks={[0, 25, 50, 75, 100]}
                       tickFormatter={(v) => `${v}${valueSuffix || '%'}`}
                       tick={{ fontSize: 11, fill: '#71717a' }}
-                      axisLine={false}
-                      tickLine={false}
+                      axisLine={{ stroke: '#18181b', strokeWidth: 1.5 }}
+                      tickLine={{ stroke: '#18181b' }}
                       width={barAxisLabels?.y ? 48 : 38}
                       label={
                         barAxisLabels
@@ -481,8 +494,8 @@ export default function AttendanceChart({
                 <YAxis
                   domain={[0, 100]}
                   tick={{ fontSize: 11, fill: '#71717a' }}
-                  axisLine={false}
-                  tickLine={false}
+                  axisLine={{ stroke: '#18181b', strokeWidth: 1.5 }}
+                  tickLine={{ stroke: '#18181b' }}
                   width={lineAxisLabels?.y ? 46 : 32}
                   tickFormatter={(v) => `${v}`}
                   label={

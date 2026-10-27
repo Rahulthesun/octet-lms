@@ -634,6 +634,30 @@ export async function downloadStudentTestReportPdf(studentId: string, month: str
   URL.revokeObjectURL(url)
 }
 
+/**
+ * OCTET 12-month progress report — for every month of `year`, the student's
+ * test performance graph and attendance graph, one month per page.
+ */
+export async function downloadStudentProgressReportPdf(studentId: string, year: number, filename: string) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/progress-reports/students/${studentId}/pdf?year=${year}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export async function gradeDescriptiveAttempt(testId: string, attemptId: string, marksAwarded: number, feedback: string) {
   return authedFetch(`/api/tests/${testId}/attempts/${attemptId}/grade`, {
     method: 'POST',

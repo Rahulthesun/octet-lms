@@ -14,6 +14,7 @@ import {
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
 import { authedFetch } from '@/lib/apiClient'
+import { downloadStudentProgressReportPdf } from '@/hooks/useTests'
 import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import AttendanceChart, {
   ATTENDANCE_STATUS_COLORS,
@@ -60,6 +61,20 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
   const [sendingReport, setSendingReport] = useState(false)
   const [sendReportMessage, setSendReportMessage] = useState<string | null>(null)
   const [month, setMonth] = useState(currentMonthStr())
+  const [downloadingProgress, setDownloadingProgress] = useState(false)
+
+  async function downloadProgressReport() {
+    setDownloadingProgress(true)
+    try {
+      const year = Number(month.slice(0, 4))
+      const who = report ? (report.student.roll || report.student.name).replace(/\s+/g, '_') : studentId
+      await downloadStudentProgressReportPdf(studentId, year, `progress_report_${who}_${year}.pdf`)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDownloadingProgress(false)
+    }
+  }
 
   async function sendMonthlyReportNow() {
     setSendingReport(true)
@@ -147,7 +162,11 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
           <div>
             <h3 className="text-sm font-semibold text-zinc-900">Attendance Report</h3>
-            {report && <p className="text-xs text-zinc-500 mt-0.5">{report.student.name} · {report.student.roll || '—'}</p>}
+            {report && (
+              <p className="text-xs text-zinc-500 mt-0.5">
+                <span className="text-base font-bold text-red-600">{report.student.name}</span> · {report.student.roll || '—'}
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
         </div>
@@ -206,6 +225,8 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
                   valueSuffix={chartType === 'bar' ? '' : '%'}
                   barAxisLabels={{ x: 'Date', y: 'Attendance %' }}
                   lineAxisLabels={{ x: 'Session number', y: 'Attendance % so far' }}
+                  showEmblem
+                  title={`Octetians — Attendance Graph for the Month of ${monthLabel(month)}`}
                   description={
                     chartType === 'bar'
                       ? 'Attendance by date — black bars mark a class this student never logged into at all.'
@@ -266,6 +287,13 @@ function StudentReportModal({ studentId, onClose }: { studentId: string; onClose
               {downloading === 'pdf' ? 'Preparing…' : 'Download PDF'}
             </button>
           </div>
+          <button
+            onClick={downloadProgressReport}
+            disabled={downloadingProgress}
+            className="w-full py-2.5 text-sm font-medium text-zinc-700 border border-zinc-300 rounded-md hover:bg-zinc-100 transition-colors disabled:opacity-40"
+          >
+            {downloadingProgress ? 'Preparing…' : `Download Progress Report ${month.slice(0, 4)} (12 months)`}
+          </button>
           <button
             onClick={sendMonthlyReportNow}
             disabled={!report || sendingReport}
