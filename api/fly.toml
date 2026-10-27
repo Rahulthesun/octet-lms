@@ -1,7 +1,5 @@
-# fly.toml app configuration file generated for api-satin-leaf-209 on 2026-06-12T00:57:45+05:30
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+
+# fly.toml app configuration file generated for api-satin-leaf-209
 
 app = 'api-satin-leaf-209'
 primary_region = 'bom'
@@ -19,5 +17,3 @@ primary_region = 'bom'
 [[vm]]
   memory = '512mb'
   cpus = 1
-  memory_mb = 512
-  memory_mb = 512

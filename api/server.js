@@ -46,13 +46,17 @@ app.use(cors({
     // Local/LAN origins are a development convenience only — never trusted in
     // production. Tunnel domains (e.g. trycloudflare.com) must be listed
     // explicitly in CORS_ORIGINS; a wildcard would trust anyone's subdomain.
+    if (configured.includes(origin.replace(/\/$/, ""))) {
+      return callback(null, true);
+    }
+
     const devOrigin = !IS_PROD && (
       origin.startsWith("http://localhost") ||
       origin.startsWith("http://192.168.") ||
       origin.endsWith(".trycloudflare.com") ||
-      origin.endsWith(".vercel.app") ||
-      configured.includes(origin.replace(/\/$/, ""))
-    ) {
+      origin.endsWith(".vercel.app")
+    );
+    if (devOrigin) {
       return callback(null, true);
     }
 
