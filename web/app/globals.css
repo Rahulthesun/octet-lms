@@ -10,9 +10,45 @@
   --color-accent4: #c8e0da;
   --color-muted: #8b6fa0;
   --color-border: #c8b8d8;
-  --color-brand: #7A6B96;        /* dusty plum — student portal accent (admin/landing don't use) */
-  --color-brand-dark: #635580;   /* plum-dark — hover / pressed */
-  --font-sans: "Geist", system-ui, sans-serif;
+  --color-primary-dark: #4b3260; /* hover / pressed state of primary */
+  /* The ONE button/action violet for the whole app (admin + student). Unlike
+     `primary`, this is not re-bound inside .student-scope, so buttons look the
+     same in both portals. */
+  --color-action: #5e4075;
+  --color-action-dark: #4b3260;
+  --color-brand: #5e4075;        /* student portal accent — same plum as admin */
+  --color-brand-dark: #4b3260;   /* hover / pressed */
+
+  /* Tailwind's stock violet/purple are a brighter, bluer violet than the brand
+     plum, which produced two competing violets. Both scales are re-pointed at
+     the brand plum so every violet-* / purple-* class matches. */
+  --color-violet-50: #f6f3f9;
+  --color-violet-100: #ede6f3;
+  --color-violet-200: #dccfe8;
+  --color-violet-300: #c4b0d7;
+  --color-violet-400: #a587c0;
+  --color-violet-500: #8665a5;
+  --color-violet-600: #6f4f8e;
+  --color-violet-700: #5e4075;
+  --color-violet-800: #4b3260;
+  --color-violet-900: #3b2849;
+  --color-violet-950: #251830;
+  --color-purple-50: #f6f3f9;
+  --color-purple-100: #ede6f3;
+  --color-purple-200: #dccfe8;
+  --color-purple-300: #c4b0d7;
+  --color-purple-400: #a587c0;
+  --color-purple-500: #8665a5;
+  --color-purple-600: #6f4f8e;
+  --color-purple-700: #5e4075;
+  --color-purple-800: #4b3260;
+  --color-purple-900: #3b2849;
+  --color-purple-950: #251830;
+
+  /* next/font registers Geist under a generated family name and exposes it as
+     --font-geist; the literal "Geist" only matches if it happens to be
+     installed locally. */
+  --font-sans: var(--font-geist), "Geist", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
 }
 
@@ -31,12 +67,13 @@
   --color-border:  #E6E2EC;   /* faint plum-grey border */
 }
 
-/* Numbers / data display inside the student portal use Space Grotesk. */
-.student-scope .font-data,
-.student-scope .font-num {
-  font-family: 'Space Grotesk', var(--font-data), ui-monospace, system-ui, sans-serif;
-  font-feature-settings: 'tnum' 1;
-  letter-spacing: -0.01em;
+/* Numbers / data display: same family as everything else, with tabular
+   (fixed-width) digits so columns of figures line up. */
+.font-data,
+.font-num,
+.font-inter {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
 *, *::before, *::after {
@@ -52,7 +89,7 @@
   body {
     background-color: #f8f9ed;
     color: #5e4075;
-    font-family: "Geist", system-ui, sans-serif;
+    font-family: var(--font-sans);
     font-weight: 500;
     font-size: 1rem;
     line-height: 1.6;
@@ -101,12 +138,6 @@ html.lenis body {
 ::selection {
   background: #e9deb5;
   color: #5e4075;
-}
-
-/* Space Grotesk for numeric/data displays in admin UI */
-.font-inter,
-.font-data {
-  font-family: 'Space Grotesk', var(--font-data), system-ui, sans-serif;
 }
 
 /* ── Landing page decorative textures & section backgrounds ───────────────── */

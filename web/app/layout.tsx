@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import { Geist, Space_Grotesk } from 'next/font/google'
+import { Geist } from 'next/font/google'
 import './globals.css'
 import LenisProvider from '@/components/providers/LenisProvider'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: ['400', '600', '700'], variable: '--font-data', display: 'swap' })
+// One typeface for the whole app; globals.css builds --font-sans from --font-geist.
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'Chemistry@OCTET — Spread True Science',
@@ -13,11 +13,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className={geist.variable}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
         {/* Static, stationary favicon — the animated canvas version added page
             latency, so it's intentionally left non-animating. */}
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

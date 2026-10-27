@@ -5,29 +5,34 @@
 // (paste a screenshot per question and per option) with a text fallback, and
 // can be imported from the question bank.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useChapters } from '@/hooks/useOnlineClasses'
 import { useBatches } from '@/hooks/useAttendanceData'
-import { useAdminTests } from '@/hooks/useTests'
-import type { CreateTestInput, TestQuestionInput, TestType, OptionKey, QuestionField } from '@/hooks/useTests'
+import { useAdminTests, createDraftTest, autosaveDraftTest, fetchTestForForm } from '@/hooks/useTests'
+import type { CreateTestInput, TestAdminDetail, TestQuestionInput, TestType, OptionKey, QuestionField, TestSummary } from '@/hooks/useTests'
+import { authedFetch } from '@/lib/apiClient'
 import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
 import QuestionBankModal from './QuestionBankModal'
+import TimeInput12h from '@/components/shared/TimeInput12h'
+import { chapterLabel, todayISODate, isPastDate } from '@/lib/helpers'
+import Select from '@/components/ui/Select'
+import { Watermark } from '@/components/shared/ExamSecurity'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
 const labelCls = 'block text-sm font-medium text-zinc-700 mb-2'
 
 // Image is the default for the question and for every option.
 function blankQuestion(): TestQuestionInput {
   return {
-    questionType: 'image', questionText: '', questionImageKey: null, questionImageUrl: null,
-    optionAType: 'image', optionA: '', optionAImageKey: null, optionAImageUrl: null,
-    optionBType: 'image', optionB: '', optionBImageKey: null, optionBImageUrl: null,
-    optionCType: 'image', optionC: '', optionCImageKey: null, optionCImageUrl: null,
-    optionDType: 'image', optionD: '', optionDImageKey: null, optionDImageUrl: null,
+    questionType: 'image', questionText: '', questionImageKey: null, questionImageUrl: null, questionImageContentHash: null, questionImagePerceptualHash: null,
+    optionAType: 'image', optionA: '', optionAImageKey: null, optionAImageUrl: null, optionAImageContentHash: null, optionAImagePerceptualHash: null,
+    optionBType: 'image', optionB: '', optionBImageKey: null, optionBImageUrl: null, optionBImageContentHash: null, optionBImagePerceptualHash: null,
+    optionCType: 'image', optionC: '', optionCImageKey: null, optionCImageUrl: null, optionCImageContentHash: null, optionCImagePerceptualHash: null,
+    optionDType: 'image', optionD: '', optionDImageKey: null, optionDImageUrl: null, optionDImageContentHash: null, optionDImagePerceptualHash: null,
     correctOption: 'a',
     marks: 1,
   }
@@ -50,6 +55,8 @@ function getField(q: TestQuestionInput, f: QuestionField): FieldValue {
     text: r[textKeyOf(f)] ?? '',
     imageKey: r[`${f}ImageKey`] ?? null,
     imageUrl: r[`${f}ImageUrl`] ?? null,
+    imageContentHash: r[`${f}ImageContentHash`] ?? null,
+    imagePerceptualHash: r[`${f}ImagePerceptualHash`] ?? null,
   }
 }
 
@@ -60,6 +67,8 @@ function withField(q: TestQuestionInput, f: QuestionField, v: FieldValue): TestQ
     [textKeyOf(f)]: v.text,
     [`${f}ImageKey`]: v.imageKey,
     [`${f}ImageUrl`]: v.imageUrl,
+    [`${f}ImageContentHash`]: v.imageContentHash ?? null,
+    [`${f}ImagePerceptualHash`]: v.imagePerceptualHash ?? null,
   } as TestQuestionInput
 }
 
@@ -71,6 +80,29 @@ function fieldFilled(q: TestQuestionInput, f: QuestionField) {
 
 const isBlankQuestion = (q: TestQuestionInput) => QUESTION_FIELDS.every(({ field }) => !fieldFilled(q, field))
 
+// ISO -> local "YYYY-MM-DD" / "HH:mm", the inverse of how this form builds
+// scheduledStart/scheduledEnd (new Date(`${date}T${startTime}`).toISOString()).
+function isoToLocalDate(iso: string | null | undefined) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+function isoToLocalTime(iso: string | null | undefined) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Does the form have enough content yet to be worth silently saving as a draft?
+function hasDraftableContent(title: string, chapterId: string, batchId: string, questions: TestQuestionInput[]) {
+  if (title.trim() || chapterId || batchId) return true
+  return questions.some((q) => QUESTION_FIELDS.some(({ field }) => fieldFilled(q, field)))
+}
+
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-2xl border border-zinc-200 p-6 sm:p-8">
@@ -81,11 +113,13 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   )
 }
 
-export default function ScheduleTestForm() {
+export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { chapters } = useChapters()
   const { batches } = useBatches('all')
-  const { createTest } = useAdminTests()
+  const { createTest, updateTest, deleteTest } = useAdminTests()
+  const isEditMode = !!testId
 
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TestType>('mcq')
@@ -103,6 +137,87 @@ export default function ScheduleTestForm() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ─── Pre-populate from an existing test (edit mode) or a resumed draft ───
+
+  const [loadingExisting, setLoadingExisting] = useState(isEditMode || !!searchParams.get('draft'))
+  const [draftId, setDraftId] = useState<string | null>(testId ? null : searchParams.get('draft'))
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const hydratedRef = useRef(false)
+  // An existing test keeps its original start even if it is already in the past (e.g. editing questions).
+  const [originalStart, setOriginalStart] = useState<string | null>(null)
+
+  // ─── Unfinished drafts from a previous visit (closed tab, crash, etc.) ───
+  // Only relevant on a fresh "create" page load — not mid-edit, and not when
+  // a specific ?draft= is already being resumed.
+  const [otherDrafts, setOtherDrafts] = useState<TestSummary[]>([])
+  const [resuming, setResuming] = useState(false)
+
+  useEffect(() => {
+    if (isEditMode || searchParams.get('draft')) return
+    authedFetch('/api/tests?status=draft')
+      .then((list: TestSummary[]) => setOtherDrafts(list))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function resumeDraft(id: string) {
+    setResuming(true)
+    try {
+      const test = await fetchTestForForm(id)
+      populateFromTest(test)
+      setDraftId(id)
+      const qs = new URLSearchParams(Array.from(searchParams.entries()))
+      qs.set('draft', id)
+      router.replace(`/admin/tests/new?${qs.toString()}`, { scroll: false })
+      setOtherDrafts([])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to resume the draft')
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  async function discardDrafts() {
+    setResuming(true)
+    try {
+      await Promise.all(otherDrafts.map((d) => deleteTest(d.id).catch(() => {})))
+      setOtherDrafts([])
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  function populateFromTest(test: TestAdminDetail) {
+    setTitle(test.title || '')
+    setType(test.type)
+    setChapterId(test.chapterId || '')
+    setBatchId(test.audience === 'ALL' ? 'ALL' : (test.batchId || ''))
+    if (isEditMode) setOriginalStart(test.scheduledStart ? new Date(test.scheduledStart).toISOString() : null)
+    setDate(isoToLocalDate(test.scheduledStart))
+    setStartTime(isoToLocalTime(test.scheduledStart))
+    setEndTime(isoToLocalTime(test.scheduledEnd))
+    setInstructions(test.instructions || '')
+    setMaxMarks(String(test.maxMarks ?? 100))
+    setQuestionText(test.questionText || '')
+    if (test.type === 'mcq' && test.questions && test.questions.length > 0) {
+      setQuestions(test.questions.map((q) => ({ ...q, marks: q.marks ?? 1 })))
+    }
+  }
+
+  useEffect(() => {
+    const resumeId = testId || draftId
+    if (!resumeId) { hydratedRef.current = true; return }
+    let cancelled = false
+    setLoadingExisting(true)
+    fetchTestForForm(resumeId)
+      .then((test) => { if (!cancelled) populateFromTest(test) })
+      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load the test') })
+      .finally(() => { if (!cancelled) { setLoadingExisting(false); hydratedRef.current = true } })
+    return () => { cancelled = true }
+    // Only ever runs once on mount for whichever id we were handed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const updateQuestion = (i: number, patch: Partial<TestQuestionInput>) =>
     setQuestions((prev) => prev.map((q, idx) => (idx === i ? { ...q, ...patch } : q)))
   const setQuestionField = (i: number, f: QuestionField, v: FieldValue) =>
@@ -117,6 +232,32 @@ export default function ScheduleTestForm() {
 
   const totalMcqMarks = questions.reduce((s, q) => s + (Number(q.marks) || 1), 0)
 
+  // Flags questions that are byte-for-byte identical to an earlier one in
+  // this same test — the exact pattern that fills the question bank with
+  // repeats when a question is accidentally pasted/saved more than once
+  // while iterating on a test. Compares every field's content (text or
+  // image key) plus the correct answer; doesn't require the server-side
+  // image-hash migration since it only ever compares questions already
+  // loaded in this form.
+  function questionSignature(q: TestQuestionInput) {
+    return QUESTION_FIELDS.map(({ field }) => {
+      const v = getField(q, field)
+      return v.type === 'image' ? `img:${v.imageKey || ''}` : `txt:${v.text.trim().toLowerCase()}`
+    }).join('|') + `|correct:${q.correctOption}`
+  }
+  const duplicateQuestionIndexes = useMemo(() => {
+    const seen = new Map<string, number>()
+    const dupes = new Set<number>()
+    questions.forEach((q, i) => {
+      if (isBlankQuestion(q)) return
+      const sig = questionSignature(q)
+      if (seen.has(sig)) dupes.add(i)
+      else seen.set(sig, i)
+    })
+    return dupes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions])
+
   const scheduledStart = date && startTime ? new Date(`${date}T${startTime}`).toISOString() : ''
   const scheduledEnd = date && endTime ? new Date(`${date}T${endTime}`).toISOString() : ''
 
@@ -127,48 +268,106 @@ export default function ScheduleTestForm() {
     if (!batchId) p.push('Choose a batch or All Students')
     if (!date || !startTime || !endTime) p.push('Set the date, start and end time')
     else if (scheduledEnd <= scheduledStart) p.push('End time must be after start time')
+    else if (scheduledStart !== originalStart && new Date(scheduledStart).getTime() < Date.now()) {
+      p.push(isPastDate(date) ? 'The test date is in the past — pick today or a later date' : 'The start time has already passed — pick a later time')
+    }
     if (type === 'mcq') {
       if (questions.length === 0) p.push('Add at least one question')
       questions.forEach((q, i) => {
         const missing = QUESTION_FIELDS.filter(({ field }) => !fieldFilled(q, field)).map((f) => f.label)
         if (missing.length) p.push(`Question ${i + 1} needs: ${missing.join(', ')}`)
       })
+      duplicateQuestionIndexes.forEach((i) => p.push(`Question ${i + 1} is an exact duplicate of an earlier question — remove or change one of them`))
     }
     return p
-  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, type, questions])
+  }, [title, batchId, date, startTime, endTime, scheduledStart, scheduledEnd, originalStart, type, questions, duplicateQuestionIndexes])
+
+  // Builds the same shape createTest/updateTest/draft endpoints all take, from current form state.
+  function buildInput(): CreateTestInput {
+    const input: CreateTestInput = {
+      title: title.trim(),
+      type,
+      chapterId: chapterId || undefined,
+      batchId,
+      scheduledStart,
+      scheduledEnd,
+      instructions: instructions.trim() || undefined,
+    }
+    if (type === 'mcq') {
+      // Local/signed preview URLs are display-only; the server stores the image keys.
+      input.questions = questions.map((q) => {
+        const {
+          questionImageUrl, optionAImageUrl, optionBImageUrl, optionCImageUrl, optionDImageUrl,
+          ...rest
+        } = q
+        void questionImageUrl; void optionAImageUrl; void optionBImageUrl; void optionCImageUrl; void optionDImageUrl
+        return { ...rest, marks: Number(q.marks) || 1 }
+      })
+    } else {
+      input.maxMarks = Number(maxMarks) || 0
+      input.questionText = questionText.trim() || undefined
+    }
+    return input
+  }
+
+  // ─── Autosave (create-mode only — an edit of an already-scheduled test is never silently drafted) ───
+
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftIdRef = useRef<string | null>(draftId)
+  draftIdRef.current = draftId
+  const savingRef = useRef(false)
+
+  useEffect(() => {
+    if (isEditMode) return // editing a real test never creates/updates a draft
+    if (!hydratedRef.current || loadingExisting) return // don't autosave the values we just loaded in
+    if (!hasDraftableContent(title, chapterId, batchId, questions)) return
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(async () => {
+      if (savingRef.current) return
+      savingRef.current = true
+      setSaveState('saving')
+      try {
+        const input = buildInput()
+        if (!draftIdRef.current) {
+          const created = await createDraftTest(input)
+          setDraftId(created.id)
+          draftIdRef.current = created.id
+          const qs = new URLSearchParams(Array.from(searchParams.entries()))
+          qs.set('draft', created.id)
+          router.replace(`/admin/tests/new?${qs.toString()}`, { scroll: false })
+        } else {
+          await autosaveDraftTest(draftIdRef.current, input)
+        }
+        setSaveState('saved')
+      } catch {
+        setSaveState('error')
+      } finally {
+        savingRef.current = false
+      }
+    }, 1500)
+
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, chapterId, batchId, date, startTime, endTime, instructions, maxMarks, questionText, questions, type, loadingExisting])
 
   async function handleSubmit() {
     if (problems.length > 0) return
     setSubmitting(true)
     setError(null)
     try {
-      const input: CreateTestInput = {
-        title: title.trim(),
-        type,
-        chapterId: chapterId || undefined,
-        batchId,
-        scheduledStart,
-        scheduledEnd,
-        instructions: instructions.trim() || undefined,
-      }
-      if (type === 'mcq') {
-        // Local/signed preview URLs are display-only; the server stores the image keys.
-        input.questions = questions.map((q) => {
-          const {
-            questionImageUrl, optionAImageUrl, optionBImageUrl, optionCImageUrl, optionDImageUrl,
-            ...rest
-          } = q
-          void questionImageUrl; void optionAImageUrl; void optionBImageUrl; void optionCImageUrl; void optionDImageUrl
-          return { ...rest, marks: Number(q.marks) || 1 }
-        })
+      const input = buildInput()
+      if (isEditMode && testId) {
+        await updateTest(testId, input)
+      } else if (draftId) {
+        // Promote the autosaved draft into a real, fully-scheduled test — no duplicate row.
+        await updateTest(draftId, { ...input, status: 'scheduled' })
       } else {
-        input.maxMarks = Number(maxMarks) || 0
-        input.questionText = questionText.trim() || undefined
+        await createTest(input)
       }
-      await createTest(input)
       router.push('/admin/tests')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create the test')
+      setError(e instanceof Error ? e.message : 'Failed to save the test')
       document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSubmitting(false)
@@ -178,13 +377,42 @@ export default function ScheduleTestForm() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-6">
-        <div>
-          <Link href="/admin/tests" className="text-sm text-zinc-500 hover:text-violet-700">Back to tests</Link>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 mt-2">Schedule New Test</h1>
-          <p className="text-[15px] text-zinc-500 mt-1">MCQ tests auto-grade instantly; descriptive tests are graded manually.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link href="/admin/tests" className="text-sm text-zinc-500 hover:text-violet-700">Back to tests</Link>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 mt-2">{isEditMode ? 'Edit Test' : 'Schedule New Test'}</h1>
+            <p className="text-[15px] text-zinc-500 mt-1">MCQ tests auto-grade instantly; descriptive tests are graded manually.</p>
+          </div>
+          {!isEditMode && saveState !== 'idle' && (
+            <span className={`shrink-0 mt-1 text-xs px-2.5 py-1 rounded-full ${
+              saveState === 'saving' ? 'bg-zinc-100 text-zinc-500' : saveState === 'saved' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            }`}>
+              {saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Draft saved' : 'Draft save failed'}
+            </span>
+          )}
         </div>
 
+        {loadingExisting && <div className="text-sm px-4 py-3 rounded-lg bg-zinc-50 text-zinc-500 border border-zinc-200">Loading...</div>}
         {error && <div className="text-sm px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">{error}</div>}
+
+        {otherDrafts.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm px-4 py-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+            <span>
+              You have an unfinished test{otherDrafts.length > 1 ? 's' : ''} from before
+              {otherDrafts[0].title ? ` ("${otherDrafts[0].title}")` : ''} — pick up where you left off?
+            </span>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => resumeDraft(otherDrafts[0].id)} disabled={resuming}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm disabled:opacity-50">
+                Resume draft
+              </button>
+              <button onClick={discardDrafts} disabled={resuming}
+                className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 text-sm hover:bg-amber-100 disabled:opacity-50">
+                Discard & start new
+              </button>
+            </div>
+          </div>
+        )}
 
         <Section title="Test details">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -193,28 +421,42 @@ export default function ScheduleTestForm() {
               <input id="t-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                 placeholder="Chemistry" className={inputCls} />
             </div>
-            <div>
-              <label className={labelCls} htmlFor="t-type">Type</label>
-              <select id="t-type" value={type} onChange={(e) => setType(e.target.value as TestType)} className={inputCls}>
-                <option value="mcq">MCQ (auto-graded)</option>
-                <option value="descriptive">Descriptive (manually graded)</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="t-chapter">Chapter</label>
-              <select id="t-chapter" value={chapterId} onChange={(e) => setChapterId(e.target.value)} className={inputCls}>
-                <option value="">No chapter</option>
-                {chapters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="t-batch">Batch</label>
-              <select id="t-batch" value={batchId} onChange={(e) => setBatchId(e.target.value)} className={inputCls}>
-                <option value="">Select a batch</option>
-                <option value="ALL">All Students</option>
-                {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
+            <Select
+              label="Type"
+              id="t-type"
+              value={type}
+              onChange={(e) => setType(e.target.value as TestType)}
+            >
+              <option value="mcq">MCQ (auto-graded)</option>
+              <option value="descriptive">Descriptive (manually graded)</option>
+            </Select>
+            <Select
+              label="Chapter"
+              id="t-chapter"
+              value={chapterId}
+              onChange={(e) => setChapterId(e.target.value)}
+            >
+              <option value="">No chapter</option>
+              {chapters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {chapterLabel(chapters, c)}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Batch"
+              id="t-batch"
+              value={batchId}
+              onChange={(e) => setBatchId(e.target.value)}
+            >
+              <option value="">Select a batch</option>
+              <option value="ALL">All Students</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
           </div>
         </Section>
 
@@ -222,15 +464,22 @@ export default function ScheduleTestForm() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
               <label className={labelCls} htmlFor="t-date">Date</label>
-              <input id="t-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+              <input
+                id="t-date"
+                type="date"
+                value={date}
+                min={originalStart && isoToLocalDate(originalStart) < todayISODate() ? isoToLocalDate(originalStart) : todayISODate()}
+                onChange={(e) => setDate(e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls} htmlFor="t-start">Start time</label>
-              <input id="t-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
+              <TimeInput12h id="t-start" value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className={labelCls} htmlFor="t-end">End time</label>
-              <input id="t-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
+              <TimeInput12h id="t-end" value={endTime} onChange={setEndTime} />
             </div>
           </div>
           {date && startTime && endTime && scheduledEnd <= scheduledStart && (
@@ -283,14 +532,23 @@ export default function ScheduleTestForm() {
               </div>
             )}
 
+            <div className="space-y-6">
             {questions.map((q, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-zinc-200 p-6 sm:p-8 space-y-6">
+              <div key={i} className={`relative overflow-hidden bg-white rounded-2xl border p-6 sm:p-8 space-y-6 ${
+                duplicateQuestionIndexes.has(i) ? 'border-rose-300 ring-2 ring-rose-100' : 'border-zinc-200'
+              }`}>
+                <Watermark lines={['OCTET']} />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-base font-semibold text-zinc-900">Question {i + 1}</span>
                     {q.bankQuestionId && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500" title="Changes here do not affect the original">
                         Imported copy
+                      </span>
+                    )}
+                    {duplicateQuestionIndexes.has(i) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                        Exact duplicate of another question
                       </span>
                     )}
                   </div>
@@ -339,6 +597,7 @@ export default function ScheduleTestForm() {
                 </div>
               </div>
             ))}
+            </div>
 
             {questions.length > 0 && (
               <button onClick={addQuestion} type="button"
@@ -373,7 +632,7 @@ export default function ScheduleTestForm() {
             <button onClick={handleSubmit} disabled={problems.length > 0 || submitting}
               className="px-6 py-2.5 rounded-lg text-white text-[15px] transition-colors disabled:opacity-40"
               style={{ backgroundColor: ACCENT }}>
-              {submitting ? 'Scheduling...' : 'Schedule test'}
+              {submitting ? (isEditMode ? 'Saving...' : 'Scheduling...') : (isEditMode ? 'Save changes' : 'Schedule test')}
             </button>
           </div>
         </div>

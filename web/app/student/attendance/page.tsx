@@ -13,6 +13,9 @@ import AttendanceChart, {
   buildAttendanceTrend,
 } from '@/components/shared/AttendanceChart'
 import { downloadAttendanceFile } from '@/hooks/useAttendanceData'
+import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
+import PageHeader from '@/components/ui/PageHeader'
 
 
 // ─── Auth fetch helper ─────────────────────────────────────────────────────
@@ -86,62 +89,109 @@ type MyReport = {
 
 // ─── QR Scanner ─────────────────────────────────────────────────────────────
 
+/** Turns getUserMedia failures into something a student can act on. */
+function cameraErrorMessage(err: unknown): string {
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    return 'The camera only works on the secure (https) site. Open the student portal from its https link and try again.'
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return 'This browser cannot open the camera. Please use the latest Chrome, Safari or Edge.'
+  }
+  const name = err instanceof DOMException ? err.name : ''
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera access is blocked. Tap the lock/camera icon in the address bar, allow Camera for this site, then tap Try again.'
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return 'No camera was found on this device.'
+  }
+  if (name === 'NotReadableError' || name === 'AbortError') {
+    return 'The camera is being used by another app. Close it and tap Try again.'
+  }
+  return err instanceof Error ? err.message : 'Could not open the camera.'
+}
+
+const SCAN_INTERVAL_MS = 120 // decoding every frame at full resolution makes low-end phones stutter
+
 function QRScanner({ onClose }: { onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number | null>(null)
+  const lastScanRef = useRef(0)
+  const decodedRef = useRef(false)
   const [state, setState] = useState<ScanState>('requesting')
   const [errorMsg, setErrorMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('Attendance marked')
+  const [attempt, setAttempt] = useState(0)
+
+  // The parent passes a new onClose every render (it polls the server); keep the
+  // latest in a ref so the camera effect below never restarts mid-scan.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
   }, [])
 
-  const tick = useCallback(() => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      rafRef.current = requestAnimationFrame(tick)
-      return
-    }
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    })
-
-    if (code?.data) {
-      handleDecoded(code.data)
-      return
-    }
-    rafRef.current = requestAnimationFrame(tick)
-  }, [])
-
-  async function handleDecoded(token: string) {
-    stopCamera()
-    try {
-      await submitScan(token)
-      setState('success')
-      setTimeout(onClose, 1400)
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Could not mark attendance')
-      setState('error')
-    }
-  }
-
   useEffect(() => {
     let cancelled = false
+    decodedRef.current = false
+    setState('requesting')
+
+    async function handleDecoded(token: string) {
+      stopCamera()
+      try {
+        const res = await submitScan(token)
+        if (cancelled) return
+        setSuccessMsg(res?.alreadyMarked ? 'You were already marked present' : 'Attendance marked')
+        setState('success')
+        setTimeout(() => onCloseRef.current(), 1600)
+      } catch (e) {
+        if (cancelled) return
+        setErrorMsg(e instanceof Error ? e.message : 'Could not mark attendance')
+        setState('error')
+      }
+    }
+
+    function tick() {
+      if (cancelled) return
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      const now = performance.now()
+      if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA || now - lastScanRef.current < SCAN_INTERVAL_MS) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      lastScanRef.current = now
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+      // Downscale large frames — QR decoding doesn't need full HD and it keeps the scan loop fast.
+      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight))
+      canvas.width = Math.round(video.videoWidth * scale)
+      canvas.height = Math.round(video.videoHeight * scale)
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      })
+
+      if (code?.data && !decodedRef.current) {
+        decodedRef.current = true
+        void handleDecoded(code.data)
+        return
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
     async function start() {
       try {
+        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('unsupported')
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
         })
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
         streamRef.current = stream
@@ -152,19 +202,14 @@ function QRScanner({ onClose }: { onClose: () => void }) {
         setState('scanning')
         rafRef.current = requestAnimationFrame(tick)
       } catch (err) {
-        console.error("Camera error:", err);
-        console.log("isSecureContext:", window.isSecureContext);
-        console.log("mediaDevices:", navigator.mediaDevices);
-
-        setErrorMsg(
-          err instanceof Error ? err.message : "Failed to access camera"
-        );
-        setState("error");
+        if (cancelled) return
+        setErrorMsg(cameraErrorMessage(err))
+        setState('error')
       }
     }
     start()
     return () => { cancelled = true; stopCamera() }
-  }, [tick, stopCamera])
+  }, [stopCamera, attempt])
 
   return (
     <motion.div
@@ -190,7 +235,7 @@ function QRScanner({ onClose }: { onClose: () => void }) {
                   }} />
               ))}
               <motion.div
-                className="absolute left-0 right-0 h-0.5 bg-brand shadow-[0_0_8px_rgba(122,107,150,0.8)]"
+                className="absolute left-0 right-0 h-0.5 bg-brand shadow-[0_0_8px_rgba(94,64,117,0.8)]"
                 animate={{ top: ['4%', '94%', '4%'] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
               />
@@ -216,7 +261,7 @@ function QRScanner({ onClose }: { onClose: () => void }) {
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M7 12l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </motion.svg>
-              <p className="text-white text-lg font-medium">Attendance marked</p>
+              <p className="text-white text-lg font-medium">{successMsg}</p>
             </motion.div>
           )}
           {state === 'error' && (
@@ -235,6 +280,14 @@ function QRScanner({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="bg-black px-6 py-5 flex items-center justify-center gap-3 shrink-0">
+        {state === 'error' && (
+          <button
+            onClick={() => setAttempt(a => a + 1)}
+            className="px-6 py-3 rounded-full bg-white text-zinc-900 text-sm font-medium hover:bg-white/90 transition-colors"
+          >
+            Try again
+          </button>
+        )}
         <button
           onClick={onClose}
           className="px-6 py-3 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
@@ -552,7 +605,10 @@ function AttendanceStatisticsCard() {
       </div>
 
       {loading ? (
-        <div className="py-10 text-center text-muted text-sm">Loading statistics…</div>
+        <div className="space-y-3 py-2">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-9 w-36" />
+        </div>
       ) : !report || report.totalSessions === 0 ? (
         <div className="py-10 text-center text-muted text-sm">No attendance recorded yet.</div>
       ) : (
@@ -563,7 +619,7 @@ function AttendanceStatisticsCard() {
             barData={categoryData}
             pieData={categoryData}
             lineData={trendData}
-            lineColor="#7A6B96"
+            lineColor="#5e4075"
             valueSuffix={chartType === 'line' ? '%' : ''}
             barAxisLabels={{ x: 'Attendance status', y: 'Number of sessions' }}
             lineAxisLabels={{ x: 'Session number', y: 'Attendance % so far' }}
@@ -597,6 +653,7 @@ function AttendanceStatisticsCard() {
 function HistoryList() {
   const [open, setOpen] = useState(false)
   const [history, setHistory] = useState<HistoryRecord[]>([])
+  const paging = usePagination(history)
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(false)
   const [error, setError] = useState('')
@@ -647,7 +704,11 @@ function HistoryList() {
             className="overflow-hidden border-t border-[#e2e5ec]"
           >
             {loading && (
-              <div className="px-5 py-6 text-center text-sm text-muted">Loading history…</div>
+              <div className="px-5 py-4 space-y-3">
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </div>
             )}
 
             {!loading && error && (
@@ -660,7 +721,7 @@ function HistoryList() {
 
             {!loading && !error && history.length > 0 && (
               <div className="divide-y divide-[#F4F1F8]">
-                {history.map(record => {
+                {paging.pageItems.map(record => {
                   const triStatus = record.attendanceStatus || record.status
                   const isPresent = triStatus === 'present'
                   const isPartial = triStatus === 'partial'
@@ -710,6 +771,10 @@ function HistoryList() {
                     </div>
                   )
                 })}
+                <Pagination
+                  page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+                  onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="records"
+                />
               </div>
             )}
           </motion.div>
@@ -725,17 +790,16 @@ export default function AttendancePage() {
   const [scannerOpen, setScannerOpen] = useState(false)
 
   return (
-    <div className="p-5 lg:p-8 max-w-screen mx-auto pb-10 space-y-5">
+    <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h1 className="text-3xl text-primary mb-1">Attendance</h1>
-        <p className="text-muted text-base">Scan in class, check your history below</p>
+        <PageHeader className="!mb-0" title="Attendance" subtitle="Scan in class, check your history below" />
       </motion.div>
 
       {/* Scan CTA — the whole point of the page, so it goes first and big */}
       <motion.button
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
         onClick={() => setScannerOpen(true)}
-        className="w-full bg-brand rounded-xl px-6 py-7 flex items-center gap-4 shadow-[0_4px_20px_rgba(122,107,150,0.35)] active:scale-[0.98] transition-transform"
+        className="w-full bg-brand rounded-xl px-6 py-7 flex items-center gap-4 shadow-[0_4px_20px_rgba(94,64,117,0.35)] active:scale-[0.98] transition-transform"
       >
         <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center shrink-0">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

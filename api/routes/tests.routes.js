@@ -20,7 +20,7 @@ const testsCtrl = require("../controllers/tests.controller");
 const attemptsCtrl = require("../controllers/testAttempts.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 const allowedExtensions = new Set(["pdf", "pptx", "docx", "doc", "png", "jpg", "jpeg"]);
 const upload = multer({
@@ -68,6 +68,12 @@ router.get("/:id/attempts/:attemptId", verifyToken, adminOnly, attemptsCtrl.admi
 // POST /api/tests/:id/attempts/:attemptId/grade → grade a descriptive attempt
 router.post("/:id/attempts/:attemptId/grade", verifyToken, adminOnly, attemptsCtrl.gradeAttempt);
 
+// GET  /api/tests/students/:studentId/report      → one student's consolidated monthly test report (?month=YYYY-MM)
+router.get("/students/:studentId/report", verifyToken, adminOnly, attemptsCtrl.adminGetStudentMonthlyReport);
+
+// GET  /api/tests/students/:studentId/report/pdf  → the same, as a downloadable PDF (?month=YYYY-MM)
+router.get("/students/:studentId/report/pdf", verifyToken, adminOnly, attemptsCtrl.adminDownloadStudentMonthlyReportPdf);
+
 // GET  /api/tests/analytics/overall              → analytics across EVERY test (must come before "/:id/analytics" below)
 router.get("/analytics/overall", verifyToken, adminOnly, testsCtrl.getOverallAnalytics);
 
@@ -97,6 +103,12 @@ router.post("/:id/question-file", verifyToken, adminOnly, upload.single("file"),
 // POST /api/tests/:id/answer-key-file          → upload/replace the descriptive answer key
 router.post("/:id/answer-key-file", verifyToken, adminOnly, upload.single("file"), handleUploadError, testsCtrl.uploadAnswerKeyFile);
 
+// POST /api/tests/draft                        → silent autosave: create an in-progress draft test
+router.post("/draft", verifyToken, adminOnly, testsCtrl.createDraftTest);
+
+// PATCH /api/tests/:id/draft                    → silent autosave: persist current draft state
+router.patch("/:id/draft", verifyToken, adminOnly, testsCtrl.updateDraftTest);
+
 // POST /api/tests                              → create a test (MCQ with questions[], or descriptive)
 router.post("/", verifyToken, adminOnly, testsCtrl.createTest);
 
@@ -108,6 +120,12 @@ router.get("/:id", verifyToken, adminOnly, testsCtrl.getTest);
 
 // PATCH /api/tests/:id                         → update a test (and optionally replace its questions[])
 router.patch("/:id", verifyToken, adminOnly, testsCtrl.updateTest);
+
+// PATCH /api/tests/:testId/questions/:questionId → in-place edit of ONE existing question's
+// correct_option/marks/content, with retroactive re-grading of already-submitted test_answers/
+// test_attempts. Use this instead of the PATCH /api/tests/:id questions[] full-replace path
+// whenever the test may already have attempts (see services/tests.service.js for why).
+router.patch("/:testId/questions/:questionId", verifyToken, adminOnly, testsCtrl.updateTestQuestion);
 
 // DELETE /api/tests/:id                        → delete a test (cascades questions/attempts/answers)
 router.delete("/:id", verifyToken, adminOnly, testsCtrl.deleteTest);

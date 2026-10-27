@@ -10,7 +10,7 @@ const router = express.Router();
 const ctrl = require("../controllers/attendanceSettings.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 router.get("/", verifyToken, adminOnly, ctrl.get);
 router.patch("/", verifyToken, adminOnly, ctrl.update);

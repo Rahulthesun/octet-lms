@@ -15,8 +15,9 @@ import {
   useBatchStudents,
   type AttendanceTriState,
 } from '@/hooks/useAttendanceData'
+import { Select } from '@/components/ui/Select'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 const STATUS_STYLE: Record<AttendanceTriState, { label: string; fg: string; bg: string }> = {
   present: { label: 'Present', fg: '#15803D', bg: '#F0FDF4' },
@@ -112,7 +113,7 @@ export default function SessionAttendanceModal({ sessionId, onClose }: Props) {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-2xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[90vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-2xl shadow-2xl rounded-t-xl sm:rounded-xl border border-zinc-200 overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
@@ -269,16 +270,16 @@ export default function SessionAttendanceModal({ sessionId, onClose }: Props) {
 
                         {assigningIndex === i && (
                           <div className="mt-2 flex gap-2">
-                            <select
+                            <Select
                               value={assignStudentId}
                               onChange={(e) => setAssignStudentId(e.target.value)}
-                              className="flex-1 text-xs rounded-md px-2.5 py-1.5 border border-zinc-300 bg-white"
+                              className="flex-1 text-xs"
                             >
                               <option value="">Select student…</option>
                               {batchStudents.map((s) => (
                                 <option key={s.id} value={s.id}>{s.name} ({s.roll})</option>
                               ))}
-                            </select>
+                            </Select>
                             <button onClick={() => saveAssign(i)} disabled={busy || !assignStudentId}
                               className="text-xs px-3 py-1.5 rounded-md text-white disabled:opacity-40" style={{ backgroundColor: ACCENT }}>
                               Assign

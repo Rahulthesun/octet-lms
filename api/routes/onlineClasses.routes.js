@@ -13,7 +13,7 @@ const router = express.Router();
 const ctrl = require("../controllers/onlineClasses.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
 

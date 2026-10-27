@@ -87,18 +87,15 @@ const getAllPdfs = async (req, res) => {
 const streamPdfbyId = async (req, res) => {
     try {
       const { id } = req.params;
-      await pdfService.streamPdfbyId(id, res);
+      await pdfService.streamPdfbyId(id, res, req.user);
     
     } catch (err) {
     console.error("streamPdfbyId controller error:", err);
+    if (err.status === 403) return res.status(403).json({ message: err.message });
     if (err.message === "PDF_NOT_FOUND") {
       return res.status(404).json({ message: "PDF not found" });
     }
-    return res.status(500).json({
-      message: "Failed to stream PDF",
-      error: err.message,
-      stack: err.stack,
-    });
+    return res.status(500).json({ message: "Failed to stream PDF" });
   }
   }
 

@@ -8,7 +8,7 @@
  * - No HTTP knowledge (no req/res)
  * ─────────────────────────────────────────────────────────────
  */
-const { uploadStudentDocument } = require("./upload.service");
+const { uploadStudentDocument, signStudentDocs } = require("./upload.service");
 const  supabase  = require("../config/supabase");
 const { generateTempPassword, generateUsername , generateAdmissionNumber } = require("../utils/helpers");
 const { sendWelcomeEmail } = require("../utils/email");
@@ -52,12 +52,15 @@ async function getAllStudents({ batch, mode, status, search, limit = 100, offset
     if (batch) query = query.eq("preferred_batch", batch);
     if (mode) query = query.eq("learning_mode", mode);
     if (status) query = query.eq("status", status);
-    if (search) {
+    // The search text is spliced into a PostgREST filter string, so strip the
+    // characters that are filter syntax (commas, parentheses, quotes, wildcards, backslash).
+    const term = typeof search === "string" ? search.replace(/[,()"'%_*\\]/g, " ").trim().slice(0, 100) : "";
+    if (term) {
         query = query.or(
-            `name.ilike.%${search}%,` +
-            `email.ilike.%${search}%,` +
-            `admission_number.ilike.%${search}%,` +
-            `mobile_number.ilike.%${search}%`
+            `name.ilike.%${term}%,` +
+            `email.ilike.%${term}%,` +
+            `admission_number.ilike.%${term}%,` +
+            `mobile_number.ilike.%${term}%`
         );
     }
     const { data, error, count } = await query
@@ -65,7 +68,7 @@ async function getAllStudents({ batch, mode, status, search, limit = 100, offset
         .range(offset, offset + limit - 1);
     if (error) throw error;
     // Remove sensitive fields
-    const sanitized = data.map(({ password_hash, temp_password, ...rest }) => rest);
+    const sanitized = await signStudentDocs(data.map(({ password_hash, temp_password, ...rest }) => rest));
     return {
         success: true,
         data: sanitized,
@@ -92,7 +95,7 @@ async function getPendingStudents() {
         .eq("status", "PENDING")
         .order("created_at", { ascending: false });
     if (error) throw error;
-    const sanitized = data.map(({ password_hash, temp_password, ...rest }) => rest);
+    const sanitized = await signStudentDocs(data.map(({ password_hash, temp_password, ...rest }) => rest));
     return { success: true, count: sanitized.length, applications: sanitized };
 }
 
@@ -106,7 +109,7 @@ async function getStudentById(id) {
     if (error) return null;
     delete data.password_hash;
     delete data.temp_password;
-    return { success: true, data };
+    return { success: true, data: await signStudentDocs(data) };
 }
 
 // ========================= POST /students =========================
@@ -163,7 +166,36 @@ async function createStudent(studentData, files) {
 
     } = studentData;
 
-    // Upload documents
+    // ── Validate everything BEFORE any file is uploaded, so a rejected
+    // application never leaves orphan files in storage.
+    const fail = (status, message) => Object.assign(new Error(message), { status });
+
+    const cleanName = typeof name === "string" ? name.trim() : "";
+    const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!cleanName || !cleanEmail) throw fail(400, "Name and email are required");
+    if (cleanName.length > 120) throw fail(400, "Name is too long");
+    if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        throw fail(400, "Please enter a valid email address");
+    }
+
+    // Duplicate email — case-insensitive (A@x.com and a@x.com are one person).
+    const { data: existing } = await supabase
+        .from("students")
+        .select("id")
+        .ilike("email", cleanEmail.replace(/[%_\\]/g, "\\$&"))
+        .maybeSingle();
+    if (existing) throw fail(409, "Student with this email already exists");
+
+    // preferred_batch is a foreign key to batches(id): accept only a real
+    // batch, never invent one. Missing means "not chosen yet" (null).
+    let batchId = null;
+    if (preferred_batch) {
+        const { data: batchRow } = await supabase.from("batches").select("id").eq("id", preferred_batch).maybeSingle();
+        if (!batchRow) throw fail(400, "Selected batch does not exist");
+        batchId = batchRow.id;
+    }
+
+    // Upload documents (validated + sanitized in upload.service)
     const idCardUrl = files?.id_card?.[0]
         ? await uploadStudentDocument(files.id_card[0], "id-cards")
         : null;
@@ -171,21 +203,6 @@ async function createStudent(studentData, files) {
     const marksheetUrl = files?.marksheet?.[0]
         ? await uploadStudentDocument(files.marksheet[0], "marksheets")
         : null;
-
-    if (!name || !email) {
-        throw new Error("Name and email are required");
-    }
-
-    // Check duplicate email
-    const { data: existing } = await supabase
-        .from("students")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-    if (existing) {
-        throw new Error("Student with this email already exists");
-    }
 
     // Parse subjects
     let parsedSubjects = [];
@@ -203,8 +220,8 @@ async function createStudent(studentData, files) {
         .insert({
 
             // Student
-            name,
-            email,
+            name: cleanName,
+            email: cleanEmail,
             date_of_birth,
 
             mobile_number,
@@ -228,7 +245,7 @@ async function createStudent(studentData, files) {
 
             future_plan,
 
-            preferred_batch: preferred_batch || "EVENING",
+            preferred_batch: batchId,
 
             learning_mode: learning_mode || "OFFLINE",
 
@@ -427,18 +444,26 @@ async function bulkImportStudents(studentsArray) {
 }
 
 // ========================= POST /students/:id/approve =========================
-async function approveStudent(id) {
-    // Get pending student
+// Also used to accept a previously REJECTED applicant ("reinstate") — they go
+// through exactly the same steps as a fresh approval, so the result is
+// indistinguishable from approving them in the first place.
+async function approveStudent(id, { fromStatuses = ["PENDING"] } = {}) {
     const { data: student, error: fetchError } = await supabase
         .from("students")
         .select("*")
         .eq("id", id)
-        .eq("status", "PENDING")
-        .single();
-    if (fetchError || !student) throw new Error("Pending student not found");
+        .in("status", fromStatuses)
+        .maybeSingle();
+    if (fetchError) throw fetchError;
+    if (!student) {
+        throw Object.assign(
+            new Error(fromStatuses.includes("REJECTED") ? "Rejected student not found (they may already have been accepted)" : "Pending student not found"),
+            { status: 404 }
+        );
+    }
     const admissionNumber = generateAdmissionNumber();
     const { authUserId, tempPassword, username } = await createStudentAuthUser(student, admissionNumber);
-    // Update student record
+    // Update student record (status filter guards against two admins accepting at once)
     const { data: approved, error: updateError } = await supabase
         .from("students")
         .update({
@@ -449,6 +474,7 @@ async function approveStudent(id) {
             username
         })
         .eq("id", id)
+        .in("status", fromStatuses)
         .select()
         .single();
     if (updateError) throw updateError;
@@ -477,6 +503,12 @@ async function rejectStudent(id, reason) {
         .single();
     if (error) throw error;
     return { success: true, message: "Student rejected", data };
+}
+
+// ========================= POST /students/:id/reinstate =========================
+async function reinstateStudent(id) {
+    const result = await approveStudent(id, { fromStatuses: ["REJECTED"] });
+    return { ...result, message: "Student accepted" };
 }
 
 // ========================= GET /students/batch/:batchId =========================
@@ -520,7 +552,11 @@ async function getDashboardStats() {
     return {
         success: true,
         stats: {
-            total: total.count,
+            // "Students" means active, approved students — the same set the
+            // Student Database tab lists. Pending and rejected applicants are
+            // reported separately and never counted as students.
+            total: approved.count,
+            allRecords: total.count,
             pending: pending.count,
             approved: approved.count,
             rejected: rejected.count,
@@ -531,8 +567,6 @@ async function getDashboardStats() {
 }
 
 async function getStudentByUserId(userId) {
-  console.log("A. Querying for auth_user_id:", userId);
-  
   const { data: student, error } = await supabase
     .from("students")
     .select(`
@@ -548,10 +582,7 @@ async function getStudentByUserId(userId) {
     .eq("auth_user_id", userId)
     .single();
 
-  console.log("B. Query result:", { data: student, error: error });
-
   if (error) {
-    console.log("C. Error code:", error.code);
     if (error.code === "PGRST116") {
       throw Object.assign(new Error(`No student profile found for user ID: ${userId}`), { status: 404 });
     }
@@ -586,7 +617,7 @@ async function getRejectedStudents() {
 
     return {
         success: true,
-        data,
+        data: await signStudentDocs(data.map(({ password_hash, temp_password, ...rest }) => rest)),
     };
 }
 
@@ -601,6 +632,7 @@ module.exports = {
     bulkImportStudents,
     approveStudent,
     rejectStudent,
+    reinstateStudent,
     getStudentsByBatch,
     getDashboardStats,
     getStudentByUserId,

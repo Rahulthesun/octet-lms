@@ -13,6 +13,10 @@ import { useContentTree, authHeaders } from "../../../hooks/admin/useContentTree
 import { PdfViewer } from "../../../components/admin/PDFViewer";
 import { VideoPreviewPlayer } from "../../../components/admin/VideoPreviewPlayer";
 import { getSession } from "@/lib/auth";
+import { QaCategorySection, QaUnitContentPanel, type SelectedQaUnit } from "@/components/admin/qa/QaCategorySection";
+import { SkeletonList } from "@/components/ui/Skeleton";
+import SearchInput from '@/components/ui/SearchInput'
+import { btnAddRow, btnPrimary } from '@/components/ui/buttonStyles'
 
 // ─── Backend shapes ────────────────────────────────────────────────────────────
 
@@ -115,20 +119,6 @@ function formatBytes(bytes: number, decimals = 2) {
   );
 }
   */
-}
-
-function SearchIcon({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none">
-      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M 10.5,10.5 L 14,14"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 function PlusIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
@@ -254,6 +244,11 @@ export default function ContentPage() {
 
   // ── Navigation state ───────────────────────────────────────────────────────
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
+  const [openCategoryId, setOpenCategoryId] = useState<"qa" | "practice" | null>(null);
+  // The Q&A/Practice Unit currently shown in the big right panel — same
+  // visual slot as a real notes chapter's "Upload PDF or PPTX" panel,
+  // instead of being squeezed into the narrow left rail.
+  const [selectedQaUnit, setSelectedQaUnit] = useState<SelectedQaUnit | null>(null);
   const [openChapterId, setOpenChapterId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -505,10 +500,12 @@ export default function ContentPage() {
     }
     setChapterContentType((prev) => ({ ...prev, [chapterId]: ct }));
     setSelectedItemId(null);
+    setSelectedQaUnit(null);
   }
 
   function selectFile(id: string, title: string) {
     setSelectedItemId(id);
+    setSelectedQaUnit(null);
     setEditTitle(title);
     setEditDesc("");
     setReplaceFile(null);
@@ -1003,7 +1000,21 @@ export default function ContentPage() {
     ? "MP4, WebM, MKV, MOV or AVI — max 4 GB"
     : "PDF or PPTX — max 50 MB";
 
-  const allSubjects = subjects as BackendSubject[];
+  // Only show notes/study material subjects in the top tree; deduplicate by name per grade
+  // to prevent duplicated entries appearing on different devices due to legacy records.
+  const notesSubjects = (subjects as (BackendSubject & { category?: string })[]).filter(
+    (s) => !s.category || s.category === "notes"
+  );
+
+  const seenGrade11 = new Set<string>();
+  const seenGrade12 = new Set<string>();
+  const allSubjects = notesSubjects.filter((s) => {
+    const key = (s.name || "").trim().toLowerCase();
+    const targetSet = s.grade === 11 ? seenGrade11 : seenGrade12;
+    if (targetSet.has(key)) return false;
+    targetSet.add(key);
+    return true;
+  });
 
   const gradeSubjects = allSubjects.filter((s) => s.grade === activeGrade);
 
@@ -1024,20 +1035,17 @@ export default function ContentPage() {
 
   // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full p-3">
+    <div className="flex flex-col h-full">
       {/* ── Page header ── */}
-      <div className="shrink-0 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="shrink-0 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="shrink-0">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
               Content Manager
             </h1>
-            <p className="text-base text-gray-600 mt-1">
-              
-            </p>
           </div>
-          <div className="flex-1 flex items-center justify-end gap-4">
-            <div className="lg:w-100 shrink-0">
+          <div className="w-full sm:flex-1 flex items-center justify-end gap-4 min-w-0">
+            <div className="w-full sm:w-auto lg:w-100 shrink-0">
               <StorageBar totalBytes={storage.totalBytes} />
             </div>
           </div>
@@ -1059,30 +1067,13 @@ export default function ContentPage() {
 
       {/* ── Search bar ── */}
       <div className="shrink-0 px-6 pb-3">
-        <div className="relative w-full max-w-xl">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chapters or files…"
-            className="w-full bg-transparent border border-gray-300 rounded-full pl-10 pr-4 py-2 text-base text-gray-700 placeholder-gray-400 outline-none focus:border-primary"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-            >
-              <IconClose className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search chapters or files…" />
       </div>
 
       {/* ── Two-panel body ── */}
-      <div className="flex flex-1 min-h-0 p-3">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-3">
         {/* ── Left rail ── */}
-        <div className="w-[45%] shrink-0 border-r rounded-2xl border-gray-200 bg-white flex flex-col h-full overflow-hidden">
+        <div className="w-full lg:w-[45%] shrink-0 lg:border-r rounded-2xl border border-gray-200 bg-white flex flex-col min-h-[420px] lg:h-full overflow-hidden shadow-xs">
           {/* Grade tabs + Add, right at the top of the subject card */}
           <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
             <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 p-1">
@@ -1110,17 +1101,17 @@ export default function ContentPage() {
             </div>
             <button
               onClick={openAddSubject}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition hover:bg-primary/90 cursor-pointer shrink-0"
+              className={`${btnPrimary} shrink-0`}
             >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add
+              <PlusIcon className="h-4 w-4" />
+              Add Subject
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {loading && (
-              <div className="p-8 text-center text-gray-400 text-base">
-                Loading subjects…
+              <div className="p-4">
+                <SkeletonList count={5} />
               </div>
             )}
             {error && (
@@ -1135,7 +1126,7 @@ export default function ContentPage() {
               </div>
             ) : visibleSubjects.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-base">
-                {`No subjects in Class ${activeGrade} yet — click "+ Add" above to create one.`}
+                {`No subjects in Class ${activeGrade} yet — click "Add Subject" above to create one.`}
               </div>
             ) : (
               visibleSubjects.map((subject) => {
@@ -1594,7 +1585,7 @@ export default function ContentPage() {
                                     setAddingChapterToSubject(subject.id);
                                     setNewChapterName("");
                                   }}
-                                  className="mx-4 mb-3 mt-1 flex w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 py-2.5 text-sm text-gray-400 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
+                                  className={`${btnAddRow} mx-4 mb-3 mt-1 !w-[calc(100%-2rem)]`}
                                 >
                                   <PlusIcon className="h-4 w-4" />
                                   Add Chapter
@@ -1609,13 +1600,82 @@ export default function ContentPage() {
                 );
               })
             )}
+
+            {/* ── Q&A / Practice Questions — same list, same row style as a
+                real subject above, but these are question-based content
+                categories (Subject → Unit → Class), not PDF/video subjects. ── */}
+            {([
+              { key: "qa" as const, label: "Q&A" },
+              { key: "practice" as const, label: "Practice Questions" },
+            ]).map(({ key, label }) => {
+              const open = openCategoryId === key;
+              return (
+                <div key={key} className="border-b border-gray-100 last:border-0">
+                  <div
+                    className={`group w-full flex items-center gap-1 pl-4 pr-2 py-1.5 transition-colors ${
+                      open ? "bg-gray-50" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <button
+                      onClick={() => setOpenCategoryId(open ? null : key)}
+                      className="flex-1 flex items-center gap-3 py-1.5 text-left cursor-pointer"
+                    >
+                      <span className="flex-1 text-lg text-gray-800 font-medium">
+                        {label}
+                      </span>
+                      <ChevronIcon open={open} className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                    {/* Invisible spacers matching the rename/delete icon
+                        buttons every real subject row reserves space for
+                        (even hidden at opacity-0, they still occupy layout
+                        width) — without these the chevron above sits in a
+                        different column than the real subjects' chevrons. */}
+                    <span className="shrink-0 rounded-lg p-1.5 opacity-0 pointer-events-none" aria-hidden>
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="shrink-0 rounded-lg p-1.5 opacity-0 pointer-events-none" aria-hidden>
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: "auto" }}
+                        exit={{ height: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pl-8 pr-3 pb-3">
+                          <QaCategorySection
+                            category={key}
+                            title={label}
+                            activeGrade={activeGrade}
+                            embedded
+                            selectedUnitId={selectedQaUnit?.category === key ? selectedQaUnit.id : null}
+                            onSelectUnit={(unit) => {
+                              setSelectedItemId(null)
+                              setSelectedQaUnit(
+                                unit ? { id: unit.id, name: unit.name, category: key, categoryTitle: label } : null
+                              )
+                            }}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* ── Right panel ── */}
         <div className="flex-1 h-full overflow-y-auto">
-          {/* ── PDF selected: viewer + edit form ── */}
-          {selectedFile &&
+          {/* ── Q&A / Practice Questions: a Unit was picked ── */}
+          {selectedQaUnit ? (
+            <QaUnitContentPanel unit={selectedQaUnit} onClose={() => setSelectedQaUnit(null)} />
+          ) : selectedFile &&
           selectedPath &&
           selectedPath.contentType === "pdf" ? (
             <div className="p-4 space-y-4">

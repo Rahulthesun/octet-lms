@@ -75,6 +75,23 @@ export interface TestQuestionInput extends QuestionContentFields {
   optionBImageKey?: string | null
   optionCImageKey?: string | null
   optionDImageKey?: string | null
+  // SHA-256 hex of the actual image bytes (computed client-side at upload
+  // time), used server-side for true duplicate detection instead of the
+  // random R2 storage key. Optional/nullable for backward compatibility.
+  questionImageContentHash?: string | null
+  optionAImageContentHash?: string | null
+  optionBImageContentHash?: string | null
+  optionCImageContentHash?: string | null
+  optionDImageContentHash?: string | null
+  // dHash perceptual hash (computed client-side at upload time), used
+  // server-side for NEAR-duplicate detection (separate screenshots of the
+  // same question) in addition to the exact content hash above. Optional/
+  // nullable for backward compatibility.
+  questionImagePerceptualHash?: string | null
+  optionAImagePerceptualHash?: string | null
+  optionBImagePerceptualHash?: string | null
+  optionCImagePerceptualHash?: string | null
+  optionDImagePerceptualHash?: string | null
   correctOption: OptionKey
   marks?: number
   bankQuestionId?: string | null
@@ -280,6 +297,26 @@ export function useAdminTests(params?: { batchId?: string; status?: string }) {
   }, [refetch])
 
   return { tests, loading, error, refetch, createTest, updateTest, deleteTest, uploadQuestionFile, uploadAnswerKeyFile }
+}
+
+// ─── Admin: draft autosave (test creation in progress) ─────────────────────
+//
+// Lenient counterparts to createTest/updateTest above, used only by
+// ScheduleTestForm's silent autosave while the admin is still filling the
+// form in. They never go through useAdminTests' refetch (the draft must
+// stay invisible in the main tests list until it's actually scheduled).
+
+export async function createDraftTest(input: Partial<CreateTestInput>): Promise<TestAdminDetail> {
+  return authedFetch('/api/tests/draft', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function autosaveDraftTest(id: string, patch: Partial<CreateTestInput>): Promise<TestAdminDetail> {
+  return authedFetch(`/api/tests/${id}/draft`, { method: 'PATCH', body: JSON.stringify(patch) })
+}
+
+/** Fetches one test (draft or real) for pre-populating the edit/resume-draft form. Shared by both flows. */
+export async function fetchTestForForm(id: string): Promise<TestAdminDetail> {
+  return authedFetch(`/api/tests/${id}`)
 }
 
 export function useAdminTestDetail(testId: string | null) {
@@ -522,6 +559,88 @@ export function useOverallTestAnalytics(passPct = 40) {
 export async function downloadOverallAnalyticsPdf(filename: string, passPct = 40) {
   const token = await getToken()
   const res = await fetch(`${API_BASE}/api/tests/analytics/overall/pdf?passPct=${passPct}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Admin: one student's consolidated monthly test report ─────────────────
+
+export interface StudentTestReportPoint {
+  date: string // YYYY-MM-DD
+  day: number
+  marksAwarded: number
+  maxMarks: number
+  testTitle: string
+}
+
+export interface StudentTestReport {
+  student: { id: string; name: string }
+  month: string // YYYY-MM
+  points: StudentTestReportPoint[]
+  absentDates: number[]
+}
+
+export function useStudentTestReport(studentId: string | null, month: string) {
+  const [report, setReport] = useState<StudentTestReport | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(() => {
+    if (!studentId || !month) { setReport(null); return }
+    setLoading(true)
+    setError(null)
+    authedFetch(`/api/tests/students/${studentId}/report?month=${month}`)
+      .then((d) => setReport(d))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [studentId, month])
+
+  useEffect(() => { refetch() }, [refetch])
+
+  return { report, loading, error, refetch }
+}
+
+/** Downloads the student's monthly test report PDF (same auth-header-then-blob pattern as the attendance report download). */
+export async function downloadStudentTestReportPdf(studentId: string, month: string, filename: string) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/tests/students/${studentId}/report/pdf?month=${month}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * OCTET 12-month progress report — for every month of `year`, the student's
+ * test performance graph and attendance graph, one month per page.
+ */
+export async function downloadStudentProgressReportPdf(studentId: string, year: number, filename: string) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}/api/progress-reports/students/${studentId}/pdf?year=${year}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) {

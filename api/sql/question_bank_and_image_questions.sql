@@ -113,3 +113,9 @@ from public.test_questions tq
 join public.tests t on t.id = tq.test_id
 order by t.created_at, tq.order_index
 on conflict (content_hash) do nothing;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 3. EDIT TRACKING ON question_bank (standalone "edit in question bank" feature)
+-- ═════════════════════════════════════════════════════════════════════════
+alter table public.question_bank add column if not exists updated_by uuid references auth.users(id);
+alter table public.question_bank add column if not exists updated_at timestamptz;

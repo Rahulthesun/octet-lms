@@ -7,6 +7,7 @@ import { authedFetch } from '@/lib/apiClient'
 import { formatTimeInZone, toTitleCase } from '@/lib/helpers'
 import { getSession } from '@/lib/auth'
 import PersonalTasksWidget from '@/components/shared/PersonalTasksWidget'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 const ACCENT = '#5e4075'
 const GOOD = '#3e7450'
@@ -213,7 +214,7 @@ export default function AdminDashboard() {
     : []
 
   return (
-    <div className="p-8 lg:p-10 max-w-[1400px] mx-auto space-y-10">
+    <div className="space-y-10">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
@@ -221,14 +222,28 @@ export default function AdminDashboard() {
       >
         <div>
           <p className="text-xs font-medium tracking-[0.2em] uppercase text-gray-400 mb-2">{greeting()}</p>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-          {email && <p className="text-base text-gray-500 mt-1.5">{email}</p>}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+          {email && <p className="text-sm sm:text-base text-gray-500 mt-1">{email}</p>}
         </div>
         <p className="text-base text-gray-500 shrink-0">{today}</p>
       </motion.div>
 
       {loading ? (
-        <div className="py-24 text-center text-gray-400 text-base">Loading dashboard…</div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+          </div>
+          <Skeleton className="h-44 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        </div>
       ) : error ? (
         <div className="py-24 text-center text-base" style={{ color: BAD }}>{error}</div>
       ) : data ? (

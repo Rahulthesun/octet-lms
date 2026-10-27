@@ -18,7 +18,7 @@ const ctrl         = require("../controllers/attendance.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
 // Role gate for admin/developer actions
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // ─── Batches ──────────────────────────────────────────────────────────────────
 // GET  /api/attendance/batches              → list all batches
@@ -73,6 +73,7 @@ router.get("/students/:studentId/report/pdf", verifyToken, adminOnly, ctrl.downl
 
 router.post("/sessions",                       verifyToken, adminOnly, ctrl.startSession);
 router.post("/sessions/:sessionId/refresh",    verifyToken, adminOnly, ctrl.refreshSession);
+router.post("/sessions/:sessionId/end",        verifyToken, adminOnly, ctrl.endSession);
 router.get( "/sessions/:sessionId/roster",     verifyToken, adminOnly, ctrl.getRoster);
 
 // ─── Session attendance detail / override / unmatched Meet participants ──────

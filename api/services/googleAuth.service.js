@@ -39,13 +39,15 @@ function getOAuthClient() {
 }
 
 /** Builds the URL the admin's browser is sent to for consent. */
-function buildAuthUrl(state) {
+function buildAuthUrl(state, loginHint) {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: "offline", // required to receive a refresh_token
-    prompt: "consent", // forces a refresh_token on every (re)connect
+    prompt: "consent select_account", // forces a refresh_token on every (re)connect
+    include_granted_scopes: true,
     scope: SCOPES,
     state,
+    ...(loginHint ? { login_hint: loginHint } : {}),
   });
 }
 
@@ -138,8 +140,17 @@ async function getAuthorizedClient(adminUserId) {
     // expiry, so callers always get a live client instead of failing later.
     await client.getAccessToken();
   } catch (err) {
+    const googleError = err?.response?.data?.error || err?.message || "unknown";
+    console.error(`[google-auth] token refresh failed for admin ${adminUserId}: ${googleError}`);
+    // invalid_grant = Google revoked the refresh token (password change, access
+    // removed, or the 7-day expiry Google applies while the OAuth consent
+    // screen is in "Testing"). The stored row can never work again, so drop
+    // it — the UI then shows "not connected" instead of a false "connected".
+    if (String(googleError).includes("invalid_grant")) {
+      await supabase.from("google_admin_tokens").delete().eq("admin_user_id", adminUserId);
+    }
     throw Object.assign(
-      new Error("Google authorization expired — please reconnect your Google account"),
+      new Error("Your Google connection has expired — click \"Connect Google Account\" to reconnect, then schedule again"),
       { status: 424, code: "GOOGLE_REAUTH_REQUIRED" }
     );
   }
@@ -152,9 +163,23 @@ async function disconnect(adminUserId) {
   if (error) throw error;
 }
 
+/**
+ * Reports whether scheduling will actually work right now — a stored row alone
+ * isn't enough, because Google can revoke the refresh token at any time.
+ * getAccessToken() only calls Google when the cached access token has expired.
+ */
 async function getStatus(adminUserId) {
   const row = await getStoredTokenRow(adminUserId);
-  return row ? { connected: true, email: row.google_email } : { connected: false, email: null };
+  if (!row) return { connected: false, email: null, reauthRequired: false };
+  try {
+    await getAuthorizedClient(adminUserId);
+    return { connected: true, email: row.google_email, reauthRequired: false };
+  } catch (err) {
+    if (err.code === "GOOGLE_REAUTH_REQUIRED") {
+      return { connected: false, email: row.google_email, reauthRequired: true };
+    }
+    throw err;
+  }
 }
 
 /**
@@ -190,7 +215,13 @@ async function getConfigCheck(adminUserId) {
   };
 }
 
+async function getStoredEmail(adminUserId) {
+  const row = await getStoredTokenRow(adminUserId);
+  return row?.google_email || null;
+}
+
 module.exports = {
+  getStoredEmail,
   getConfigCheck,
   buildAuthUrl,
   exchangeCodeAndStore,

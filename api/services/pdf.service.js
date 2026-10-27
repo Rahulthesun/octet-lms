@@ -19,6 +19,7 @@
  * ─────────────────────────────────────────────────────────────
  */
 
+const { assertStudentCanAccess } = require("../utils/contentAccess");
 const { indexPdfDocument } = require("./pdfIndexer.service");
 
 const { PutObjectCommand, DeleteObjectCommand} = require("@aws-sdk/client-s3");
@@ -154,17 +155,17 @@ const getAllPdfs = async (filters = {}) => {
 
 
 // ─── CHANGE 2: Replace streamPdfbyId entirely ────────────────────────────────
-const streamPdfbyId = async (id, res) => {
+const streamPdfbyId = async (id, res, user) => {
   const { data: pdf, error } = await supabase
     .from("pdfs")
-    .select("r2_key, title, filename")
+    .select("r2_key, title, filename, is_visible, chapter_id")
     .eq("id", id)
     .single();
 
   if (error?.code === "PGRST116" || !pdf) throw new Error("PDF_NOT_FOUND");
   if (error) throw new Error(error.message);
 
-  //console.log("r2_key from DB:", pdf.r2_key); // ← add this
+  await assertStudentCanAccess(user, pdf);
 
   const signedUrl = await getSignedPdfUrl(pdf.r2_key);
   res.json({ url: signedUrl }); // ← not res.redirect

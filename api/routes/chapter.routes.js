@@ -16,7 +16,7 @@ const router  = express.Router();
 const chapterController = require("../controllers/chapter.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // POST  /api/chapters                      → create a chapter (admin only)
 //   body should include { subjectId, name, ... }

@@ -9,9 +9,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { authedFetch } from '@/lib/apiClient'
 import QuestionContent from '@/components/shared/QuestionContent'
+import { Watermark } from '@/components/shared/ExamSecurity'
 import type { OptionKey, QuestionContentFields, TestQuestionInput } from '@/hooks/useTests'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 interface BankGroup {
   sourceTestId: string | null
@@ -30,6 +32,16 @@ interface BankQuestion extends QuestionContentFields {
   optionBImageKey: string | null
   optionCImageKey: string | null
   optionDImageKey: string | null
+  questionImageContentHash?: string | null
+  optionAImageContentHash?: string | null
+  optionBImageContentHash?: string | null
+  optionCImageContentHash?: string | null
+  optionDImageContentHash?: string | null
+  questionImagePerceptualHash?: string | null
+  optionAImagePerceptualHash?: string | null
+  optionBImagePerceptualHash?: string | null
+  optionCImagePerceptualHash?: string | null
+  optionDImagePerceptualHash?: string | null
 }
 
 /** A bank question becomes a fresh copy for the new test; the bank id is kept only as a tracking reference. */
@@ -39,22 +51,32 @@ export function copyForNewTest(b: BankQuestion): TestQuestionInput {
     questionText: b.questionText ?? '',
     questionImageKey: b.questionImageKey,
     questionImageUrl: b.questionImageUrl ?? null,
+    questionImageContentHash: b.questionImageContentHash ?? null,
+    questionImagePerceptualHash: b.questionImagePerceptualHash ?? null,
     optionAType: b.optionAType,
     optionA: b.optionA ?? '',
     optionAImageKey: b.optionAImageKey,
     optionAImageUrl: b.optionAImageUrl ?? null,
+    optionAImageContentHash: b.optionAImageContentHash ?? null,
+    optionAImagePerceptualHash: b.optionAImagePerceptualHash ?? null,
     optionBType: b.optionBType,
     optionB: b.optionB ?? '',
     optionBImageKey: b.optionBImageKey,
     optionBImageUrl: b.optionBImageUrl ?? null,
+    optionBImageContentHash: b.optionBImageContentHash ?? null,
+    optionBImagePerceptualHash: b.optionBImagePerceptualHash ?? null,
     optionCType: b.optionCType,
     optionC: b.optionC ?? '',
     optionCImageKey: b.optionCImageKey,
     optionCImageUrl: b.optionCImageUrl ?? null,
+    optionCImageContentHash: b.optionCImageContentHash ?? null,
+    optionCImagePerceptualHash: b.optionCImagePerceptualHash ?? null,
     optionDType: b.optionDType,
     optionD: b.optionD ?? '',
     optionDImageKey: b.optionDImageKey,
     optionDImageUrl: b.optionDImageUrl ?? null,
+    optionDImageContentHash: b.optionDImageContentHash ?? null,
+    optionDImagePerceptualHash: b.optionDImagePerceptualHash ?? null,
     correctOption: b.correctOption,
     marks: b.marks,
     bankQuestionId: b.bankQuestionId,
@@ -154,7 +176,7 @@ export default function QuestionBankModal({ onClose, onImport }: {
       onClick={(e) => { e.stopPropagation(); onClose() }}
     >
       <div
-        className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
@@ -176,13 +198,7 @@ export default function QuestionBankModal({ onClose, onImport }: {
 
           {!openGroup ? (
             <>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search past tests by name"
-                className="w-full text-[15px] rounded-lg px-4 py-2.5 border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <SearchInput value={search} onChange={setSearch} placeholder="Search past tests by name" wrapperClassName="w-full" />
               {loadingGroups ? (
                 <p className="text-sm text-zinc-500 py-6 text-center">Loading...</p>
               ) : groups.length === 0 ? (
@@ -238,9 +254,10 @@ export default function QuestionBankModal({ onClose, onImport }: {
                 <div className="space-y-3">
                   {questions.map((q, i) => (
                     <label key={q.bankQuestionId}
-                      className={`block rounded-xl border p-4 cursor-pointer transition-colors ${
+                      className={`relative overflow-hidden block rounded-xl border p-4 cursor-pointer transition-colors ${
                         selected.has(q.bankQuestionId) ? 'border-violet-400 bg-violet-50/50' : 'border-zinc-200 hover:bg-zinc-50'
                       }`}>
+                      <Watermark lines={['OCTET']} />
                       <div className="flex items-start gap-3">
                         <input type="checkbox" checked={selected.has(q.bankQuestionId)} onChange={() => toggle(q.bankQuestionId)}
                           className="accent-violet-600 w-4 h-4 mt-1 shrink-0" />

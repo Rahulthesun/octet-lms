@@ -1,11 +1,12 @@
 {
   "name": "co-admin-api",
   "version": "1.0.0",
-  "description": "C@O Admin Dashboard – Content Management API",
+  "description": "C@O Admin Dashboard â€“ Content Management API",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -15,18 +16,23 @@
     "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@supabase/supabase-js": "^2.108.0",
     "cors": "^2.8.6",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
     "googleapis": "^174.0.1",
+    "helmet": "^8.3.0",
+    "jimp": "^1.6.1",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.2.1",
     "pdfjs-dist": "^6.0.227",
     "pdfkit": "^0.19.1",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.5"
   }
 }

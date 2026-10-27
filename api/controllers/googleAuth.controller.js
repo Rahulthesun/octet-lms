@@ -25,7 +25,8 @@ function handleError(res, err) {
 async function getConnectUrl(req, res) {
   try {
     const state = signState(req.user.id);
-    const url = svc.buildAuthUrl(state);
+    const previous = await svc.getStoredEmail(req.user.id).catch(() => null);
+    const url = svc.buildAuthUrl(state, previous);
     res.json({ url });
   } catch (err) {
     handleError(res, err);

@@ -13,7 +13,7 @@ const router  = express.Router();
 const storageController = require("../controllers/storage.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 // GET  /api/storage/usage          → total storage used (bytes, counts)
 router.get("/usage", verifyToken, adminOnly, storageController.getStorageUsage);

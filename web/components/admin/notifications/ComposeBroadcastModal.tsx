@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
 import { sendBroadcast } from '@/hooks/useNotifications'
+import { Select } from '@/components/ui/Select'
+import SearchInput from '@/components/ui/SearchInput'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 const inputCls = 'w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400'
 const labelCls = 'block text-sm font-medium text-zinc-700 mb-2'
 
@@ -74,7 +76,7 @@ export default function ComposeBroadcastModal({ onClose, onSent }: { onClose: ()
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-2xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-2xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-8 py-5 border-b border-zinc-200 flex items-center justify-between shrink-0">
@@ -123,11 +125,10 @@ export default function ComposeBroadcastModal({ onClose, onSent }: { onClose: ()
                 {!allApproved && (
                   <>
                     <label className={labelCls}>Batch</label>
-                    <select value={batchId} onChange={(e) => { setBatchId(e.target.value); setExtraStudentIds([]); setStudentSearch(''); setShowExtraStudents(false) }}
-                      className={inputCls}>
+                    <Select value={batchId} onChange={(e) => { setBatchId(e.target.value); setExtraStudentIds([]); setStudentSearch(''); setShowExtraStudents(false) }}>
                       <option value="">Select a batch (optional)…</option>
                       {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    </Select>
 
                     {batchId && (
                       <div className="mt-3">
@@ -138,9 +139,8 @@ export default function ComposeBroadcastModal({ onClose, onSent }: { onClose: ()
 
                         {showExtraStudents && (
                           <div className="mt-3 space-y-2">
-                            <input type="text" value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)}
-                              placeholder="Search students by name…"
-                              className="w-full text-sm rounded-lg px-3.5 py-2.5 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                            <SearchInput value={studentSearch} onChange={setStudentSearch}
+                              placeholder="Search students by name…" size="sm" wrapperClassName="w-full" />
                             <div className="max-h-40 overflow-y-auto border border-zinc-200 rounded-lg divide-y divide-zinc-100">
                               {studentDropdownOptions.length === 0 ? (
                                 <div className="px-3.5 py-3 text-sm text-zinc-400">No matching students.</div>

@@ -6,15 +6,16 @@
 // /api/tests/:id/analytics; the admin can switch each graph between bar,
 // pie and line, and download the whole report as a PDF.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  useTestAnalytics, downloadTestAnalyticsPdf,
+  useTestAnalytics, downloadTestAnalyticsPdf, authedFetch,
   type TestSummary, type AnalyticsPoint,
 } from '@/hooks/useTests'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 function toChartData(points: AnalyticsPoint[], color?: string): ChartDatum[] {
   return points.map((p) => ({ label: p.label, value: p.value, color }))
@@ -34,8 +35,17 @@ export default function TestAnalyticsModal({ test, onClose }: {
   test: TestSummary
   onClose: () => void
 }) {
-  const [passPct, setPassPct] = useState(40)
+  // Initial default comes from the persisted admin setting (GET
+  // /api/test-settings); a local override here does NOT write back to it —
+  // only the Settings page (app/admin/settings/page.tsx) persists a change.
+  const [passPct, setPassPct] = useState(35)
+  useEffect(() => {
+    authedFetch('/api/test-settings')
+      .then((d) => setPassPct(Number(d?.passPercentage ?? 35)))
+      .catch(() => setPassPct(35))
+  }, [])
   const { analytics, loading, error } = useTestAnalytics(test.id, passPct)
+  const studentPaging = usePagination(analytics?.perStudent ?? [])
 
   const [distType, setDistType] = useState<AttendanceChartType>('bar')
   const [questionType, setQuestionType] = useState<AttendanceChartType>('bar')
@@ -66,7 +76,7 @@ export default function TestAnalyticsModal({ test, onClose }: {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-4xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-4xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between gap-3 shrink-0">
@@ -175,16 +185,16 @@ export default function TestAnalyticsModal({ test, onClose }: {
 
               <div className="border-t border-zinc-100 pt-6">
                 <p className="text-sm font-medium text-zinc-700 mb-3">Per-student results</p>
-                <div className="border border-zinc-200 rounded-xl overflow-hidden">
-                  <div className="hidden sm:grid sm:grid-cols-[1fr_100px_100px_90px_80px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
+                <div className="border border-zinc-200 rounded-xl overflow-x-auto">
+                  <div className="hidden sm:grid sm:min-w-[440px] sm:grid-cols-[1fr_100px_100px_90px_80px] gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 bg-zinc-50 border-b border-zinc-200">
                     <span>Student</span>
                     <span>Batch</span>
                     <span>Status</span>
                     <span className="text-right">Marks</span>
                     <span className="text-right">Result</span>
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-zinc-100">
-                    {analytics.perStudent.map((s) => (
+                  <div className="divide-y divide-zinc-100">
+                    {studentPaging.pageItems.map((s) => (
                       <div key={s.studentId} className="flex flex-wrap sm:grid sm:grid-cols-[1fr_100px_100px_90px_80px] gap-2 px-4 py-2.5 text-sm items-center">
                         <div className="min-w-0">
                           <p className="text-zinc-900 truncate">{s.name}</p>
@@ -205,6 +215,10 @@ export default function TestAnalyticsModal({ test, onClose }: {
                       </div>
                     ))}
                   </div>
+                  <Pagination
+                    page={studentPaging.page} pageCount={studentPaging.pageCount} pageSize={studentPaging.pageSize} total={studentPaging.total}
+                    onPageChange={studentPaging.setPage} onPageSizeChange={studentPaging.setPageSize} label="students"
+                  />
                 </div>
               </div>
             </>

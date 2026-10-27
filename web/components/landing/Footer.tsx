@@ -156,9 +156,13 @@ export default function Footer() {
             © 2026 Chemistry@OCTET. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
-            {['Privacy Policy', 'Terms of Service', 'Refund Policy'].map((link) => (
-              <a key={link} href="#footer" className="text-muted text-[14px] hover:text-bg transition-colors duration-150">
-                {link}
+            {[
+              { label: 'Privacy Policy', href: '/privacy' },
+              { label: 'Terms of Service', href: '/terms' },
+              { label: 'Refund Policy', href: '#footer' },
+            ].map((link) => (
+              <a key={link.label} href={link.href} className="text-muted text-[14px] hover:text-bg transition-colors duration-150">
+                {link.label}
               </a>
             ))}
           </div>

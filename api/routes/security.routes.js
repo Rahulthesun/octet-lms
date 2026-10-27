@@ -17,7 +17,7 @@ router.get("/watermark/token", verifyToken, ctrl.getWatermarkToken);
 router.post(
   "/watermark/lookup",
   verifyToken,
-  requireRole(["admin", "developer"]),
+  requireRole(["admin"]),
   ctrl.lookupWatermark
 );
 

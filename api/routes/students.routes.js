@@ -22,9 +22,30 @@ const studentController = require("../controllers/students.controller");
 //FOR BULK IMPORT CSV UPLOAD
 const multer = require('multer');
 const { verifyToken, requireRole } = require("../middleware/auth");
-const upload = multer({ storage: multer.memoryStorage() });
+const { admissionLimiter } = require("../middleware/rateLimit");
 
-const adminOnly = requireRole(["admin", "developer"]);
+// Bulk CSV import (admin only) — CSV text, small.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+
+// Public admission form: only ID-card / marksheet scans (images or PDF), 5 MB each.
+const ADMISSION_MIME = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const admissionUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 2, fields: 60 },
+    fileFilter: (req, file, cb) => {
+        if (ADMISSION_MIME.includes(file.mimetype)) return cb(null, true);
+        cb(Object.assign(new Error("Only JPG, PNG, WEBP or PDF files are allowed"), { status: 400 }));
+    },
+});
+const handleAdmissionUploadError = (err, req, res, next) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ success: false, error: "Each file must be 5 MB or smaller" });
+    }
+    return res.status(err.status || 400).json({ success: false, error: err.message || "Invalid upload" });
+};
+
+const adminOnly = requireRole(["admin"]);
 
 // ======================== Student CRUD ========================
 
@@ -65,7 +86,8 @@ router.get("/:id", verifyToken, adminOnly, studentController.getStudentById);
 // students without an account yet submit their application)
 router.post(
     "/",
-    upload.fields([
+    admissionLimiter,
+    admissionUpload.fields([
         {
             name: "id_card",
             maxCount: 1,
@@ -75,6 +97,7 @@ router.post(
             maxCount: 1,
         },
     ]),
+    handleAdmissionUploadError,
     studentController.createStudent
 );
 
@@ -97,6 +120,9 @@ router.post("/:id/approve", verifyToken, adminOnly, studentController.approveStu
 
 // POST   /api/students/:id/reject    → reject a pending student (with optional reason) — admin only
 router.post("/:id/reject", verifyToken, adminOnly, studentController.rejectStudent);
+
+// Accept a previously rejected applicant — runs the full approval flow.
+router.post("/:id/reinstate", verifyToken, adminOnly, studentController.reinstateStudent);
 
 // ======================== Additional Utilities ========================
 

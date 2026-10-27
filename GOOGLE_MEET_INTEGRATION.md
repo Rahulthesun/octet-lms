@@ -486,6 +486,47 @@ Reports**) to see the calculated roster.
 
 ---
 
+## 9a. Troubleshooting: "Access blocked … has not completed the Google verification process" / "session expired"
+
+Both symptoms come from the OAuth consent screen being in **Testing**
+publishing status, not from the LMS code:
+
+- In Testing, Google only lets accounts listed under **Test users** sign in.
+  Any other account gets *Access blocked … Error 403: access_denied* on
+  Google's own page (it never reaches the LMS callback).
+- In Testing, every refresh token Google issues **expires after 7 days**.
+  A week after connecting, scheduling fails with "Your Google connection has
+  expired" and the admin must reconnect — which then hits the block above if
+  the account isn't a test user.
+
+Permanent fix (Google Cloud Console, project that owns `GOOGLE_CLIENT_ID`):
+
+1. **Google Auth Platform → Audience** (older UI: *APIs & Services → OAuth
+   consent screen*).
+2. Under **Publishing status**, click **Publish app** → **In production**.
+   - The requested scopes (`calendar.events`, `meetings.space.readonly`,
+     `userinfo.email`) are *sensitive*, not *restricted*, so an unverified app
+     in production still works for up to 100 users. The admin sees a one-time
+     "Google hasn't verified this app" screen → **Advanced → Go to
+     api-satin-leaf-209.fly.dev (unsafe)** → **Continue**.
+   - Refresh tokens no longer expire after 7 days.
+   - Optional: submit for verification later to remove that warning screen.
+3. If you prefer to stay in Testing for now, add the admin's Google account
+   (e.g. `buildifywb@gmail.com`) under **Test users** — but you will have to
+   reconnect every 7 days.
+4. Confirm **Clients → your Web client → Authorised redirect URIs** contains
+   `https://api-satin-leaf-209.fly.dev/api/google/callback` and
+   `https://api-satin-leaf-209.fly.dev/api/google-identity/callback`.
+5. In the LMS: **Online Classes → Reconnect / Connect Google Account**.
+
+The LMS now detects a revoked/expired token itself: the status panel shows
+**"Google connection expired" → Reconnect** instead of a false "connected",
+and the dead token is removed so the next connect starts clean.
+`GET /api/google/config-check` (admin) prints the redirect URIs the server
+is actually using, to compare against the console.
+
+---
+
 ## 10. Security notes
 
 - Google tokens are stored **only** in `google_admin_tokens`, encrypted

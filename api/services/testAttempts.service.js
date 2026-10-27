@@ -88,7 +88,11 @@ async function finalizeMcqAttempt(attempt, test, { autoSubmitted = false } = {})
   const marksAwarded = (answers || []).reduce((sum, a) => sum + Number(a.marks_awarded || 0), 0);
   const now = new Date().toISOString();
 
-  const { data: updated, error } = await supabase
+  // Compare-and-set: only the caller that flips in_progress -> evaluated gets
+  // a row back. A concurrent run (lazy read-path finalize + scheduler + the
+  // student's own submit) matches nothing, so grading and the result email
+  // happen exactly once.
+  const { data: updatedRows, error } = await supabase
     .from("test_attempts")
     .update({
       status: "evaluated",
@@ -99,9 +103,14 @@ async function finalizeMcqAttempt(attempt, test, { autoSubmitted = false } = {})
       evaluated_at: now,
     })
     .eq("id", attempt.id)
-    .select()
-    .single();
+    .eq("status", "in_progress")
+    .select();
   if (error) throw error;
+  if (!updatedRows || updatedRows.length === 0) {
+    const { data: current } = await supabase.from("test_attempts").select("*").eq("id", attempt.id).maybeSingle();
+    return current || attempt;
+  }
+  const updated = updatedRows[0];
 
   const testResultReport = require("./testResultReport.service");
   testResultReport.sendResultReport(attempt.id).catch((err) => {
@@ -155,6 +164,7 @@ async function listTestsForStudent(authUserId) {
     .select(testsService.TEST_SELECT)
     .or(["audience.eq.ALL", batchIds.length > 0 ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
     .neq("status", "cancelled")
+    .neq("status", "draft") // drafts are admin-only in-progress authoring — never visible to students
     .order("scheduled_start", { ascending: false });
   if (error) throw error;
 
@@ -224,9 +234,7 @@ async function startAttempt(testId, authUserId) {
     .maybeSingle();
   if (exErr) throw exErr;
 
-  if (existing) {
-    if (existing.status !== "not_started") return existing; // resume — same shuffle re-served
-  }
+  if (existing && existing.status !== "not_started") return existing; // resume — same shuffle re-served
 
   let questionOrder = null;
   if (test.type === "mcq") {
@@ -245,13 +253,40 @@ async function startAttempt(testId, authUserId) {
     max_marks: test.max_marks,
   };
 
-  const { data: attempt, error: upsertErr } = await supabase
+  // Create-or-resume without ever overwriting a running attempt: a double
+  // click / second tab that races this insert hits the unique (test, student)
+  // constraint and is handed the attempt that won, with its original shuffle
+  // and start time intact.
+  if (!existing) {
+    const { data: created, error: insertErr } = await supabase
+      .from("test_attempts")
+      .insert(payload)
+      .select()
+      .single();
+    if (!insertErr) return created;
+    if (insertErr.code !== "23505") throw insertErr;
+    const { data: winner, error: winnerErr } = await supabase
+      .from("test_attempts")
+      .select("*")
+      .eq("test_id", testId)
+      .eq("student_id", student.id)
+      .single();
+    if (winnerErr) throw winnerErr;
+    return winner;
+  }
+
+  // A pre-created "not_started" row: start it only if it is still not started.
+  const { data: started, error: startErr } = await supabase
     .from("test_attempts")
-    .upsert(payload, { onConflict: "test_id,student_id" })
-    .select()
-    .single();
-  if (upsertErr) throw upsertErr;
-  return attempt;
+    .update(payload)
+    .eq("id", existing.id)
+    .eq("status", "not_started")
+    .select();
+  if (startErr) throw startErr;
+  if (started && started.length > 0) return started[0];
+  const { data: current, error: curErr } = await supabase.from("test_attempts").select("*").eq("id", existing.id).single();
+  if (curErr) throw curErr;
+  return current;
 }
 
 // ─── Student: read my attempt (questions in shuffled order, no answers) ───
@@ -289,26 +324,25 @@ async function getMyAttemptDetail(testId, authUserId) {
   };
 
   if (test.type === "mcq") {
-    const ids = attempt.question_order || [];
-    const { data: questions, error } = await supabase.from("test_questions").select("*").in("id", ids);
-    if (error) throw error;
-    const byId = Object.fromEntries((questions || []).map((q) => [q.id, q]));
+    // Students never get question/answer detail back once the attempt is
+    // evaluated — only the aggregate score above. This is intentional and
+    // enforced here server-side (not just hidden in the UI): the question
+    // text, options, correctOption and isCorrect must never appear in the
+    // response body for a student once grading is done, otherwise they'd be
+    // visible via the raw API response/devtools regardless of what the
+    // frontend renders.
+    if (attempt.status !== "evaluated") {
+      const ids = attempt.question_order || [];
+      const { data: questions, error } = await supabase.from("test_questions").select("*").in("id", ids);
+      if (error) throw error;
+      const byId = Object.fromEntries((questions || []).map((q) => [q.id, q]));
 
-    const revealAnswers = attempt.status === "evaluated" && resultsReady;
-    let myAnswers = {};
-    if (revealAnswers) {
-      const { data: answers } = await supabase.from("test_answers").select("*").eq("attempt_id", attempt.id);
-      myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
-    } else if (attempt.status !== "evaluated") {
-      // Still in progress: the student's own picks are needed to resume, but
-      // never the correct answers.
+      // Still in progress or submitted-but-ungraded: the student's own picks
+      // are needed to resume/review their submission, but never the correct
+      // answers.
       const { data: answers } = await supabase.from("test_answers").select("question_id, selected_option").eq("attempt_id", attempt.id);
-      myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
-    }
-    // Evaluated but not yet resultsReady: myAnswers stays empty — the
-    // question/answer review is withheld entirely until the test ends.
+      const myAnswers = Object.fromEntries((answers || []).map((a) => [a.question_id, a]));
 
-    if (attempt.status !== "evaluated" || resultsReady) {
       // Each question/option is text or an image; images are delivered as
       // short-lived signed URLs (raw storage keys are never sent to students).
       base.questions = [];
@@ -318,15 +352,13 @@ async function getMyAttemptDetail(testId, authUserId) {
           ...(await serializeQuestion(q, signKey)),
           marks: q.marks,
           selectedOption: myAnswers[q.id]?.selected_option || null,
-          // Only revealed once the attempt is evaluated AND the test's window has closed:
-          correctOption: revealAnswers ? q.correct_option : undefined,
-          isCorrect: revealAnswers ? myAnswers[q.id]?.is_correct ?? false : undefined,
         });
       }
     }
-    // else: submitted/evaluated but the test is still open for other
-    // students — base.questions is left undefined, so nothing about the
-    // paper leaks before everyone is done.
+    // Evaluated: base.questions is left undefined entirely. No question
+    // text, options, correctOption or isCorrect is ever included in a
+    // student-facing response past this point — only marksAwarded/maxMarks
+    // on `base.attempt` above.
   } else if (resultsReady) {
     base.descriptive = {
       questionText: test.question_text,
@@ -544,6 +576,99 @@ async function gradeDescriptiveAttempt(testId, attemptId, { marksAwarded, feedba
   return attempt;
 }
 
+// ─── Admin: one student's consolidated monthly test report ─────────────────
+
+/**
+ * Every test scheduled (for this student's batch, or All Students) within
+ * the given calendar month, split into:
+ *  - points: evaluated attempts, with the raw marks and the test's date —
+ *    used to plot the student's score trend for that month.
+ *  - absentDates: the day-of-month for every test the student was targeted
+ *    by but has no attempt row for at all (never started it) — a
+ *    pragmatic "a test was scheduled for them and they didn't attempt it"
+ *    definition of absence.
+ * `month` is a "YYYY-MM" string.
+ */
+async function getStudentMonthlyReport(studentId, month) {
+  const { data: student, error: studentErr } = await supabase
+    .from("students")
+    .select("id, name")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (studentErr) throw studentErr;
+  if (!student) throw notFound("Student not found");
+
+  const m = /^(\d{4})-(\d{2})$/.exec(month || "");
+  if (!m) throw badRequest("month must be in YYYY-MM format");
+  const year = Number(m[1]);
+  const monthIdx = Number(m[2]) - 1; // 0-based
+  const rangeStart = new Date(Date.UTC(year, monthIdx, 1));
+  const rangeEnd = new Date(Date.UTC(year, monthIdx + 1, 1));
+
+  const batchIds = await attendanceService.getStudentBatchIds(studentId);
+
+  let query = supabase
+    .from("tests")
+    .select("id, title, audience, batch_id, scheduled_start, max_marks")
+    .gte("scheduled_start", rangeStart.toISOString())
+    .lt("scheduled_start", rangeEnd.toISOString())
+    .neq("status", "cancelled");
+  if (batchIds.length > 0) {
+    query = query.or(`audience.eq.ALL,batch_id.in.(${batchIds.join(",")})`);
+  } else {
+    query = query.eq("audience", "ALL");
+  }
+  const { data: tests, error: testsErr } = await query;
+  if (testsErr) throw testsErr;
+
+  const testIds = (tests || []).map((t) => t.id);
+  let attemptsByTestId = new Map();
+  if (testIds.length > 0) {
+    const { data: attempts, error: attemptsErr } = await supabase
+      .from("test_attempts")
+      .select("test_id, status, submitted_at, marks_awarded, max_marks")
+      .eq("student_id", studentId)
+      .in("test_id", testIds);
+    if (attemptsErr) throw attemptsErr;
+    attemptsByTestId = new Map((attempts || []).map((a) => [a.test_id, a]));
+  }
+
+  const points = [];
+  const absentDates = [];
+
+  for (const test of tests || []) {
+    const attempt = attemptsByTestId.get(test.id);
+    const testDate = new Date(test.scheduled_start);
+    const dayOfMonth = testDate.getUTCDate();
+
+    if (!attempt) {
+      // Targeted by this test but never even started an attempt.
+      absentDates.push(dayOfMonth);
+      continue;
+    }
+    if (attempt.status === "evaluated" && attempt.marks_awarded !== null && attempt.max_marks) {
+      const date = (attempt.submitted_at ? new Date(attempt.submitted_at) : testDate).toISOString().slice(0, 10);
+      points.push({
+        date,
+        day: dayOfMonth,
+        marksAwarded: Number(attempt.marks_awarded),
+        maxMarks: Number(attempt.max_marks),
+        testTitle: test.title,
+      });
+    }
+    // submitted-but-not-yet-evaluated, or in_progress: neither plotted nor absent.
+  }
+
+  points.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    student: { id: student.id, name: student.name },
+    month,
+    points,
+    absentDates: [...new Set(absentDates)].sort((a, b) => a - b),
+  };
+}
+
 module.exports = {
   listTestsForStudent,
   startAttempt,
@@ -555,4 +680,5 @@ module.exports = {
   gradeDescriptiveAttempt,
   autoFinalizeExpiredAttempts,
   getStudentForUser,
+  getStudentMonthlyReport,
 };

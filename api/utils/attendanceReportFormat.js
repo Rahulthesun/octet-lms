@@ -7,6 +7,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+const { drawOctetEmblem } = require("./octetEmblem");
+
 // ─── CSV ─────────────────────────────────────────────────────────────────────
 
 function csvEscape(value) {
@@ -86,6 +88,12 @@ const CHART_TYPES = ["bar", "pie", "line"];
 // web/components/shared/AttendanceChart.tsx.
 const CHART_STATUS_COLORS = { present: "#0ca30c", partial: "#fab219", absent: "#d03b3b" };
 
+// Matches NEVER_JOINED_COLOR in web/components/shared/AttendanceChart.tsx —
+// a student who never logged into the online class at all, drawn as a solid
+// black bar at present-height, distinct from "joined but under threshold".
+const NEVER_JOINED_COLOR = "#000000";
+const NEVER_JOINED_BAR_HEIGHT = 100;
+
 /** Same threshold coloring as pctColor() in AttendanceReportsTab.tsx. */
 function pctColor(pct) {
   if (pct === null || pct === undefined) return "#9CA3AF";
@@ -116,6 +124,25 @@ function buildCategoryChartData(records) {
     { label: "Partial", value: partial, color: CHART_STATUS_COLORS.partial },
     { label: "Absent", value: absent, color: CHART_STATUS_COLORS.absent },
   ];
+}
+
+/**
+ * PRIMARY chart data for a student report: one bar per session DATE (not an
+ * aggregate "number of sessions" count), oldest to most recent. Mirrors
+ * buildAttendanceDateWiseData() in web/components/shared/AttendanceChart.tsx
+ * exactly, including the solid-black "never logged in" marker, so the PDF
+ * always matches the on-screen primary view.
+ */
+function buildDateWiseChartData(recordsNewestFirst) {
+  return [...recordsNewestFirst].reverse().map((r) => {
+    const status = r.attendanceStatus || r.status;
+    const neverJoined = r.source === "GOOGLE_MEET" && status === "absent" && (r.durationMinutes || 0) <= 0;
+    if (neverJoined) {
+      return { label: r.date, value: NEVER_JOINED_BAR_HEIGHT, color: NEVER_JOINED_COLOR };
+    }
+    const value = r.attendancePct ?? (status === "present" ? 100 : status === "partial" ? 50 : 0);
+    return { label: r.date, value, color: CHART_STATUS_COLORS[status] };
+  });
 }
 
 /**
@@ -159,7 +186,23 @@ function drawLegend(doc, x, y, width, items) {
   return cy + 14;
 }
 
-function drawBarChartVertical(doc, { x, y, width, height, data, valueSuffix }) {
+/** Solid black Y-axis with tick labels at 0, half and max, at the chart's left edge. */
+function drawYAxis(doc, { x, top, baseline, maxValue, valueSuffix }) {
+  doc.moveTo(x, top).lineTo(x, baseline).strokeColor("#18181b").lineWidth(1.2).stroke();
+  doc.fontSize(7).font("Helvetica").fillColor("#71717a");
+  [0, maxValue / 2, maxValue].forEach((v) => {
+    const ty = baseline - (v / maxValue) * (baseline - top);
+    doc.moveTo(x - 3, ty).lineTo(x, ty).strokeColor("#18181b").lineWidth(0.8).stroke();
+    doc.text(`${Math.round(v)}${valueSuffix || ""}`, x - 30, ty - 3.5, { width: 26, align: "right", lineBreak: false });
+  });
+  doc.fillColor("black").lineWidth(1);
+}
+
+const Y_AXIS_SPACE = 30;
+
+function drawBarChartVertical(doc, { x: chartX, y, width: chartWidth, height, data, valueSuffix }) {
+  const x = chartX + Y_AXIS_SPACE;
+  const width = chartWidth - Y_AXIS_SPACE;
   const maxValue = Math.max(1, ...data.map((d) => d.value));
   const axisSpace = 16;
   const labelSpace = 14;
@@ -168,7 +211,8 @@ function drawBarChartVertical(doc, { x, y, width, height, data, valueSuffix }) {
   const slot = width / data.length;
   const barWidth = Math.min(56, slot * 0.5);
 
-  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#e4e4e7").lineWidth(1).stroke();
+  drawYAxis(doc, { x, top: baseline - plotHeight, baseline, maxValue, valueSuffix });
+  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#18181b").lineWidth(1.5).stroke();
 
   data.forEach((d, i) => {
     const barHeight = (d.value / maxValue) * plotHeight;
@@ -205,7 +249,24 @@ function drawBarChartHorizontal(doc, { x, width, data, valueSuffix }) {
   doc.fillColor("black");
 }
 
-function drawPieChart(doc, { x, y, width, height, data, valueSuffix }) {
+// Categorical palette for pie slices — mirrors PIE_PALETTE in
+// web/components/shared/AttendanceChart.tsx so the PDF slice colors match the screen.
+const PIE_PALETTE = ["#5B21B6", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6", "#8b5cf6", "#84cc16", "#f97316"];
+
+/**
+ * Slices that already carry distinct meaningful colors (e.g. Present/Partial/
+ * Absent) keep them; when they don't (one shared color, or none), every slice
+ * gets its own palette color so categories can be told apart.
+ */
+function withPieColors(data) {
+  const colors = data.map((d) => d.color).filter(Boolean);
+  const distinct = new Set(colors).size === data.length && colors.length === data.length;
+  if (distinct || data.length < 2) return data;
+  return data.map((d, i) => ({ ...d, color: PIE_PALETTE[i % PIE_PALETTE.length] }));
+}
+
+function drawPieChart(doc, { x, y, width, height, data: rawData, valueSuffix }) {
+  const data = withPieColors(rawData);
   const total = data.reduce((a, d) => a + d.value, 0);
   const cx = x + Math.min(width, height) / 2.4;
   const cy = y + height / 2;
@@ -239,14 +300,17 @@ function drawPieChart(doc, { x, y, width, height, data, valueSuffix }) {
   drawLegend(doc, x + r * 2 + 24, y + height / 2 - legendItems.length * 8, width - (r * 2 + 24), legendItems);
 }
 
-function drawLineChart(doc, { x, y, width, height, data, valueSuffix, color }) {
+function drawLineChart(doc, { x: chartX, y, width: chartWidth, height, data, valueSuffix, color }) {
+  const x = chartX + Y_AXIS_SPACE;
+  const width = chartWidth - Y_AXIS_SPACE;
   const axisSpace = 16;
   const labelSpace = 12;
   const plotHeight = height - axisSpace - labelSpace;
   const baseline = y + plotHeight + axisSpace;
   const maxValue = 100; // percentage scale, fixed 0-100 to match the on-screen chart
 
-  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#e4e4e7").lineWidth(1).stroke();
+  drawYAxis(doc, { x, top: baseline - plotHeight, baseline, maxValue, valueSuffix: "%" });
+  doc.moveTo(x, baseline).lineTo(x + width, baseline).strokeColor("#18181b").lineWidth(1.5).stroke();
 
   if (data.length < 2) {
     doc.fontSize(9).fillColor("#a1a1aa").text("Not enough data yet", x, y + plotHeight / 2, { width, align: "center" });
@@ -370,17 +434,27 @@ function drawTable(doc, { headers, rows, colWidths, startX = doc.page.margins.le
   });
 
   doc.y = y + 10;
+  // drawRow() positions text at explicit x coordinates, which leaves pdfkit's
+  // cursor at the LAST column — without this reset the next heading flows
+  // from that x and wraps into a thin right-hand column ("Batch-wise break
+  // down" stacked over the final column).
+  doc.x = startX;
 }
 
 /** Writes a single student's report onto an open PDFDocument. */
 function buildStudentReportPdf(doc, report, chartType = "bar") {
   const type = normalizeChartType(chartType);
 
-  doc.font("Helvetica-Bold").fontSize(18).text("Student Attendance Report");
+  const top = doc.y;
+  drawOctetEmblem(doc, doc.page.margins.left + 24, top + 24, 48);
+  doc.font("Helvetica-Bold").fontSize(18).text("Student Attendance Report", doc.page.margins.left + 60, top + 6);
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#dc2626").text(report.student.name, doc.page.margins.left + 60);
+  doc.fillColor("black");
+  doc.x = doc.page.margins.left;
+  doc.y = Math.max(doc.y, top + 54);
   doc.moveDown(0.5);
 
   doc.font("Helvetica").fontSize(11);
-  doc.text(`Name: ${report.student.name}`);
   doc.text(`Roll No: ${report.student.roll || "—"}`);
   if (report.student.grade) doc.text(`Grade: ${report.student.grade}`);
   if (report.student.batch) doc.text(`Registered Batch: ${report.student.batch}`);
@@ -394,25 +468,31 @@ function buildStudentReportPdf(doc, report, chartType = "bar") {
   doc.text(`Attendance %: ${report.attendancePct !== null ? report.attendancePct + "%" : "N/A"}`);
   doc.moveDown(1);
 
-  const barData = buildCategoryChartData(report.records);
+  const dateWiseData = buildDateWiseChartData(report.records);
+  const categoryData = buildCategoryChartData(report.records);
   const lineData = buildTrendChartData(
     [...report.records].reverse().map((r) => ({ present: r.status === "present" }))
   );
   const studentChartCopy = {
-    bar: { description: "How many of this student's sessions fall into each attendance status.", axisLabels: { x: "Attendance status", y: "Number of sessions" } },
-    pie: { description: "Share of this student's sessions in each attendance status.", axisLabels: null },
+    bar: { description: "Attendance by date — black bars mark a class this student never logged into at all.", axisLabels: { x: "Date", y: "Attendance %" } },
+    pie: { description: "Share of this student's sessions in each attendance status (summary).", axisLabels: null },
     line: { description: "Running attendance percentage after each session, oldest to most recent.", axisLabels: { x: "Session number", y: "Attendance % so far" } },
   };
   drawStatisticsChart(doc, {
     type,
-    barData,
-    pieData: barData,
+    barData: dateWiseData,
+    pieData: categoryData,
     lineData,
-    valueSuffix: type === "line" ? "%" : "",
+    valueSuffix: type === "bar" ? "" : "%",
     color: "#5B21B6",
     description: studentChartCopy[type].description,
     axisLabels: studentChartCopy[type].axisLabels,
   });
+  if (type === "bar") {
+    doc.fontSize(8).fillColor("#71717a").font("Helvetica-Oblique")
+      .text("Black = never logged into that online class (vs. joined but under threshold, shown in red).");
+    doc.fillColor("black");
+  }
   doc.moveDown(0.5);
 
   doc.font("Helvetica-Bold").fontSize(12).text("Session History");
@@ -517,6 +597,8 @@ module.exports = {
   drawTable,
   buildCategoryChartData,
   buildTrendChartData,
+  buildDateWiseChartData,
   CHART_STATUS_COLORS,
+  NEVER_JOINED_COLOR,
   pctColor,
 };

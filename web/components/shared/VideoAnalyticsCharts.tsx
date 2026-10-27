@@ -15,7 +15,7 @@
 
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 export interface BucketPoint {
   bucketIndex: number

@@ -6,17 +6,23 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   useAdminOnlineClasses,
   useGoogleAccountStatus,
-  useSubjects,
+  useChapters,
   useAttendanceSettings,
   type OnlineClass,
   type OnlineClassStatus,
   type SyncStatus,
 } from '@/hooks/useOnlineClasses'
 import { useBatches, useEligibleStudents } from '@/hooks/useAttendanceData'
-import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpers'
+import { formatDateInZone, formatTimeInZone, isoToZonedParts, chapterLabel, todayISODate, isPastDate, isPastDateTime } from '@/lib/helpers'
 import SessionAttendanceModal from '@/components/admin/SessionAttendanceModal'
+import TimeInput12h from '@/components/shared/TimeInput12h'
+import { SkeletonCard, Skeleton } from '@/components/ui/Skeleton'
+import { Select } from '@/components/ui/Select'
+import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SearchInput from '@/components/ui/SearchInput'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -39,15 +45,6 @@ function CalendarIcon({ className = 'w-5 h-5' }: { className?: string }) {
   )
 }
 
-function SearchIcon({ className = 'w-4 h-4' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none">
-      <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function UsersIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none">
@@ -55,6 +52,15 @@ function UsersIcon({ className = 'w-4 h-4' }: { className?: string }) {
       <path d="M2 16c.6-3 2.4-4.5 5-4.5s4.4 1.5 5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       <circle cx="14.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
       <path d="M12.5 11.3c2 .1 3.3 1.4 3.8 3.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function SettingsIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   )
 }
@@ -85,7 +91,7 @@ function StatusBadge({ status }: { status: OnlineClassStatus }) {
 
 const SYNC_STYLE: Partial<Record<SyncStatus, { label: string; fg: string; bg: string }>> = {
   NOT_STARTED: { label: 'Not started', fg: '#71717A', bg: '#F4F4F5' },
-  LIVE: { label: 'Live', fg: '#5B21B6', bg: '#F5F3FF' },
+  LIVE: { label: 'Live', fg: '#5e4075', bg: '#f6f3f9' },
   AWAITING_ATTENDANCE_SYNC: { label: 'Awaiting sync', fg: '#B45309', bg: '#FFFBEB' },
   SYNCED: { label: 'Synced', fg: '#15803D', bg: '#F0FDF4' },
   SYNC_FAILED: { label: 'Sync failed', fg: '#B91C1C', bg: '#FEF2F2' },
@@ -103,7 +109,7 @@ function SyncBadge({ status }: { status: SyncStatus | null }) {
 }
 
 // ─── Online attendance settings modal ──────────────────────────────────────
-// Reached via the ⚙️ button next to "Schedule Online Class" — kept out of
+// Reached via the settings button next to "Schedule Online Class" — kept out of
 // the main flow since it's configured once and rarely touched day to day.
 
 function SettingField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -165,7 +171,9 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
       >
         <div className="px-6 py-4 border-b border-zinc-200 flex items-start justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-xl leading-none" aria-hidden="true">⚙️</span>
+            <span className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0" style={{ color: ACCENT }} aria-hidden="true">
+              <SettingsIcon className="w-4 h-4" />
+            </span>
             <div>
               <h3 className="text-sm font-semibold text-zinc-900">Online Attendance Settings</h3>
               <p className="text-xs text-zinc-500 mt-0.5">How Google Meet attendance is calculated and synced</p>
@@ -176,12 +184,12 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           {loading ? (
-            <p className="text-sm text-zinc-400">Loading settings…</p>
+            <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-2/3" /></div>
           ) : (
             <>
               <div>
                 <p className="text-xs text-zinc-500 mb-2">Minimum % of class time to count as Present or Partial</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <SettingField label="Present threshold (%)">
                     <input type="number" min={0} max={100} value={presentThreshold}
                       onChange={(e) => setPresentThreshold(Number(e.target.value))}
@@ -286,13 +294,17 @@ function GoogleAccountPanel() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-zinc-200 bg-white">
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+          className={`w-2 h-2 rounded-full shrink-0 ${status?.connected ? 'bg-emerald-500' : status?.reauthRequired ? 'bg-amber-500' : 'bg-zinc-300'}`}
         />
         <div className="min-w-0">
           <p className="text-sm text-zinc-900">
-            {status?.connected ? 'Google account connected' : 'Google account not connected'}
+            {status?.connected
+              ? 'Google account connected'
+              : status?.reauthRequired
+                ? 'Google connection expired'
+                : 'Google account not connected'}
           </p>
-          {status?.connected && status.email && (
+          {status?.email && (status.connected || status.reauthRequired) && (
             <p className="text-xs text-zinc-500 truncate">{status.email}</p>
           )}
         </div>
@@ -306,7 +318,7 @@ function GoogleAccountPanel() {
           }`}
           style={!status?.connected ? { backgroundColor: ACCENT } : undefined}
         >
-          {busy ? 'Working…' : status?.connected ? 'Disconnect' : 'Connect Google Account'}
+          {busy ? 'Working…' : status?.connected ? 'Disconnect' : status?.reauthRequired ? 'Reconnect' : 'Connect Google Account'}
         </button>
       </div>
       {error && (
@@ -324,10 +336,10 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
   googleConnected: boolean
 }) {
   const { schedule } = useAdminOnlineClasses()
-  const { subjects } = useSubjects()
+  const { chapters } = useChapters()
   const { batches } = useBatches('all')
 
-  const [subjectId, setSubjectId] = useState('')
+  const [chapterId, setChapterId] = useState('')
   const [batchId, setBatchId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -378,12 +390,20 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 
   async function handleSubmit() {
     if (!canSubmit) return
+    if (isPastDate(date) || isPastDateTime(date, startTime)) {
+      setError('The class must start in the future. Pick today or a later date and a start time that has not passed.')
+      return
+    }
+    if (endTime <= startTime) {
+      setError('End time must be after the start time.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
       await schedule({
         batchId,
-        subjectId: subjectId || undefined,
+        chapterId: chapterId || undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         date,
@@ -411,7 +431,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
       <motion.div
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="bg-white w-full sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-white w-full sm:w-[92vw] sm:max-w-3xl shadow-2xl rounded-t-2xl sm:rounded-2xl border border-zinc-200 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-8 py-5 border-b border-zinc-200 flex items-center justify-between shrink-0">
@@ -431,17 +451,16 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">Course / Subject</label>
-              <select
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+              <label className="block text-sm font-medium text-zinc-700 mb-2">Chapter</label>
+              <Select
+                value={chapterId}
+                onChange={(e) => setChapterId(e.target.value)}
               >
-                <option value="">Select subject (optional)…</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                <option value="">Select chapter (optional)…</option>
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Topic</label>
@@ -467,23 +486,17 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Date</label>
               <input
-                type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                type="date" value={date} min={todayISODate()} onChange={(e) => setDate(e.target.value)}
                 className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Start time</label>
-              <input
-                type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <TimeInput12h value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">End time</label>
-              <input
-                type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
-              />
+              <TimeInput12h value={endTime} onChange={setEndTime} />
             </div>
           </div>
 
@@ -492,7 +505,7 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
               <UsersIcon className="w-4 h-4 text-zinc-400" />
               Students (batch)
             </label>
-            <select
+            <Select
               value={batchId}
               onChange={(e) => {
                 setBatchId(e.target.value)
@@ -500,14 +513,13 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
                 setStudentSearch('')
                 setShowExtraStudents(false)
               }}
-              className="w-full text-[15px] rounded-lg px-4 py-3 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
             >
               <option value="">Select a batch…</option>
               <option value="ALL">All Students</option>
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
-            </select>
+            </Select>
             {isAllStudents && (
               <p className="text-sm text-zinc-500 mt-2">
                 Every active student is invited, including students added later. Choose a single batch instead to limit it.
@@ -545,20 +557,19 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
                   )}
 
                   <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                    <div className="relative p-2.5 bg-zinc-50 border-b border-zinc-200">
-                      <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
+                    <div className="p-2.5 bg-zinc-50 border-b border-zinc-200">
+                      <SearchInput
                         value={studentSearch}
-                        onChange={(e) => setStudentSearch(e.target.value)}
+                        onChange={setStudentSearch}
                         placeholder="Search students by name…"
-                        className="w-full text-sm rounded-md pl-9 pr-3 py-2 border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                        size="sm"
+                        wrapperClassName="w-full"
                       />
                     </div>
 
                     <div className="max-h-56 overflow-y-auto divide-y divide-zinc-100">
                       {loadingEligible ? (
-                        <p className="text-xs text-zinc-400 px-4 py-3">Loading students…</p>
+                        <div className="px-4 py-3 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
                       ) : studentDropdownOptions.length === 0 ? (
                         <p className="text-xs text-zinc-400 px-4 py-3">
                           {studentSearch
@@ -627,18 +638,23 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
 function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
   cls: OnlineClass
   onClose: () => void
-  onReschedule: (id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string }) => Promise<void>
+  onReschedule: (id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) => Promise<void>
   onCancel: (id: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const startParts = isoToZonedParts(cls.scheduledStart, cls.timezone)
   const endParts = isoToZonedParts(cls.scheduledEnd, cls.timezone)
 
+  const { batches } = useBatches('all')
+  const { chapters } = useChapters()
+
   const [title, setTitle] = useState(cls.title)
   const [description, setDescription] = useState(cls.description ?? '')
   const [date, setDate] = useState(startParts.date)
   const [startTime, setStartTime] = useState(startParts.time)
   const [endTime, setEndTime] = useState(endParts.time)
+  const [batchId, setBatchId] = useState(cls.allStudents ? 'ALL' : (cls.batchId || ''))
+  const [chapterId, setChapterId] = useState(cls.chapterId || '')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -646,10 +662,18 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
   const isCancelled = cls.status === 'cancelled'
 
   async function handleSave() {
+    if (isPastDate(date) || isPastDateTime(date, startTime)) {
+      setError('A rescheduled class must start in the future. Pick today or a later date and a start time that has not passed.')
+      return
+    }
+    if (endTime <= startTime) {
+      setError('End time must be after the start time.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      await onReschedule(cls.id, { title, description, date, startTime, endTime })
+      await onReschedule(cls.id, { title, description, date, startTime, endTime, batchId, chapterId })
       setEditing(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to reschedule')
@@ -687,7 +711,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
           <div>
             <h3 className="text-sm font-semibold text-zinc-900">{editing ? 'Reschedule class' : cls.title}</h3>
             <p className="text-xs text-zinc-500 mt-0.5">
-              {cls.batchName}{cls.subjectName ? ` · ${cls.subjectName}` : ''}
+              {cls.batchName}{cls.chapterName ? ` · ${cls.chapterName}` : (cls.subjectName ? ` · ${cls.subjectName}` : '')}
             </p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">&times;</button>
@@ -733,21 +757,44 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
                   className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 resize-none" />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Date</label>
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  <input type="date" value={date} min={todayISODate()} onChange={(e) => setDate(e.target.value)}
                     className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">Start</label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  <TimeInput12h value={startTime} onChange={setStartTime}
+                    className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-500 mb-1.5">End</label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full text-sm rounded-md px-3 py-2 border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                  <TimeInput12h value={endTime} onChange={setEndTime}
+                    className="px-1.5 py-2 rounded-md border border-zinc-300 bg-white text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Students (batch)</label>
+                  <Select value={batchId} onChange={(e) => setBatchId(e.target.value)}
+                    className="text-sm">
+                    <option value="">Select a batch…</option>
+                    <option value="ALL">All Students</option>
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1.5">Chapter</label>
+                  <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)}
+                    className="text-sm">
+                    <option value="">Select chapter (optional)…</option>
+                    {chapters.map((c) => (
+                      <option key={c.id} value={c.id}>{chapterLabel(chapters, c)}</option>
+                    ))}
+                  </Select>
                 </div>
               </div>
             </>
@@ -794,7 +841,7 @@ function ClassDetailsModal({ cls, onClose, onReschedule, onCancel }: {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
-type ViewFilter = 'all' | 'past' | 'today'
+type ViewFilter = 'all' | 'past' | 'today' | 'upcoming'
 
 /** Which calendar day (in the CLASS's own timezone) a class falls on, relative to today. */
 function classDayBucket(cls: OnlineClass): 'today' | 'past' | 'future' {
@@ -844,11 +891,18 @@ export default function OnlineClassesPage() {
   const filtered = useMemo(() => {
     if (viewFilter === 'all') return sorted
     if (viewFilter === 'today') return sorted.filter((c) => classDayBucket(c) === 'today')
+    if (viewFilter === 'upcoming') return [...sorted].reverse().filter((c) => classDayBucket(c) === 'future')
     return sorted.filter((c) => classDayBucket(c) === 'past')
   }, [sorted, viewFilter])
+  const paging = usePagination(filtered)
 
-  async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string }) {
-    const updated = await reschedule(id, input)
+  async function handleReschedule(id: string, input: { title: string; description: string; date: string; startTime: string; endTime: string; batchId: string; chapterId: string }) {
+    const { batchId, chapterId, ...rest } = input
+    const updated = await reschedule(id, {
+      ...rest,
+      batchId: batchId || undefined,
+      chapterId: chapterId || undefined,
+    })
     setSelectedClass(updated)
   }
 
@@ -865,36 +919,61 @@ export default function OnlineClassesPage() {
     })
   }
 
-  async function handleSync(classId: string) {
-    setSyncingId(classId)
+  // Auto-sync attendance for classes that have ended and haven't synced yet
+  useEffect(() => {
+    if (!classes || classes.length === 0) return
+    const now = Date.now()
+    const endedNeedingSync = classes.filter(
+      (c) =>
+        c.status !== 'cancelled' &&
+        c.meetUrl &&
+        new Date(c.scheduledEnd).getTime() <= now &&
+        (!c.attendance || c.attendance.syncStatus === 'AWAITING_ATTENDANCE_SYNC' || c.attendance.syncStatus === 'NOT_STARTED')
+    )
+    if (endedNeedingSync.length === 0) return
+
+    endedNeedingSync.forEach((c) => {
+      syncAttendance(c.id).catch((err) => console.warn(`Auto-sync for class ${c.id} failed:`, err))
+    })
+  }, [classes, syncAttendance])
+
+  async function handleOpenAttendance(cls: OnlineClass) {
+    if (cls.attendance?.sessionId) {
+      setAttendanceSessionId(cls.attendance.sessionId)
+    }
+    // Auto-sync attendance in background when opening attendance
     try {
-      await syncAttendance(classId)
+      const res = await syncAttendance(cls.id)
+      if (res?.attendanceSessionId) {
+        setAttendanceSessionId(res.attendanceSessionId)
+      } else if (res?.session?.id) {
+        setAttendanceSessionId(res.session.id)
+      }
     } catch (e) {
-      console.error(e)
-    } finally {
-      setSyncingId(null)
+      console.warn('Auto-sync attendance failed:', e)
     }
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 sm:px-6 py-6 max-w-screen mx-auto space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-zinc-200">
+    <div className="space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-zinc-400 mb-1">Online Classes</p>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">Schedule &amp; Manage Online Classes</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Online Classes</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Schedule Google Meet classes and track their attendance.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={() => setShowSettings(true)}
             title="Online Attendance Settings"
-            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-md border border-zinc-300 hover:bg-zinc-100 transition-colors text-xl leading-none"
+            aria-label="Online Attendance Settings"
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
           >
-            <span aria-hidden="true">⚙️</span>
+            <SettingsIcon className="w-[18px] h-[18px]" />
           </button>
           <GoogleAccountPanel />
           <button
             onClick={() => setShowSchedule(true)}
-            className="text-sm px-4 py-2.5 text-white rounded-md transition-colors whitespace-nowrap"
+            className="flex items-center justify-center gap-2 text-[15px] px-5 py-2.5 text-white rounded-lg transition-colors whitespace-nowrap"
             style={{ backgroundColor: ACCENT }}
           >
             Schedule Online Class
@@ -910,20 +989,17 @@ export default function OnlineClassesPage() {
       )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 rounded-lg" role="group" aria-label="Filter classes">
-          {(['all', 'past', 'today'] as ViewFilter[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setViewFilter(v)}
-              aria-pressed={viewFilter === v}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                viewFilter === v ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              {v === 'all' ? 'All' : v === 'past' ? 'Past' : 'Today'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          ariaLabel="Filter classes"
+          value={viewFilter}
+          onChange={setViewFilter}
+          options={[
+            { value: 'today', label: 'Today' },
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'past', label: 'Past' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
         <p className="text-xs text-zinc-400">
           {filtered.length} class{filtered.length === 1 ? '' : 'es'}
         </p>
@@ -931,7 +1007,7 @@ export default function OnlineClassesPage() {
 
       <div className="space-y-3">
         {loading ? (
-          <div className="py-12 text-center text-sm text-zinc-400 bg-white border border-zinc-200 rounded-xl">Loading classes…</div>
+          <SkeletonCard count={3} />
         ) : error ? (
           <div className="py-12 text-center text-sm text-red-600 bg-white border border-zinc-200 rounded-xl">{error}</div>
         ) : filtered.length === 0 ? (
@@ -940,10 +1016,12 @@ export default function OnlineClassesPage() {
               ? 'No online classes scheduled for today.'
               : viewFilter === 'past'
               ? 'No past online classes.'
+              : viewFilter === 'upcoming'
+              ? 'No upcoming online classes.'
               : 'No online classes scheduled yet.'}
           </div>
         ) : (
-          filtered.map((cls) => (
+          paging.pageItems.map((cls) => (
             <div
               key={cls.id}
               className="bg-white rounded-xl border border-zinc-200 hover:border-violet-200 hover:shadow-sm transition-all p-5"
@@ -952,7 +1030,7 @@ export default function OnlineClassesPage() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-semibold text-zinc-900 truncate">{cls.title}</h3>
                   <p className="text-sm text-zinc-500 truncate mt-0.5">
-                    {cls.batchName}{cls.subjectName ? ` · ${cls.subjectName}` : ''}
+                    {cls.batchName}{cls.chapterName ? ` · ${cls.chapterName}` : (cls.subjectName ? ` · ${cls.subjectName}` : '')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -981,16 +1059,10 @@ export default function OnlineClassesPage() {
                   className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
                   View
                 </button>
-                {cls.attendance && (
-                  <button onClick={() => setAttendanceSessionId(cls.attendance!.sessionId)}
-                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors">
+                {(cls.attendance || new Date(cls.scheduledEnd).getTime() <= Date.now()) && (
+                  <button onClick={() => handleOpenAttendance(cls)}
+                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer">
                     Attendance
-                  </button>
-                )}
-                {cls.status !== 'cancelled' && cls.meetUrl && (
-                  <button onClick={() => handleSync(cls.id)} disabled={syncingId === cls.id}
-                    className="text-sm px-3 py-1.5 rounded-md border border-zinc-300 text-zinc-600 hover:bg-zinc-100 transition-colors disabled:opacity-40">
-                    {syncingId === cls.id ? 'Syncing…' : cls.attendance?.syncStatus === 'SYNC_FAILED' ? 'Retry Sync' : 'Sync Attendance'}
                   </button>
                 )}
                 {cls.meetUrl && cls.status !== 'cancelled' && (
@@ -1022,6 +1094,16 @@ export default function OnlineClassesPage() {
           ))
         )}
       </div>
+
+      {!loading && !error && (
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <Pagination
+            page={paging.page} pageCount={paging.pageCount} pageSize={paging.pageSize} total={paging.total}
+            onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} label="classes"
+            className="border-t-0"
+          />
+        </div>
+      )}
 
       <AnimatePresence>
         {showSchedule && (

@@ -55,10 +55,17 @@ async function getAdminOverview() {
     studentsService.getApprovedStudentIds(),
   ]);
 
+  // Both attendance cards come from the same per-student percentages (active
+  // approved students only, counting only sessions where attendance was
+  // actually taken), so they always agree with each other and with the
+  // Attendance column on the Students page. Students with no counted session
+  // yet are left out of both rather than treated as 0%.
   const pctByStudent = await attendanceService.getAttendancePercentagesForStudents(approvedIds);
-  const belowThresholdCount = Object.values(pctByStudent).filter(
-    (pct) => pct !== null && pct < settings.presentThreshold
-  ).length;
+  const measuredPcts = Object.values(pctByStudent).filter((pct) => pct !== null);
+  const belowThresholdCount = measuredPcts.filter((pct) => pct < settings.presentThreshold).length;
+  const avgAttendancePct = measuredPcts.length
+    ? Math.round(measuredPcts.reduce((sum, pct) => sum + pct, 0) / measuredPcts.length)
+    : null;
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -77,7 +84,8 @@ async function getAdminOverview() {
   return {
     students: studentStatsResult.stats,
     attendance: {
-      avgAttendancePct: attendanceOverview.avgAttendancePct,
+      avgAttendancePct,
+      studentsWithAttendance: measuredPcts.length,
       liveSessionsToday: attendanceOverview.liveSessionsToday,
       presentTodayCount: attendanceOverview.presentTodayCount,
       presentThreshold: settings.presentThreshold,

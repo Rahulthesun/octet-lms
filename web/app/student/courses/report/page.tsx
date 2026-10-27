@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useMyWatchedVideos, useMyVideoReport } from '@/hooks/useVideoAnalytics'
 import { DropOffChart, EngagementHeatmap, formatDuration } from '@/components/shared/VideoAnalyticsCharts'
+import { Select } from '@/components/ui/Select'
 
 const card = 'bg-white rounded-lg border border-[#e2e5ec] shadow-[0_2px_12px_rgba(15,23,42,0.06)]'
 
@@ -30,7 +31,7 @@ export default function VideoReportPage() {
   const selected = videos.find((v) => v.videoId === selectedVideoId)
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="max-w-5xl">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
         <button
           onClick={() => router.push('/student/courses')}
@@ -41,8 +42,8 @@ export default function VideoReportPage() {
           </svg>
           Back to Video Lessons
         </button>
-        <h1 className="text-3xl md:text-4xl text-primary mb-1">Video Report</h1>
-        <p className="text-muted text-base">Your own watch-time, session, and engagement statistics</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Video Report</h1>
+        <p className="text-sm sm:text-base text-gray-500 mt-1">Your own watch-time, session, and engagement statistics</p>
       </motion.div>
 
       {videosLoading && <p className="text-muted text-[15px]">Loading your watched lessons…</p>}
@@ -59,17 +60,17 @@ export default function VideoReportPage() {
         <>
           <div className="mb-6">
             <label className="text-muted text-[13px] block mb-1.5">Lesson</label>
-            <select
+            <Select
               value={selectedVideoId ?? ''}
               onChange={(e) => setSelectedVideoId(e.target.value)}
-              className="w-full sm:w-96 px-4 py-2.5 rounded-md border border-[#e2e5ec] bg-white text-primary text-[15px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full sm:w-96"
             >
               {videos.map((v) => (
                 <option key={v.videoId} value={v.videoId}>
                   {v.subjectTitle ? `${v.subjectTitle} · ` : ''}{v.chapterTitle ? `${v.chapterTitle} · ` : ''}{v.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {reportLoading && <p className="text-muted text-[15px]">Loading report…</p>}

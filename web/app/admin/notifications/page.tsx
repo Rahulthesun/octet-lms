@@ -7,7 +7,7 @@ import NotificationInbox from '@/components/shared/NotificationInbox'
 import ComposeBroadcastModal from '@/components/admin/notifications/ComposeBroadcastModal'
 import DeliveryTrackingView from '@/components/admin/notifications/DeliveryTrackingView'
 
-const ACCENT = '#5B21B6'
+const ACCENT = '#5e4075'
 
 export default function AdminNotificationsPage() {
   const { notifications, loading, error, markRead, markAllRead, refetch } = useMyNotifications()
@@ -15,10 +15,10 @@ export default function AdminNotificationsPage() {
   const [showCompose, setShowCompose] = useState(false)
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Notifications</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Notifications</h1>
           <p className="text-[15px] text-zinc-500 mt-1">Your inbox, and tools to message students.</p>
         </div>
         <button onClick={() => setShowCompose(true)}

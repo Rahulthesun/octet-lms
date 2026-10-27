@@ -17,12 +17,13 @@ import { MobileBlockedScreen } from '@/components/MobileBlockedScreen'
 import { useWatermarkToken } from '@/hooks/useWatermarkToken'
 import { getSession } from '@/lib/auth'
 import ChemistryOctetLogo from '@/components/ui/ChemistryOctetLogo'
+import SearchInput from '@/components/ui/SearchInput'
 
 // Per-subject accent — dusty-plum family (on-theme, lightly differentiated)
 const SUBJECT_STYLE: Record<string, { text: string; border: string }> = {
-  physical: { text: 'text-[#7A6B96]', border: 'border-l-[#7A6B96]' },
+  physical: { text: 'text-[#5e4075]', border: 'border-l-[#5e4075]' },
   organic: { text: 'text-[#8F7BA0]', border: 'border-l-[#8F7BA0]' },
-  inorganic: { text: 'text-[#635580]', border: 'border-l-[#635580]' },
+  inorganic: { text: 'text-[#4b3260]', border: 'border-l-[#4b3260]' },
 }
 
 function formatTime(seconds: number): string {
@@ -617,7 +618,7 @@ function VideoPlayer({
                     </button>
                     <button
                       onClick={chooseResume}
-                      className="flex-1 py-2.5 rounded-lg bg-primary text-white text-sm hover:bg-[#3d2652] transition-colors"
+                      className="flex-1 py-2.5 rounded-lg bg-action text-white text-sm hover:bg-action-dark transition-colors"
                     >
                       Resume
                     </button>
@@ -891,16 +892,16 @@ export default function VideoLessonsPage() {
 
   // ── Browse view (accordion) ──────────────────────────────────────────────
   return (
-    <div className="p-6 lg:p-6 max-w-7xl mx-auto">
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center text-primary">
               <VideoIcon className="w-5 h-5" />
             </span>
-            <h1 className="text-3xl md:text-4xl text-primary">Video Lessons</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Video Lessons</h1>
           </div>
-          <p className="text-muted text-base mt-1">Watch your chemistry lectures, organized by subject and chapter</p>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">Watch your chemistry lectures, organized by subject and chapter</p>
         </div>
         <button
           onClick={() => router.push('/student/courses/report')}
@@ -912,18 +913,12 @@ export default function VideoLessonsPage() {
       </motion.div>
 
       <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M 11,11 L 14.5,14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search subjects, chapters, or lessons..."
-            className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-white text-primary text-base placeholder:text-border focus:outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 transition-all"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search subjects, chapters, or lessons..."
+          wrapperClassName="flex-1 max-w-xl"
+        />
         <button
           onClick={() => (allOpen ? collapseAll() : expandAll())}
           disabled={searching}

@@ -1,3 +1,17 @@
+// Several chapters can share the same name across different subjects (e.g.
+// "Electrochemistry" under both "Physical Chemistry" and a revision subject
+// like "Exam Eve Study Material") — append the subject name only for the
+// chapters whose name collides, so the dropdown stays clean everywhere else.
+export function chapterLabel<T extends { name: string; subjectName?: string | null }>(
+  allChapters: T[],
+  chapter: T
+): string {
+  const nameCount = allChapters.filter((c) => c.name === chapter.name).length
+  return nameCount > 1 && chapter.subjectName
+    ? `${chapter.name} (${chapter.subjectName})`
+    : chapter.name
+}
+
 export const toTitleCase = (str?: string | null) =>
   str
     ? str
@@ -31,6 +45,35 @@ export function formatDate(date: string): string {
   };
 
   return `${getOrdinal(day)} ${months[month - 1]} ${year}`;
+}
+
+// ─── Date-picker bounds ───────────────────────────────────────────────────────
+// Built from the device's local wall clock, not toISOString() (which is UTC and
+// is a day behind in IST between midnight and 05:30).
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Today as "YYYY-MM-DD" — use as `min` on scheduling date pickers. */
+export function todayISODate(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** Now as "YYYY-MM-DDTHH:mm" — use as `min` on datetime-local pickers. */
+export function nowISODateTimeLocal(): string {
+  const d = new Date()
+  return `${todayISODate()}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/** True when a "YYYY-MM-DD" value is before today. Empty values are not "past". */
+export function isPastDate(value: string): boolean {
+  return !!value && value < todayISODate()
+}
+
+/** True when "YYYY-MM-DD" + "HH:mm" (24h, local time) is already in the past. */
+export function isPastDateTime(date: string, time: string): boolean {
+  if (!date || !time) return false
+  return new Date(`${date}T${time}:00`).getTime() < Date.now()
 }
 
 // ─── Timezone-aware date/time helpers (online classes) ────────────────────────

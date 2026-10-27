@@ -9,6 +9,8 @@ import { useStudentName } from '@/hooks/useStudentName'
 import PersonalTasksWidget from '@/components/shared/PersonalTasksWidget'
 import ExamDocumentsBanner from '@/components/student/ExamDocumentsBanner'
 import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
+import { Skeleton } from '@/components/ui/Skeleton'
+import PageHeader from '@/components/ui/PageHeader'
 
 // ─── Backend shape (api/services/dashboard.service.js → getStudentOverview) ──
 
@@ -128,12 +130,12 @@ function IconProfile({ className = 'w-5 h-5' }: { className?: string }) {
 }
 
 const QUICK_LINKS = [
-  { href: '/student/courses', label: 'Video Lessons', icon: IconPlay, tint: '#F1EEF5', color: '#7A6B96' },
+  { href: '/student/courses', label: 'Video Lessons', icon: IconPlay, tint: '#F1EEF5', color: '#5e4075' },
   { href: '/student/notes', label: 'PDF Notes', icon: IconNotes, tint: '#eef2f6', color: '#475569' },
   { href: '/student/attendance', label: 'Attendance', icon: IconAttendance, tint: '#eafaf1', color: '#3e7450' },
   { href: '/student/classes', label: 'Online Classes', icon: IconOnlineClass, tint: '#eef3fb', color: '#3e5e8a' },
   { href: '/student/feedback', label: 'Feedback', icon: IconFeedback, tint: '#fdf3e9', color: '#9e7438' },
-  { href: '/student/profile', label: 'Profile', icon: IconProfile, tint: '#F1EEF5', color: '#635580' },
+  { href: '/student/profile', label: 'Profile', icon: IconProfile, tint: '#F1EEF5', color: '#4b3260' },
 ]
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -179,19 +181,14 @@ export default function StudentDashboard() {
     : []
 
   return (
-    <div className="p-6 lg:p-10 max-w-[1200px] mx-auto space-y-10">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-6 border-b border-[#e2e5ec]"
-      >
-        <div>
-          <p className="text-xs font-medium tracking-[0.2em] uppercase text-muted mb-2">{greeting()}</p>
-          <h1 className="text-4xl font-bold text-primary tracking-tight">
-            {studentName ?? 'Welcome back'}
-          </h1>
-        </div>
-        <p className="text-base text-muted shrink-0">{today}</p>
+    <div className="space-y-8">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        <PageHeader
+          className="!mb-0"
+          eyebrow={greeting()}
+          title={studentName ?? 'Welcome back'}
+          actions={<p className="text-sm text-muted">{today}</p>}
+        />
       </motion.div>
 
       {/* Reminder until every requested hall ticket / marksheet is uploaded */}
@@ -199,7 +196,19 @@ export default function StudentDashboard() {
       <GoogleLinkBanner />
 
       {loading ? (
-        <div className="py-24 text-center text-muted text-base">Loading dashboard…</div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+          <Skeleton className="h-44 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        </div>
       ) : error ? (
         <div className="py-24 text-center text-base text-rose-600">{error}</div>
       ) : data ? (
@@ -222,7 +231,7 @@ export default function StudentDashboard() {
           {/* Personal Tasks — the interactive centrepiece, not a stat */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}>
             <PersonalTasksWidget
-              accentColor="#7A6B96"
+              accentColor="#5e4075"
               borderColor="#e2e5ec"
               headingClassName="text-primary"
               mutedClassName="text-muted"

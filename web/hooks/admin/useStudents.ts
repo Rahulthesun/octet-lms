@@ -202,6 +202,14 @@ useState<StudentRecord[]>([])
     return json;
 }, [fetchRejectedStudents]);
 
+  // POST /api/students/:id/reinstate — accept a previously rejected applicant
+  const reinstateStudent = useCallback(async (id: string) => {
+    const json = await authedFetch(`/api/students/${id}/reinstate`, { method: 'POST' })
+    setRejectedStudents((prev) => prev.filter((s) => s.id !== id))
+    await fetchStudents()
+    return json
+  }, [fetchStudents])
+
   // PUT /api/students/:id  { blocked: true|false }
   const setBlocked = useCallback(async (id: string, blocked: boolean) => {
     const json = await authedFetch(`/api/students/${id}`, {
@@ -255,6 +263,7 @@ useState<StudentRecord[]>([])
     fetchRejectedStudents,
     approveStudent,
     rejectStudent,
+    reinstateStudent,
     setBlocked,
     setGraduationDate,
     bulkSetGraduationDate,

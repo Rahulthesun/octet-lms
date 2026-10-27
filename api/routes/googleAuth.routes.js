@@ -11,7 +11,7 @@ const router = express.Router();
 const ctrl = require("../controllers/googleAuth.controller");
 const { verifyToken, requireRole } = require("../middleware/auth");
 
-const adminOnly = requireRole(["admin", "developer"]);
+const adminOnly = requireRole(["admin"]);
 
 router.get("/connect-url", verifyToken, adminOnly, ctrl.getConnectUrl);
 

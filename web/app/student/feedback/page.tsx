@@ -74,7 +74,7 @@ export default function FeedbackPage() {
   if (isLoadingUser) {
     return (
       <div className="min-h-screen bg-[#f7f7f8] flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-[#4B2D8F]/30 border-t-[#4B2D8F] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-[#5e4075]/30 border-t-[#5e4075] rounded-full animate-spin" />
       </div>
     );
   }
@@ -151,7 +151,7 @@ export default function FeedbackPage() {
                       onClick={() => setFeedbackType("bug")}
                       className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
                         feedbackType === "bug"
-                          ? "bg-[#4B2D8F] text-white border-[#4B2D8F]"
+                          ? "bg-[#5e4075] text-white border-[#5e4075]"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
                     >
@@ -162,7 +162,7 @@ export default function FeedbackPage() {
                       onClick={() => setFeedbackType("suggestion")}
                       className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
                         feedbackType === "suggestion"
-                          ? "bg-[#4B2D8F] text-white border-[#4B2D8F]"
+                          ? "bg-[#5e4075] text-white border-[#5e4075]"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
                     >
@@ -180,7 +180,7 @@ export default function FeedbackPage() {
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
                     placeholder={feedbackType === "bug" ? "What went wrong with the PDF?" : "How can we improve the PDF notes?"}
-                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#4B2D8F] focus:ring-1 focus:ring-[#4B2D8F] resize-none"
+                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#5e4075] focus:ring-1 focus:ring-[#5e4075] resize-none"
                   />
                 </div>
 
@@ -188,7 +188,7 @@ export default function FeedbackPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-2.5 bg-[#4B2D8F] text-white font-semibold rounded-lg hover:bg-[#3d2475] transition disabled:opacity-60"
+                  className="w-full py-2.5 bg-[#5e4075] text-white font-semibold rounded-lg hover:bg-[#4b3260] transition disabled:opacity-60"
                 >
                   {isSubmitting ? "Sending..." : "Send feedback"}
                 </button>
