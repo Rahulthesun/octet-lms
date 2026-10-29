@@ -56,7 +56,8 @@ const uploadPdf = async (req, res) => {
     const newPdf = await pdfService.createPdf({
       title,
       chapterId,
-      isVisible: isVisible === "true",
+      // Visible unless explicitly hidden — the upload form doesn't send this field.
+      isVisible: isVisible !== "false",
       uploadedBy: req.user?.id || null,
       file: req.file,   // set by multer
     });

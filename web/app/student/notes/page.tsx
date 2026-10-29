@@ -94,6 +94,7 @@ function PdfOverlay({
 }: PdfOverlayProps) {
   const [mounted, setMounted] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -105,14 +106,21 @@ function PdfOverlay({
 
   useEffect(() => {
     if (!openDoc?.pdf?.id) return
+    let cancelled = false
     setPdfUrl(null)
+    setPdfError(null)
 
     authHeaders().then((headers) =>
       fetch(`${BASE_URL}/api/content/pdf/${openDoc.pdf.id}/stream`, { headers })
-        .then(res => res.json())
-        .then(data => setPdfUrl(data.url))
-        .catch(() => setPdfUrl(null)),
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || !data.url) throw new Error(data.message ?? 'Could not load this PDF')
+          return data.url as string
+        })
+        .then((url) => { if (!cancelled) setPdfUrl(url) })
+        .catch((e) => { if (!cancelled) setPdfError(e.message) }),
     )
+    return () => { cancelled = true }
   }, [openDoc?.pdf?.id])
 
   if (!mounted || !openDoc) return null
@@ -189,11 +197,18 @@ function PdfOverlay({
           
           {/* Fill the panel so the viewer's own scroll container handles the PDF */}
           <div className="flex-1 min-h-0">
+            {pdfError ? (
+              <div className="h-full flex flex-col items-center justify-center gap-1 text-center px-6">
+                <p className="text-sm font-medium text-gray-600">This PDF can't be opened</p>
+                <p className="text-xs text-gray-400">{pdfError}</p>
+              </div>
+            ) : (
             <PdfViewer
               url={pdfUrl}
               filename={openDoc.pdf.title}
               className="h-full min-h-0 !rounded-none !border-none"
             />
+            )}
           </div>
         </div>
       </div>
