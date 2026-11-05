@@ -613,6 +613,36 @@ export function useStudentTestReport(studentId: string | null, month: string) {
   return { report, loading, error, refetch }
 }
 
+async function downloadAuthedFile(path: string, filename: string) {
+  const token = await getToken()
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || body?.message || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** Excel: every targeted student's marks in one test (marks register layout). */
+export function downloadTestMarksXlsx(testId: string, filename: string) {
+  return downloadAuthedFile(`/api/tests/${testId}/marks/xlsx`, filename)
+}
+
+/** Excel: every student × every test held in `month` ("YYYY-MM"), scores as %. */
+export function downloadMonthlyMarksXlsx(month: string, filename = `test_marks_${month}.xlsx`) {
+  return downloadAuthedFile(`/api/tests/marks/monthly/xlsx?month=${encodeURIComponent(month)}`, filename)
+}
+
 /** Downloads the student's monthly test report PDF (same auth-header-then-blob pattern as the attendance report download). */
 export async function downloadStudentTestReportPdf(studentId: string, month: string, filename: string) {
   const token = await getToken()

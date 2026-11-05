@@ -94,6 +94,13 @@ export interface BroadcastInput {
 
 // ─── Inbox (self) ────────────────────────────────────────────────────────────
 
+/** Fired after the user reads notifications so the sidebar badge updates without a page refresh. */
+export const NOTIFICATIONS_READ_EVENT = 'octet:notifications-read'
+
+function announceRead() {
+  window.dispatchEvent(new Event(NOTIFICATIONS_READ_EVENT))
+}
+
 export function useMyNotifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -117,6 +124,7 @@ export function useMyNotifications() {
     } catch {
       refetch()
     }
+    announceRead()
   }, [refetch])
 
   const markAllRead = useCallback(async () => {
@@ -126,6 +134,7 @@ export function useMyNotifications() {
     } catch {
       refetch()
     }
+    announceRead()
   }, [refetch])
 
   return { notifications, loading, error, refetch, markRead, markAllRead }
@@ -147,6 +156,19 @@ export function useUnreadNotificationCount(pollMs = 30000) {
     timerRef.current = setInterval(refetch, pollMs)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [refetch, pollMs])
+
+  // Clear the badge the moment notifications are read (same tab), and catch up
+  // when the user returns to the tab after reading them elsewhere.
+  useEffect(() => {
+    const onRead = () => { setCount(0); refetch() }
+    const onVisible = () => { if (document.visibilityState === 'visible') refetch() }
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, onRead)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_READ_EVENT, onRead)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refetch])
 
   return { count, refetch }
 }

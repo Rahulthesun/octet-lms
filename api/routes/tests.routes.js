@@ -80,6 +80,12 @@ router.get("/analytics/overall", verifyToken, adminOnly, testsCtrl.getOverallAna
 // GET  /api/tests/analytics/overall/pdf           → the same, as a downloadable PDF
 router.get("/analytics/overall/pdf", verifyToken, adminOnly, testsCtrl.downloadOverallAnalyticsPdf);
 
+// GET  /api/tests/marks/monthly/xlsx?month=YYYY-MM → marks register (every student × every test that month)
+router.get("/marks/monthly/xlsx", verifyToken, adminOnly, testsCtrl.downloadMonthlyMarksXlsx);
+
+// GET  /api/tests/:id/marks/xlsx                → every targeted student's marks in this one test
+router.get("/:id/marks/xlsx", verifyToken, adminOnly, testsCtrl.downloadTestMarksXlsx);
+
 // GET  /api/tests/:id/analytics                 → result analytics (summary, distribution, per-question, batch-wise, per-student)
 router.get("/:id/analytics", verifyToken, adminOnly, testsCtrl.getTestAnalytics);
 

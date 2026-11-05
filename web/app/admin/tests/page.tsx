@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useAdminTests, useAdminAttempts, type TestSummary } from '@/hooks/useTests'
+import { useAdminTests, useAdminAttempts, downloadTestMarksXlsx, type TestSummary } from '@/hooks/useTests'
+import ExcelDownloadButton from '@/components/admin/tests/ExcelDownloadButton'
 import { useBatches } from '@/hooks/useAttendanceData'
 import Link from 'next/link'
 import AttemptDetailModal from '@/components/admin/tests/AttemptDetailModal'
@@ -165,6 +166,9 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
                     <ReportIcon className="w-4 h-4" /> Report
                   </button>
+                  <ExcelDownloadButton
+                    onDownload={() => downloadTestMarksXlsx(test.id, `${test.title.replace(/[^a-zA-Z0-9]+/g, '_')}_marks.xlsx`)}
+                  />
                   <button onClick={() => onDelete(test.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-500 hover:border-rose-300 hover:text-rose-600 transition-colors">
                     <TrashIcon className="w-4 h-4" /> Delete test
@@ -185,6 +189,9 @@ function TestRow({ test, isOpen, onToggle, onDelete, onUploadQ, onUploadKey }: {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 transition-colors">
                     <ReportIcon className="w-4 h-4" /> Report
                   </button>
+                  <ExcelDownloadButton
+                    onDownload={() => downloadTestMarksXlsx(test.id, `${test.title.replace(/[^a-zA-Z0-9]+/g, '_')}_marks.xlsx`)}
+                  />
                   <button onClick={() => onDelete(test.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 text-zinc-500 hover:border-rose-300 hover:text-rose-600 transition-colors">
                     <TrashIcon className="w-4 h-4" /> Delete test

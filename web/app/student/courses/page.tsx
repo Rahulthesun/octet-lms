@@ -922,7 +922,7 @@ export default function VideoLessonsPage() {
         <button
           onClick={() => (allOpen ? collapseAll() : expandAll())}
           disabled={searching}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-3 rounded-md border border-border bg-white text-primary text-[15px] hover:bg-accent1/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="shrink-0 ml-auto inline-flex items-center gap-2 px-4 py-3 rounded-md border border-border bg-white text-primary text-[15px] hover:bg-accent1/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
             {allOpen ? (

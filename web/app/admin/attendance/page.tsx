@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase/client'
 import { Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import {
   useBatches,
   useBatchStudents,
@@ -459,34 +460,22 @@ export default function AttendancePage() {
         {/* Grade */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <span className="text-xs font-medium text-zinc-500 sm:w-12 shrink-0">Grade</span>
-          <div className="flex gap-1.5 flex-wrap">
-            {GRADES.map(g => (
-              <button
-                key={g}
-                onClick={() => handleGradeSelect(g)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  selectedGrade === g
-                    ? 'text-white'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                }`}
-                style={selectedGrade === g ? { backgroundColor: ACCENT } : undefined}
-              >
-                {g}
-              </button>
-            ))}
-            <button
-              onClick={() => {
+          <SegmentedControl
+            ariaLabel="Select grade"
+            value={isAllStudents ? ALL_STUDENTS_ID : (selectedGrade ?? '')}
+            onChange={(v) => {
+              if (v === ALL_STUDENTS_ID) {
                 if (!isAllStudents && !confirmLeaveLiveSession()) return
                 setSelectedGrade('All students'); setSelectedBatchId(ALL_STUDENTS_ID); setAddingBatch(false)
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isAllStudents ? 'text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-              }`}
-              style={isAllStudents ? { backgroundColor: ACCENT } : undefined}
-            >
-              All Students
-            </button>
-          </div>
+              } else {
+                handleGradeSelect(v)
+              }
+            }}
+            options={[
+              ...GRADES.map((g) => ({ value: g as string, label: g })),
+              { value: ALL_STUDENTS_ID as string, label: 'All Students' },
+            ]}
+          />
         </div>
 
         {/* Batch */}
@@ -503,16 +492,17 @@ export default function AttendancePage() {
                   <button
                     key={b.id}
                     onClick={() => handleBatchSelect(b.id)}
-                    className={`px-3 py-1.5 rounded-md text-sm transition-colors border flex items-center gap-1.5 ${
+                    aria-pressed={selectedBatchId === b.id}
+                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
                       selectedBatchId === b.id
-                        ? 'bg-zinc-900 text-white border-zinc-900 font-medium'
-                        : 'bg-white text-zinc-600 hover:bg-zinc-50 border-zinc-300'
+                        ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
+                        : 'bg-gray-100 text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     {b.name}
                     {b.mode && (
                       <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
-                        selectedBatchId === b.id ? 'bg-white/15 text-white' : 'bg-zinc-100 text-zinc-500'
+                        selectedBatchId === b.id ? 'bg-violet-50 text-violet-700' : 'bg-white text-zinc-500'
                       }`}>
                         {b.mode}
                       </span>

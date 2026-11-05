@@ -17,7 +17,8 @@ import { createPortal } from 'react-dom'
 import { todayISODate } from '@/lib/helpers'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStudents } from '@/hooks/admin/useStudents'
-import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf } from '@/hooks/useTests'
+import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf, downloadMonthlyMarksXlsx } from '@/hooks/useTests'
+import ExcelDownloadButton from '@/components/admin/tests/ExcelDownloadButton'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import SearchInput from '@/components/ui/SearchInput'
@@ -290,6 +291,13 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
           >
             {downloading ? 'Preparing…' : 'Download PDF'}
           </button>
+          <div className="flex-1 [&>span]:w-full">
+            <ExcelDownloadButton
+              label={`Excel — all students, ${monthLabel(month)}`}
+              onDownload={() => downloadMonthlyMarksXlsx(month)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium rounded-md border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-40"
+            />
+          </div>
           <button
             onClick={downloadProgressReport}
             disabled={downloadingProgress}
@@ -301,6 +309,41 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
       </motion.div>
     </motion.div>,
     document.body
+  )
+}
+
+// ─── Monthly marks register (all students, Excel) ──────────────────────────
+
+function MonthlyMarksExport() {
+  const [month, setMonth] = useState(currentMonthStr())
+  return (
+    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+      <div className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-1 py-1">
+        <button
+          type="button"
+          onClick={() => setMonth((m) => shiftMonth(m, -1))}
+          aria-label="Previous month"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"
+        >
+          ‹
+        </button>
+        <span className="text-sm font-medium text-zinc-800 w-32 text-center">{monthLabel(month)}</span>
+        <button
+          type="button"
+          onClick={() => setMonth((m) => shiftMonth(m, 1))}
+          disabled={month >= currentMonthStr()}
+          aria-label="Next month"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 disabled:opacity-40"
+        >
+          ›
+        </button>
+      </div>
+      <ExcelDownloadButton
+        label="Download Excel"
+        onDownload={() => downloadMonthlyMarksXlsx(month)}
+        className="flex items-center gap-1.5 px-3.5 py-2 text-sm rounded-lg border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-40 whitespace-nowrap"
+      />
+    </div>
   )
 }
 
@@ -326,7 +369,10 @@ export default function TestReportsTab() {
 
   return (
     <div>
-      <p className="text-sm text-zinc-500 mb-4">Select a student to view their consolidated monthly test report.</p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+        <p className="text-sm text-zinc-500">Select a student to view their consolidated monthly test report.</p>
+        <MonthlyMarksExport />
+      </div>
 
       <SearchInput
         value={search}

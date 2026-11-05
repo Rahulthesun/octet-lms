@@ -248,10 +248,17 @@ function AttendanceSettingsModal({ onClose }: { onClose: () => void }) {
 
 // ─── Google account connection panel ───────────────────────────────────────
 
-function GoogleAccountPanel() {
-  const { status, loading, connect, disconnect } = useGoogleAccountStatus()
+function GoogleAccountPanel({ google }: { google: ReturnType<typeof useGoogleAccountStatus> }) {
+  const { status, loading, connect, disconnect } = google
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Back from Google restores the page from bfcache with `busy` stuck on.
+  useEffect(() => {
+    const onPageShow = () => setBusy(false)
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   async function handleConnect() {
     setBusy(true)
@@ -330,12 +337,14 @@ function GoogleAccountPanel() {
 
 // ─── Schedule modal ─────────────────────────────────────────────────────────
 
-function ScheduleModal({ onClose, onScheduled, googleConnected }: {
+function ScheduleModal({ schedule, onClose, googleConnected }: {
+  // Passed down from the page: calling useAdminOnlineClasses() here re-fetched
+  // the whole class list every time the modal opened. The page's schedule()
+  // already prepends the new class to its list, so no refetch is needed.
+  schedule: ReturnType<typeof useAdminOnlineClasses>['schedule']
   onClose: () => void
-  onScheduled: () => void
   googleConnected: boolean
 }) {
-  const { schedule } = useAdminOnlineClasses()
   const { chapters } = useChapters()
   const { batches } = useBatches('all')
 
@@ -413,7 +422,6 @@ function ScheduleModal({ onClose, onScheduled, googleConnected }: {
         createGoogleMeet,
         sendNotification,
       })
-      onScheduled()
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to schedule the online class')
@@ -855,8 +863,10 @@ function classDayBucket(cls: OnlineClass): 'today' | 'past' | 'future' {
 export default function OnlineClassesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { classes, loading, error, refetch, reschedule, cancel, syncAttendance } = useAdminOnlineClasses()
-  const { status: googleStatus } = useGoogleAccountStatus()
+  const { classes, loading, error, refetch, schedule, reschedule, cancel, syncAttendance } = useAdminOnlineClasses()
+  // One status fetch for the whole page — the panel and the schedule modal share it.
+  const google = useGoogleAccountStatus()
+  const googleStatus = google.status
 
   const [showSchedule, setShowSchedule] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -919,29 +929,20 @@ export default function OnlineClassesPage() {
     })
   }
 
-  // Auto-sync attendance for classes that have ended and haven't synced yet
-  useEffect(() => {
-    if (!classes || classes.length === 0) return
-    const now = Date.now()
-    const endedNeedingSync = classes.filter(
-      (c) =>
-        c.status !== 'cancelled' &&
-        c.meetUrl &&
-        new Date(c.scheduledEnd).getTime() <= now &&
-        (!c.attendance || c.attendance.syncStatus === 'AWAITING_ATTENDANCE_SYNC' || c.attendance.syncStatus === 'NOT_STARTED')
-    )
-    if (endedNeedingSync.length === 0) return
-
-    endedNeedingSync.forEach((c) => {
-      syncAttendance(c.id).catch((err) => console.warn(`Auto-sync for class ${c.id} failed:`, err))
-    })
-  }, [classes, syncAttendance])
+  // No client-side auto-sync: the API's background scheduler
+  // (onlineAttendanceSync.service.js → runDueSyncs) already syncs every ended
+  // class. Syncing from the page fired one Google-backed POST per unsynced
+  // class on every visit — classes that can never sync (e.g. Google not
+  // connected) were retried forever and exhausted the API rate limit.
 
   async function handleOpenAttendance(cls: OnlineClass) {
     if (cls.attendance?.sessionId) {
       setAttendanceSessionId(cls.attendance.sessionId)
     }
-    // Auto-sync attendance in background when opening attendance
+    // Only worth asking Google when it is connected and the class still lacks data.
+    const needsSync = !cls.attendance || !['SYNCED', 'MANUALLY_REVIEWED'].includes(cls.attendance.syncStatus ?? '')
+    // Without a session yet, the sync call is what creates it, so it always runs then.
+    if (cls.attendance?.sessionId && (!googleStatus?.connected || !needsSync)) return
     try {
       const res = await syncAttendance(cls.id)
       if (res?.attendanceSessionId) {
@@ -970,7 +971,7 @@ export default function OnlineClassesPage() {
           >
             <SettingsIcon className="w-[18px] h-[18px]" />
           </button>
-          <GoogleAccountPanel />
+          <GoogleAccountPanel google={google} />
           <button
             onClick={() => setShowSchedule(true)}
             className="flex items-center justify-center gap-2 text-[15px] px-5 py-2.5 text-white rounded-lg transition-colors whitespace-nowrap"
@@ -1108,8 +1109,8 @@ export default function OnlineClassesPage() {
       <AnimatePresence>
         {showSchedule && (
           <ScheduleModal
+            schedule={schedule}
             onClose={() => setShowSchedule(false)}
-            onScheduled={refetch}
             googleConnected={!!googleStatus?.connected}
           />
         )}

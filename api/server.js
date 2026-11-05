@@ -17,7 +17,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const { globalLimiter } = require("./middleware/rateLimit");
+const { globalLimiter, ipFloodLimiter } = require("./middleware/rateLimit");
 const sanitizeErrors = require("./middleware/sanitizeErrors");
 const app = express();
 
@@ -71,8 +71,8 @@ app.use(cors({
 // would be undefined in your route handlers.
 app.use(express.json({ limit: "1mb" }));
 
-// Blanket per-IP request ceiling; stricter limiters sit on the sensitive routes.
-app.use("/api", globalLimiter);
+// Blanket request ceilings (per user, plus a per-IP backstop); stricter limiters sit on the sensitive routes.
+app.use("/api", ipFloodLimiter, globalLimiter);
 app.use(sanitizeErrors);
 
 // express.urlencoded() handles form submissions (HTML <form> POST).

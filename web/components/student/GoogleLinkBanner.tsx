@@ -5,13 +5,22 @@
 // linking is what ties that Google account to this student for good.
 // Shown on the dashboard and the Classes page; disappears once linked.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGoogleIdentity } from '@/hooks/useOnlineClasses'
 
 export default function GoogleLinkBanner() {
   const { status, loading, link } = useGoogleIdentity()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Coming back from Google with the browser's Back button restores this page
+  // from the back-forward cache with `busy` still true — the button would sit
+  // on "Opening Google..." forever. Reset it whenever the page is shown again.
+  useEffect(() => {
+    const onPageShow = () => setBusy(false)
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   if (loading || !status || status.linked) return null
 

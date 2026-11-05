@@ -16,9 +16,11 @@ async function getToken(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 async function authedFetch(path: string, init?: RequestInit) {
   const token = await getToken()
-  const res = await fetch(`${API_BASE}${path}`, {
+  const doFetch = () => fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -26,6 +28,18 @@ async function authedFetch(path: string, init?: RequestInit) {
       ...(init?.headers ?? {}),
     },
   })
+  let res = await doFetch()
+  // Rate-limited: wait out the server's Retry-After (capped) and try once more
+  // for reads, instead of surfacing "Too many requests" to the user.
+  const method = (init?.method ?? 'GET').toUpperCase()
+  if (res.status === 429 && method === 'GET') {
+    const retryAfter = Number(res.headers.get('Retry-After'))
+    await sleep(Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000, 10000))
+    res = await doFetch()
+  }
+  if (res.status === 429) {
+    throw new Error('The server is busy right now. Please try again in a moment.')
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new Error(body?.error || body?.message || `Request failed: ${res.status}`)
@@ -137,12 +151,17 @@ export function useAdminOnlineClasses() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const refetch = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    authedFetch('/api/online-classes')
-      .then((d) => setClasses(d.classes))
-      .catch((e: Error) => setError(e.message))
+  // `silent` refreshes the list in place without flashing the skeleton —
+  // used after background syncs so the page doesn't blink on every update.
+  const refetch = useCallback((opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true)
+      setError(null)
+    }
+    return authedFetch('/api/online-classes')
+      .then((d) => { setClasses(d.classes); setError(null) })
+      // A failed background refresh keeps the list already on screen.
+      .catch((e: Error) => { if (!opts?.silent) setError(e.message) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -177,9 +196,9 @@ export function useAdminOnlineClasses() {
   }, [])
 
   /** Re-fetches Google Meet data and recalculates attendance right now. Idempotent — safe to click repeatedly. */
-  const syncAttendance = useCallback(async (classId: string) => {
+  const syncAttendance = useCallback(async (classId: string, opts?: { skipRefetch?: boolean }) => {
     const result = await authedFetch(`/api/online-classes/${classId}/sync-attendance`, { method: 'POST' })
-    await refetch() // pick up the updated sync status badge
+    if (!opts?.skipRefetch) await refetch({ silent: true }) // pick up the updated sync status badge
     return result
   }, [refetch])
 

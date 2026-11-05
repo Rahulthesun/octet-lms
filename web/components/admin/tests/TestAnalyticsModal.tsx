@@ -9,10 +9,11 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  useTestAnalytics, downloadTestAnalyticsPdf, authedFetch,
+  useTestAnalytics, downloadTestAnalyticsPdf, downloadTestMarksXlsx, authedFetch,
   type TestSummary, type AnalyticsPoint,
 } from '@/hooks/useTests'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
+import ExcelDownloadButton from '@/components/admin/tests/ExcelDownloadButton'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 
 const ACCENT = '#5e4075'
@@ -239,6 +240,11 @@ export default function TestAnalyticsModal({ test, onClose }: {
             >
               {downloading ? 'Preparing...' : 'Download as PDF'}
             </button>
+            <ExcelDownloadButton
+              label="Download as Excel"
+              onDownload={() => downloadTestMarksXlsx(test.id, `${test.title.replace(/[^a-zA-Z0-9]+/g, '_')}_marks.xlsx`)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-emerald-300 text-emerald-700 text-[15px] hover:bg-emerald-50 transition-colors disabled:opacity-40"
+            />
           </div>
         </div>
       </motion.div>

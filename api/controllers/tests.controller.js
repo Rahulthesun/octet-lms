@@ -8,7 +8,26 @@
 
 const testsService = require("../services/tests.service");
 const testAnalyticsService = require("../services/testAnalytics.service");
+const testExcelService = require("../services/testExcel.service");
 const PDFDocument = require("pdfkit");
+
+/** GET /api/tests/:id/marks/xlsx — every targeted student's marks in one test, as Excel. */
+const downloadTestMarksXlsx = async (req, res) => {
+  try {
+    await testExcelService.sendWorkbook(res, await testExcelService.buildTestWorkbook(req.params.id));
+  } catch (err) {
+    if (!res.headersSent) res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/** GET /api/tests/marks/monthly/xlsx?month=YYYY-MM — every student × every test that month, as Excel. */
+const downloadMonthlyMarksXlsx = async (req, res) => {
+  try {
+    await testExcelService.sendWorkbook(res, await testExcelService.buildMonthlyWorkbook(req.query.month));
+  } catch (err) {
+    if (!res.headersSent) res.status(err.status || 500).json({ error: err.message });
+  }
+};
 const { buildTestAnalyticsPdf, buildOverallAnalyticsPdf } = require("../utils/testAnalyticsPdf");
 
 const createTest = async (req, res) => {
@@ -186,4 +205,6 @@ module.exports = {
   downloadTestAnalyticsPdf,
   getOverallAnalytics,
   downloadOverallAnalyticsPdf,
+  downloadTestMarksXlsx,
+  downloadMonthlyMarksXlsx,
 };
