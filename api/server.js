@@ -116,6 +116,7 @@ const passwordResetRouter = require("./routes/passwordReset.routes");
 const questionBankRouter = require("./routes/questionBank.routes");
 const examDocumentsRouter = require("./routes/examDocuments.routes");
 const qaContentRouter = require("./routes/qaContent.routes");
+const feedbackRouter = require("./routes/feedback.routes");
 const { startAlumniScheduler } = require("./services/alumniScheduler.service");
 const { startScheduler: startAttendanceSyncScheduler } = require("./services/onlineAttendanceSync.service");
 const { startMonthlyReportScheduler } = require("./services/parentReportScheduler.service");
@@ -166,6 +167,7 @@ app.use("/api/auth", passwordResetRouter);
 app.use("/api/question-bank", questionBankRouter);
 app.use("/api/exam-documents", examDocumentsRouter);
 app.use("/api/qa-content", qaContentRouter);
+app.use("/api/feedback", feedbackRouter);
 
 app.use("/api/security" , securityRouter)
  

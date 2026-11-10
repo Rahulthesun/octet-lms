@@ -8,6 +8,7 @@ import { useStudents, type StudentRecord } from '@/hooks/admin/useStudents'
 import AttendanceReportsTab from '@/components/admin/AttendanceReportsTab'
 import TestReportsTab from '@/components/admin/TestReportsTab'
 import VideoReportsTab from '@/components/admin/VideoReportsTab'
+import StudentFeedbackTab from '@/components/admin/StudentFeedbackTab'
 import { authedFetch } from '@/lib/apiClient'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import Select from '@/components/ui/Select'
@@ -215,7 +216,7 @@ export default function StudentsPage() {
     }
   }
 
-  const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected' | 'attendance' | 'testReport' | 'videoReport'>('applications')
+  const [activeTab, setActiveTab] = useState<'applications' | 'database' | 'rejected' | 'attendance' | 'testReport' | 'videoReport' | 'feedbacks'>('applications')
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState<string>('All')
   const [statusFilter, setStatusFilter] = useState<typeof STATUSES[number]>('All')
@@ -385,6 +386,14 @@ export default function StudentsPage() {
           }`}
         >
           Video Report
+        </button>
+        <button
+          onClick={() => { setActiveTab('feedbacks'); setSearch('') }}
+          className={`flex items-center gap-2 px-5 py-2.5 text-base border-b-2 transition-colors -mb-px ${
+            activeTab === 'feedbacks' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Feedbacks
         </button>
       </div>
 
@@ -785,6 +794,18 @@ export default function StudentsPage() {
             transition={{ duration: 0.22 }}
           >
             <VideoReportsTab />
+          </motion.div>
+        )}
+
+        {activeTab === 'feedbacks' && (
+          <motion.div
+            key="feedbacks"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+          >
+            <StudentFeedbackTab />
           </motion.div>
         )}
       </AnimatePresence>

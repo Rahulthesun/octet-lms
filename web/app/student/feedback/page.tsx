@@ -4,6 +4,28 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChemistryOctetLogo from "@/components/ui/ChemistryOctetLogo";
 import { supabase } from "@/lib/supabase/client";
+import { authedFetch } from "@/lib/apiClient";
+import StarRating from "@/components/shared/StarRating";
+
+type FeedbackType = "bug" | "suggestion" | "general";
+
+const TYPE_COPY: Record<FeedbackType, { subtitle: string; placeholder: string; thanks: string }> = {
+  bug: {
+    subtitle: "Spotted a problem in the PDF notes? Tell us what went wrong.",
+    placeholder: "What went wrong with the PDF?",
+    thanks: "We’ve received your bug report on the PDF notes.",
+  },
+  suggestion: {
+    subtitle: "Have an idea to make the PDF notes better? We’re listening.",
+    placeholder: "How can we improve the PDF notes?",
+    thanks: "We’ve received your suggestion for the PDF notes.",
+  },
+  general: {
+    subtitle: "Rate your experience and share anything about classes, teaching or the app.",
+    placeholder: "Share your comments about classes, teaching, doubts sessions, the app…",
+    thanks: "Your feedback and rating have been sent to your teacher.",
+  },
+};
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -14,7 +36,8 @@ export default function FeedbackPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [feedbackType, setFeedbackType] = useState<"bug" | "suggestion">("bug");
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("bug");
+  const [rating, setRating] = useState<number | null>(null);
   const [details, setDetails] = useState("");
 
   useEffect(() => {
@@ -47,22 +70,29 @@ export default function FeedbackPage() {
       setIsSubmitting(false);
       return;
     }
+    if (feedbackType === "general" && !rating) {
+      setError("Please give a star rating.");
+      setIsSubmitting(false);
+      return;
+    }
     if (!details.trim()) {
       setError("Please describe your feedback.");
       setIsSubmitting(false);
       return;
     }
 
-    const { error: insertError } = await supabase.from("feedback").insert({
-      user_id: userId,
-      type: feedbackType,
-      area: "pdf",
-      details: details.trim(),
-    });
-
-    if (insertError) {
-      console.error(insertError);
-      setError("Failed to submit. Please try again.");
+    try {
+      await authedFetch("/api/feedback", {
+        method: "POST",
+        body: JSON.stringify({
+          type: feedbackType,
+          details: details.trim(),
+          rating: feedbackType === "general" ? rating : undefined,
+        }),
+      });
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to submit. Please try again.");
       setIsSubmitting(false);
       return;
     }
@@ -106,11 +136,12 @@ export default function FeedbackPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-800">Thank you!</h3>
-              <p className="text-gray-500 mt-1 text-center">We’ve received your feedback on the PDF notes.</p>
+              <p className="text-gray-500 mt-1 text-center">{TYPE_COPY[feedbackType].thanks}</p>
               <button
                 onClick={() => {
                   setIsSubmitted(false);
                   setDetails("");
+                  setRating(null);
                   setFeedbackType("bug");
                   setError(null);
                 }}
@@ -122,7 +153,7 @@ export default function FeedbackPage() {
           ) : (
             <>
               <h2 className="text-2xl font-bold text-gray-800 mb-1">Feedback</h2>
-              <p className="text-gray-500 text-sm mb-6">PDF notes only – let us know what you think.</p>
+              <p className="text-gray-500 text-sm mb-6">{TYPE_COPY[feedbackType].subtitle}</p>
 
               {error && (
                 <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded-md">
@@ -142,44 +173,51 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                {/* Type toggle - simplified two buttons (no emojis removed? Actually they are still there; we'll remove emojis as requested earlier but user didn't repeat. Keep as is or remove? I'll remove emojis per previous instruction) */}
+                {/* Type toggle */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Type</label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackType("bug")}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
-                        feedbackType === "bug"
-                          ? "bg-[#5e4075] text-white border-[#5e4075]"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      Bug
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackType("suggestion")}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
-                        feedbackType === "suggestion"
-                          ? "bg-[#5e4075] text-white border-[#5e4075]"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      Suggestion
-                    </button>
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { value: "bug", label: "Bug" },
+                      { value: "suggestion", label: "Suggestion" },
+                      { value: "general", label: "General" },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setFeedbackType(opt.value); setError(null); }}
+                        aria-pressed={feedbackType === opt.value}
+                        className={`py-2 rounded-lg border text-sm font-medium transition ${
+                          feedbackType === opt.value
+                            ? "bg-[#5e4075] text-white border-[#5e4075]"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
+                {/* Rating — General feedback only */}
+                {feedbackType === "general" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Your rating</label>
+                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <StarRating value={rating} onChange={setRating} size={28} showLabel />
+                    </div>
+                  </div>
+                )}
+
                 {/* Details textarea */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">Details</label>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">{feedbackType === "general" ? "Comments" : "Details"}</label>
                   <textarea
                     required
                     rows={4}
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
-                    placeholder={feedbackType === "bug" ? "What went wrong with the PDF?" : "How can we improve the PDF notes?"}
+                    placeholder={TYPE_COPY[feedbackType].placeholder}
                     className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#5e4075] focus:ring-1 focus:ring-[#5e4075] resize-none"
                   />
                 </div>

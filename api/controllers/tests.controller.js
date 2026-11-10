@@ -28,6 +28,24 @@ const downloadMonthlyMarksXlsx = async (req, res) => {
     if (!res.headersSent) res.status(err.status || 500).json({ error: err.message });
   }
 };
+
+/** GET /api/tests/:id/marks/view — the same register as the .xlsx, as JSON for the in-app viewer. */
+const viewTestMarks = async (req, res) => {
+  try {
+    res.status(200).json(await testExcelService.buildTestRegister(req.params.id));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
+/** GET /api/tests/marks/monthly/view?month=YYYY-MM — the same register as the monthly .xlsx, as JSON. */
+const viewMonthlyMarks = async (req, res) => {
+  try {
+    res.status(200).json(await testExcelService.buildMonthlyRegister(req.query.month));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
 const { buildTestAnalyticsPdf, buildOverallAnalyticsPdf } = require("../utils/testAnalyticsPdf");
 
 const createTest = async (req, res) => {
@@ -207,4 +225,6 @@ module.exports = {
   downloadOverallAnalyticsPdf,
   downloadTestMarksXlsx,
   downloadMonthlyMarksXlsx,
+  viewTestMarks,
+  viewMonthlyMarks,
 };

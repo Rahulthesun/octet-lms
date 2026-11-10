@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authedFetch } from '@/lib/apiClient'
-import { imageFromClipboard, imageFromFiles, uploadQuestionImage } from '@/lib/questionImages'
+import { checkQuestionImageText, imageFromClipboard, imageFromFiles, uploadQuestionImage } from '@/lib/questionImages'
 import QuestionContent from '@/components/shared/QuestionContent'
 import { Watermark, useExamGuard } from '@/components/shared/ExamSecurity'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -205,9 +205,16 @@ const FIELD_LABELS: Record<FieldKey, string> = {
 
 // onChange takes an updater (not a value) so an image upload that finishes
 // after other edits builds on the LATEST field/draft, never a stale snapshot.
-function FieldEditor({ label, value, onChange }: { label: string; value: FieldValue; onChange: (update: (prev: FieldValue) => FieldValue) => void }) {
+function FieldEditor({ label, value, onChange, duplicateCheck }: {
+  label: string
+  value: FieldValue
+  onChange: (update: (prev: FieldValue) => FieldValue) => void
+  /** Question field only — see QuestionFieldInput's prop of the same name (warning only). */
+  duplicateCheck?: (imageKey: string) => Promise<string | null>
+}) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const zoneRef = useRef<HTMLDivElement>(null)
@@ -239,6 +246,7 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
     setError(null)
     try {
       const uploaded = await uploadQuestionImage(file)
+      setWarning(duplicateCheck ? await duplicateCheck(uploaded.key) : null)
       onChange((prev) => ({ ...prev, imageKey: uploaded.key, previewUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image upload failed')
@@ -307,6 +315,7 @@ function FieldEditor({ label, value, onChange }: { label: string; value: FieldVa
           />
           {uploading && <p className="text-xs text-zinc-500">Uploading...</p>}
           {error && <p className="text-xs text-rose-600">{error}</p>}
+          {warning && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5" role="status">{warning}</p>}
         </div>
       )}
     </div>
@@ -331,7 +340,8 @@ function QuestionForm({ draft, index, onChange, onRemove, removable }: {
           <button type="button" onClick={onRemove} className="text-xs text-rose-600 hover:underline">Remove</button>
         )}
       </div>
-      <FieldEditor label={FIELD_LABELS.question} value={draft.question} onChange={(v) => setField('question', v)} />
+      <FieldEditor label={FIELD_LABELS.question} value={draft.question} onChange={(v) => setField('question', v)}
+        duplicateCheck={(key) => checkQuestionImageText(key, { excludeBankId: draft.savedId })} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {(['optionA', 'optionB', 'optionC', 'optionD'] as const).map((key) => (
           <FieldEditor key={key} label={FIELD_LABELS[key]} value={draft[key]} onChange={(v) => setField(key, v)} />

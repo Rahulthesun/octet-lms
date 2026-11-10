@@ -29,4 +29,11 @@ router.get("/:classId/attendance", verifyToken, adminOnly, ctrl.getAttendance);
 
 router.get("/me/upcoming", verifyToken, ctrl.listMine);
 
+// ─── Likes & comments (students who can see the class, and admins) ──────────
+
+router.get("/:classId/engagement", verifyToken, ctrl.getEngagement);
+router.post("/:classId/like", verifyToken, ctrl.toggleLike);
+router.post("/:classId/comments", verifyToken, ctrl.addComment);
+router.delete("/:classId/comments/:commentId", verifyToken, ctrl.deleteComment);
+
 module.exports = router;

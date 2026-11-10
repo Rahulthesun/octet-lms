@@ -7,6 +7,8 @@ import { formatDateInZone, formatTimeInZone, isoToZonedParts } from '@/lib/helpe
 import GoogleLinkBanner from '@/components/student/GoogleLinkBanner'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 import PageHeader from '@/components/ui/PageHeader'
+import SegmentedControl from '@/components/ui/SegmentedControl'
+import ClassEngagement from '@/components/shared/ClassEngagement'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -168,6 +170,16 @@ function ClassCard({ cls }: { cls: OnlineClass }) {
       ) : (
         <p className="text-muted text-sm">Meet link not available yet.</p>
       )}
+
+      {!isCancelled && (
+        <ClassEngagement
+          classId={cls.id}
+          mode="student"
+          initialLikeCount={cls.likeCount ?? 0}
+          initialCommentCount={cls.commentCount ?? 0}
+          initialLiked={!!cls.likedByMe}
+        />
+      )}
     </div>
   )
 }
@@ -177,16 +189,23 @@ function ClassCard({ cls }: { cls: OnlineClass }) {
 export default function StudentClassesPage() {
   const { classes, loading, error } = useMyOnlineClasses()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [view, setView] = useState<'upcoming' | 'past'>('upcoming')
 
   const visibleClasses = useMemo(() => {
     if (selectedDate) {
       return classes.filter((c) => isoToZonedParts(c.scheduledStart, c.timezone).date === selectedDate)
     }
     const now = Date.now()
+    if (view === 'past') {
+      // Finished classes, newest first — where students heart & comment on them.
+      return classes
+        .filter((c) => c.status !== 'cancelled' && new Date(c.scheduledEnd).getTime() < now)
+        .sort((a, b) => new Date(b.scheduledStart).getTime() - new Date(a.scheduledStart).getTime())
+    }
     return classes
       .filter((c) => c.status === 'cancelled' || new Date(c.scheduledEnd).getTime() >= now)
       .sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime())
-  }, [classes, selectedDate])
+  }, [classes, selectedDate, view])
 
   return (
     <div className="space-y-5">
@@ -202,9 +221,22 @@ export default function StudentClassesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 order-2 lg:order-1 space-y-4">
-          <h2 className="text-primary text-lg">
-            {selectedDate ? 'Classes on selected date' : 'Upcoming Online Classes'}
-          </h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-primary text-lg">
+              {selectedDate ? 'Classes on selected date' : view === 'past' ? 'Past Online Classes' : 'Upcoming Online Classes'}
+            </h2>
+            {!selectedDate && (
+              <SegmentedControl
+                ariaLabel="Show upcoming or past classes"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: 'upcoming', label: 'Upcoming' },
+                  { value: 'past', label: 'Past' },
+                ]}
+              />
+            )}
+          </div>
 
           {loading ? (
             <SkeletonCard count={3} />
@@ -212,7 +244,7 @@ export default function StudentClassesPage() {
             <div className="text-center py-12 text-rose-600">{error}</div>
           ) : visibleClasses.length === 0 ? (
             <div className="bg-white rounded-lg border border-[#e2e5ec] p-8 text-center text-muted">
-              {selectedDate ? 'No classes on this date.' : 'No upcoming online classes have been scheduled yet.'}
+              {selectedDate ? 'No classes on this date.' : view === 'past' ? 'No past classes yet.' : 'No upcoming online classes have been scheduled yet.'}
             </div>
           ) : (
             <div className="space-y-4">

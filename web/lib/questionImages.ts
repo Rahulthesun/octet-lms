@@ -200,3 +200,25 @@ export async function uploadQuestionImage(file: Blob): Promise<UploadedImage> {
 
   return { key: presign.key as string, previewUrl: URL.createObjectURL(blob), contentHash, perceptualHash }
 }
+
+/**
+ * Reads the words in an uploaded QUESTION screenshot (server-side OCR) and
+ * returns a heads-up warning when a question with the same text is already
+ * posted, or null. Only a warning: the options aren't filled in yet, and the
+ * server rejects a true duplicate (same text AND same options) on save.
+ * Never throws — if the check itself fails, nothing is shown.
+ */
+export async function checkQuestionImageText(
+  key: string,
+  opts: { excludeTestId?: string | null; excludeBankId?: string | null } = {},
+): Promise<string | null> {
+  try {
+    const res = await authedFetch('/api/tests/question-images/check-text', {
+      method: 'POST',
+      body: JSON.stringify({ key, excludeTestId: opts.excludeTestId || undefined, excludeBankId: opts.excludeBankId || undefined }),
+    })
+    return (res?.warning as string | null) ?? null
+  } catch {
+    return null
+  }
+}

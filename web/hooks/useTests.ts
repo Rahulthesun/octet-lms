@@ -370,6 +370,8 @@ export async function fetchAdminAttemptDetail(testId: string, attemptId: string)
 export interface AnalyticsPoint {
   label: string
   value: number
+  /** Score-distribution bands carry their fixed pie color. */
+  color?: string
 }
 
 export interface TestAnalyticsSummary {
@@ -638,9 +640,33 @@ export function downloadTestMarksXlsx(testId: string, filename: string) {
   return downloadAuthedFile(`/api/tests/${testId}/marks/xlsx`, filename)
 }
 
-/** Excel: every student × every test held in `month` ("YYYY-MM"), scores as %. */
+/** Excel: every student × every test held in `month` ("YYYY-MM"), scores out of 100. */
 export function downloadMonthlyMarksXlsx(month: string, filename = `test_marks_${month}.xlsx`) {
   return downloadAuthedFile(`/api/tests/marks/monthly/xlsx?month=${encodeURIComponent(month)}`, filename)
+}
+
+/** The marks register behind an Excel export — exactly what the .xlsx contains, for the in-app viewer. */
+export interface MarksRegisterCell {
+  value: number | string
+  kind: 'score' | 'absent' | 'pending' | 'none'
+  pct?: number
+}
+export interface MarksRegister {
+  title: string
+  filename: string
+  sheetName: string
+  columns: { header: string; sub: number | string }[]
+  rows: { name: string; cells: MarksRegisterCell[] }[]
+  tests: { code: string; title: string; date: string; maxMarks: number | string }[]
+  note: string
+}
+
+export function fetchTestMarksView(testId: string): Promise<MarksRegister> {
+  return authedFetch(`/api/tests/${testId}/marks/view`)
+}
+
+export function fetchMonthlyMarksView(month: string): Promise<MarksRegister> {
+  return authedFetch(`/api/tests/marks/monthly/view?month=${encodeURIComponent(month)}`)
 }
 
 /** Downloads the student's monthly test report PDF (same auth-header-then-blob pattern as the attendance report download). */

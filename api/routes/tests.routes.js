@@ -83,8 +83,14 @@ router.get("/analytics/overall/pdf", verifyToken, adminOnly, testsCtrl.downloadO
 // GET  /api/tests/marks/monthly/xlsx?month=YYYY-MM → marks register (every student × every test that month)
 router.get("/marks/monthly/xlsx", verifyToken, adminOnly, testsCtrl.downloadMonthlyMarksXlsx);
 
+// GET  /api/tests/marks/monthly/view?month=YYYY-MM → the same register as JSON (in-app "View" of the Excel)
+router.get("/marks/monthly/view", verifyToken, adminOnly, testsCtrl.viewMonthlyMarks);
+
 // GET  /api/tests/:id/marks/xlsx                → every targeted student's marks in this one test
 router.get("/:id/marks/xlsx", verifyToken, adminOnly, testsCtrl.downloadTestMarksXlsx);
+
+// GET  /api/tests/:id/marks/view                → the same single-test register as JSON (in-app "View")
+router.get("/:id/marks/view", verifyToken, adminOnly, testsCtrl.viewTestMarks);
 
 // GET  /api/tests/:id/analytics                 → result analytics (summary, distribution, per-question, batch-wise, per-student)
 router.get("/:id/analytics", verifyToken, adminOnly, testsCtrl.getTestAnalytics);
@@ -93,6 +99,17 @@ router.get("/:id/analytics", verifyToken, adminOnly, testsCtrl.getTestAnalytics)
 router.get("/:id/analytics/pdf", verifyToken, adminOnly, testsCtrl.downloadTestAnalyticsPdf);
 
 // ─── Admin: test authoring ─────────────────────────────────────
+
+// POST /api/tests/question-images/check-text    → reads the words in an uploaded question screenshot and
+//                                                 says if that question is already posted (body: key, excludeTestId?, excludeBankId?)
+router.post("/question-images/check-text", verifyToken, adminOnly, async (req, res) => {
+  try {
+    const { key, excludeTestId, excludeBankId } = req.body || {};
+    res.status(200).json(await require("../services/imageText.service").checkUploadedQuestionImage({ key, excludeTestId, excludeBankId }));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 // POST /api/tests/question-images/upload-url   → presigned R2 PUT URL for a pasted question/option image
 router.post("/question-images/upload-url", verifyToken, adminOnly, async (req, res) => {

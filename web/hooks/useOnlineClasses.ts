@@ -82,6 +82,10 @@ export interface OnlineClass {
   createdAt: string
   updatedAt: string
   attendance: OnlineClassAttendanceInfo | null
+  /** Hearts from students (see components/shared/ClassEngagement). */
+  likeCount?: number
+  commentCount?: number
+  likedByMe?: boolean
 }
 
 export interface ScheduleClassInput {

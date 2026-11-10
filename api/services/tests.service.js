@@ -17,6 +17,7 @@ const r2 = require("../config/r2");
 const notificationsService = require("./notifications.service");
 const audienceService = require("./audience.service");
 const questionBank = require("./questionBank.service");
+const imageTextService = require("./imageText.service");
 const { signKey } = require("./questionImages.service");
 const { FIELDS, toDbColumns, serializeQuestion } = require("../utils/mcqQuestion");
 const { isNearDuplicateImage } = require("../utils/perceptualHash");
@@ -144,6 +145,17 @@ const PERCEPTUAL_SCAN_COLUMNS = ["id", "source_test_title", "created_at", ...FIE
  * Cheap no-op when nothing in `questions` has any image field at all — the
  * common case for text-only MCQs — checked first, before any DB query.
  */
+/**
+ * "Question already posted" check on the WORDS inside question screenshots
+ * (services/imageText.service.js) — catches two different screenshots of the
+ * same question, which the image-hash checks above cannot. Same call sites
+ * as assertNoDuplicateImages (real saves only, never draft autosave).
+ */
+async function assertNoSameTextQuestions(questions, { excludeTestId } = {}) {
+  const items = questions.map((q, i) => ({ ...toDbColumns(q, i + 1), bankQuestionId: q.bankQuestionId || null }));
+  await imageTextService.assertNoSameTextQuestions(items, { excludeTestId });
+}
+
 async function assertNoDuplicateImages(questions, { excludeTestId } = {}) {
   const colsByQuestion = questions.map((q, i) => toDbColumns(q, i + 1));
   const hasAnyImageField = colsByQuestion.some((cols) => FIELDS.some((f) => cols[f.type] === "image"));
@@ -226,7 +238,7 @@ function filterCompleteQuestions(questions) {
  * while still authoring it, before scheduled_start / before any student has
  * started), or when the caller has explicitly accepted the data loss.
  */
-async function replaceQuestions(testId, questions) {
+async function replaceQuestions(testId, questions, { syncBank = true } = {}) {
   validateQuestions(questions);
 
   // Build (and so validate) every row BEFORE touching the existing questions.
@@ -256,10 +268,16 @@ async function replaceQuestions(testId, questions) {
   if (updErr) throw updErr;
 
   // Automatic question-bank saving. Never blocks saving the test itself.
-  try {
-    await questionBank.syncFromTest(testRow, data);
-  } catch (bankErr) {
-    console.error(`[question-bank] sync failed for test ${testId}:`, bankErr.message);
+  // Skipped for draft autosave: a draft is re-saved every few seconds while
+  // the admin is still typing / picking the correct answer, and syncing each
+  // of those intermediate states is what filled the bank with duplicates.
+  // The bank is synced once the test is actually scheduled (or edited).
+  if (syncBank) {
+    try {
+      await questionBank.syncFromTest(testRow, data);
+    } catch (bankErr) {
+      console.error(`[question-bank] sync failed for test ${testId}:`, bankErr.message);
+    }
   }
 
   return data.sort((a, b) => a.order_index - b.order_index);
@@ -482,6 +500,7 @@ async function createTest({
   if (type === "mcq") {
     validateQuestions(questions);
     await assertNoDuplicateImages(questions);
+    await assertNoSameTextQuestions(questions);
   }
 
   // The picker assigns a chapter, not a subject directly — subject_id is
@@ -582,6 +601,7 @@ async function updateTest(testId, updates) {
   // comparison, so re-saving an unchanged test never flags itself.
   if (updates.questions !== undefined) {
     await assertNoDuplicateImages(updates.questions, { excludeTestId: testId });
+    await assertNoSameTextQuestions(updates.questions, { excludeTestId: testId });
   }
 
   const { data, error } = await supabase.from("tests").update(allowed).eq("id", testId).select(TEST_SELECT).maybeSingle();
@@ -656,7 +676,7 @@ async function createDraftTest({
 
   if (resolvedType === "mcq") {
     const complete = filterCompleteQuestions(questions);
-    if (complete.length > 0) await replaceQuestions(test.id, complete);
+    if (complete.length > 0) await replaceQuestions(test.id, complete, { syncBank: false });
   }
 
   return getTestForAdmin(test.id);
@@ -721,7 +741,7 @@ async function updateDraftTest(testId, updates) {
   if (updates.questions !== undefined) {
     const complete = filterCompleteQuestions(updates.questions);
     if (complete.length > 0) {
-      await replaceQuestions(testId, complete);
+      await replaceQuestions(testId, complete, { syncBank: false });
     } else {
       // Nothing complete yet — clear any previously-saved (now-removed) questions.
       await supabase.from("test_questions").delete().eq("test_id", testId);

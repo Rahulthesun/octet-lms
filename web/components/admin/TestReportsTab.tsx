@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom'
 import { todayISODate } from '@/lib/helpers'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStudents } from '@/hooks/admin/useStudents'
-import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf, downloadMonthlyMarksXlsx } from '@/hooks/useTests'
+import { useStudentTestReport, downloadStudentTestReportPdf, downloadStudentProgressReportPdf, downloadMonthlyMarksXlsx, fetchMonthlyMarksView } from '@/hooks/useTests'
 import ExcelDownloadButton from '@/components/admin/tests/ExcelDownloadButton'
 import AttendanceChart, { type AttendanceChartType, type ChartDatum } from '@/components/shared/AttendanceChart'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
@@ -97,10 +97,10 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
     }
   }
 
-  // Per-date score data, shared by the bar/pie/line chart variants. Each
-  // evaluated attempt becomes a 0-100% datum colored by score band; each
-  // absent date becomes a black downward marker (bar/line only — a pie
-  // chart has no "below axis" concept, so absences are left out of it).
+  // Per-date score data, shared by the bar and line charts (this individual
+  // report offers only those two — no pie). Each evaluated attempt becomes a
+  // 0-100% datum colored by score band; each absent date becomes a black
+  // downward marker on the bar chart.
   const scorePoints: ChartDatum[] = useMemo(() => {
     if (!report) return []
     return report.points.map((p) => {
@@ -130,17 +130,6 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
     () => [...scorePoints, ...absentPoints].sort((a, b) => Number(a.label) - Number(b.label)),
     [scorePoints, absentPoints],
   )
-  // Pie: one slice per evaluated test (labelled by the test, not a bare day
-  // number), each in its own color — the shared chart assigns the palette.
-  const pieData: ChartDatum[] = useMemo(() => {
-    if (!report) return []
-    return report.points.map((p) => ({
-      label: p.testTitle,
-      value: p.maxMarks > 0 ? Math.round((p.marksAwarded / p.maxMarks) * 100) : 0,
-      tooltipLabel: `${p.marksAwarded}/${p.maxMarks} — ${p.maxMarks > 0 ? Math.round((p.marksAwarded / p.maxMarks) * 100) : 0}%`,
-    }))
-  }, [report])
-
   // Headline numbers shown above the graph.
   const summary = useMemo(() => {
     const pcts = scorePoints.map((d) => d.value)
@@ -228,8 +217,8 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
                 type={chartType}
                 onTypeChange={setChartType}
                 barData={barData}
-                pieData={pieData}
                 lineData={lineData}
+                types={['bar', 'line']}
                 lineColor={ACCENT}
                 valueSuffix="%"
                 barAxisLabels={{ x: 'Date of month', y: 'Score %' }}
@@ -242,7 +231,7 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
                 description="Each evaluated test attempt's score for this student this month, normalized to a 0–100% scale. Black bars below the axis = absent (a test was scheduled but not attempted). Dates with neither are skipped."
               />
 
-              <div className={`flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-zinc-500 ${chartType === 'pie' ? 'hidden' : 'flex'}`}>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-zinc-500">
                 {[
                   { c: SCORE_BAND_COLORS.high, t: '75–100% strong' },
                   { c: SCORE_BAND_COLORS.mid, t: '40–74% average' },
@@ -295,6 +284,7 @@ export function StudentTestReportModal({ studentId, studentName, onClose }: {
             <ExcelDownloadButton
               label={`Excel — all students, ${monthLabel(month)}`}
               onDownload={() => downloadMonthlyMarksXlsx(month)}
+              onView={() => fetchMonthlyMarksView(month)}
               className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium rounded-md border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-40"
             />
           </div>
@@ -339,8 +329,9 @@ function MonthlyMarksExport() {
         </button>
       </div>
       <ExcelDownloadButton
-        label="Download Excel"
+        label="Excel — View / Download"
         onDownload={() => downloadMonthlyMarksXlsx(month)}
+        onView={() => fetchMonthlyMarksView(month)}
         className="flex items-center gap-1.5 px-3.5 py-2 text-sm rounded-lg border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-40 whitespace-nowrap"
       />
     </div>

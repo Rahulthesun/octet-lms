@@ -21,13 +21,19 @@ function pct(marks, max) {
   return max > 0 ? Math.round((Number(marks) / Number(max)) * 100) : 0;
 }
 
-/** Fixed score bands, same convention as the rest of the app's percentage color scale. */
+/**
+ * Fixed score bands for the Test Results score-distribution charts, each with
+ * its pie-slice color:
+ *   low  0-9% dark red,    10-34% light red
+ *   mid  35-59% dark yellow, 60-79% light yellow
+ *   high 80-100% green
+ */
 const BANDS = [
-  { label: "0-39%", min: 0, max: 39 },
-  { label: "40-59%", min: 40, max: 59 },
-  { label: "60-74%", min: 60, max: 74 },
-  { label: "75-89%", min: 75, max: 89 },
-  { label: "90-100%", min: 90, max: 100 },
+  { label: "0-9%", min: 0, max: 9, color: "#991b1b" },
+  { label: "10-34%", min: 10, max: 34, color: "#f87171" },
+  { label: "35-59%", min: 35, max: 59, color: "#ca8a04" },
+  { label: "60-79%", min: 60, max: 79, color: "#fde047" },
+  { label: "80-100%", min: 80, max: 100, color: "#16a34a" },
 ];
 
 async function getTestAnalytics(testId, { passPct = DEFAULT_PASS_PCT } = {}) {
@@ -87,6 +93,7 @@ async function getTestAnalytics(testId, { passPct = DEFAULT_PASS_PCT } = {}) {
   // ─── Score distribution ─────────────────────────────────────────────────
   const scoreDistribution = BANDS.map((b) => ({
     label: b.label,
+    color: b.color,
     value: evaluated.filter((a) => {
       const p = pct(a.marks_awarded, a.max_marks || maxMarks);
       return p >= b.min && p <= b.max;
@@ -265,6 +272,7 @@ async function getOverallAnalytics({ passPct = DEFAULT_PASS_PCT } = {}) {
   // ─── Score distribution across every evaluated attempt ─────────────────
   const scoreDistribution = BANDS.map((b) => ({
     label: b.label,
+    color: b.color,
     value: percentages.filter((p) => p >= b.min && p <= b.max).length,
   }));
 

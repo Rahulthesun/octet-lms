@@ -21,6 +21,7 @@ import { Select } from '@/components/ui/Select'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
 import SearchInput from '@/components/ui/SearchInput'
 import SegmentedControl from '@/components/ui/SegmentedControl'
+import ClassEngagement from '@/components/shared/ClassEngagement'
 
 const ACCENT = '#5e4075'
 
@@ -1091,6 +1092,16 @@ export default function OnlineClassesPage() {
                   </>
                 )}
               </div>
+
+              {cls.status !== 'cancelled' && (
+                <ClassEngagement
+                  key={cls.id}
+                  classId={cls.id}
+                  mode="admin"
+                  initialLikeCount={cls.likeCount ?? 0}
+                  initialCommentCount={cls.commentCount ?? 0}
+                />
+              )}
             </div>
           ))
         )}

@@ -66,8 +66,11 @@ interface AttendanceChartProps {
   type: AttendanceChartType
   onTypeChange: (type: AttendanceChartType) => void
   barData: ChartDatum[]
-  pieData: ChartDatum[]
+  /** Not needed when `types` leaves out 'pie'. */
+  pieData?: ChartDatum[]
   lineData: ChartDatum[]
+  /** Which chart types the viewer can switch between (default: all three). */
+  types?: AttendanceChartType[]
   /** Horizontal bars (label on the y-axis) — used for long/many labels like per-student rankings. */
   horizontalBars?: boolean
   defaultColor?: string
@@ -203,18 +206,22 @@ export function buildAttendanceCategoryData(
   ]
 }
 
+const ALL_CHART_TYPES: AttendanceChartType[] = ['bar', 'pie', 'line']
+
 export function ChartTypeToggle({
   type,
   onTypeChange,
+  types = ALL_CHART_TYPES,
 }: {
   type: AttendanceChartType
   onTypeChange: (type: AttendanceChartType) => void
+  types?: AttendanceChartType[]
 }) {
-  const options: { value: AttendanceChartType; label: string; Icon: typeof IconBarChart }[] = [
+  const options = ([
     { value: 'bar', label: 'Bar', Icon: IconBarChart },
     { value: 'pie', label: 'Pie', Icon: IconPieChart },
     { value: 'line', label: 'Line', Icon: IconLineChart },
-  ]
+  ] as { value: AttendanceChartType; label: string; Icon: typeof IconBarChart }[]).filter((o) => types.includes(o.value))
   return (
     <div className="inline-flex items-center gap-1 p-0.5 bg-zinc-100 rounded-lg" role="group" aria-label="Chart type">
       {options.map(({ value, label, Icon }) => (
@@ -257,8 +264,9 @@ export default function AttendanceChart({
   type,
   onTypeChange,
   barData,
-  pieData,
+  pieData = [],
   lineData,
+  types = ALL_CHART_TYPES,
   horizontalBars = false,
   defaultColor = '#6b7280',
   lineColor = '#5e4075',
@@ -313,7 +321,7 @@ export default function AttendanceChart({
       )}
       <div className="flex items-center justify-between mb-1.5">
         <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Statistics</p>
-        <ChartTypeToggle type={type} onTypeChange={onTypeChange} />
+        <ChartTypeToggle type={type} onTypeChange={onTypeChange} types={types} />
       </div>
       {description && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
 

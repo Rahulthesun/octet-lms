@@ -246,6 +246,17 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/admin/parent-feedback",
+    label: "Parent's Feedback",
+    status: "production",
+    icon: (
+      <svg className="w-5.5 h-5.5 shrink-0" viewBox="0 0 20 20" fill="none">
+        <path d="M 3,4.5 Q 3,3 4.5,3 L 15.5,3 Q 17,3 17,4.5 L 17,12 Q 17,13.5 15.5,13.5 L 8,13.5 L 4.5,16.5 L 4.5,13.5 Q 3,13.5 3,12 Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M 10,6 L 10.9,7.8 L 12.9,8.1 L 11.45,9.5 L 11.8,11.4 L 10,10.5 L 8.2,11.4 L 8.55,9.5 L 7.1,8.1 L 9.1,7.8 Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 interface AdminSidebarProps {

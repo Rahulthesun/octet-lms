@@ -105,6 +105,7 @@ export default function Footer() {
                 { label: 'Demo Video', href: '#video' },
                 { label: 'Student Login', href: '/login' },
                 { label: 'Register', href: '/register' },
+                { label: "Parent's Feedback", href: '/parents-feedback' },
                 { label: 'Admin Login', href: '/admin' },
               ].map(({ label, href }) => (
                 <li key={label}>

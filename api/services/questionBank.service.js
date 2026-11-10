@@ -17,6 +17,7 @@
 const supabase = require("../config/supabase");
 const { FIELDS, contentHash, serializeQuestion, toDbColumns } = require("../utils/mcqQuestion");
 const { isNearDuplicateImage } = require("../utils/perceptualHash");
+const imageTextService = require("./imageText.service");
 const { signKey } = require("./questionImages.service");
 
 const COPY_COLUMNS = [
@@ -147,34 +148,149 @@ function normalizeTitleKey(title) {
   return String(title || "").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Identity of a question's STEM (what is being asked), independent of its
+ * options / correct answer — the same rules dedupeByStem() uses. Returns
+ * null when the stem is empty (nothing to match on).
+ */
+function stemKey(row) {
+  if (row.question_type === "image") {
+    if (row.question_image_content_hash) return `i:${row.question_image_content_hash}`;
+    return row.question_image_key ? `k:${row.question_image_key}` : null;
+  }
+  const stem = normStem(row.question_text);
+  if (!stem) return null;
+  return stem.length >= MIN_DISTINCTIVE_STEM
+    ? `t:${stem}`
+    : `t:${stem}|${[row.option_a, row.option_b, row.option_c, row.option_d].map(normStem).join("|")}`;
+}
+
+function sameStem(a, b) {
+  const ka = stemKey(a);
+  if (ka && ka === stemKey(b)) return true;
+  const pa = a.question_type === "image" && a.question_image_perceptual_hash;
+  const pb = b.question_type === "image" && b.question_image_perceptual_hash;
+  return !!(pa && pb && isNearDuplicateImage(pa, pb, STEM_PHASH_THRESHOLD));
+}
+
+const SYNC_MATCH_COLUMNS = [
+  "id", "content_hash", "source_question_id", "source_test_title",
+  "question_type", "question_text", "question_image_key", "question_image_content_hash", "question_image_perceptual_hash",
+  "option_a", "option_b", "option_c", "option_d",
+];
+
+/**
+ * Makes the bank group of one test mirror that test's CURRENT questions.
+ *
+ * The old version only ever inserted (upsert on the exact content hash), so
+ * every edit of an already-saved question — picking the real correct answer
+ * after the form defaulted to (a), swapping an option image, fixing a typo —
+ * produced a brand-new hash and therefore a brand-new bank row next to the
+ * stale one. Now, per question:
+ *   1. a bank row in this test's group with the exact same content → kept;
+ *   2. else a row in this group asking the same stem → UPDATED in place;
+ *   3. else, if the exact content (or, for a question imported from the
+ *      bank, the same stem as its source row) already exists anywhere in the
+ *      bank → nothing stored (already there);
+ *   4. else → inserted.
+ * This NEVER deletes a bank row: rows that no longer match any of the
+ * test's questions (a question removed from the test, or an older copy
+ * already in the bank) are simply left as they are.
+ */
 async function syncFromTest(test, questionRows) {
-  if (!questionRows || questionRows.length === 0) return { added: 0 };
+  if (!questionRows || questionRows.length === 0) return { added: 0, updated: 0 };
   const normalizedTitle = normalizeTitleKey(test.title);
-  const rows = questionRows.map((q) => {
+  const incoming = (questionRows || []).map((q) => {
     const copy = Object.fromEntries(COPY_COLUMNS.map((c) => [c, q[c] ?? null]));
-    // Defensive re-trim: test_questions rows should already be trimmed at
-    // test-creation time, but never let stray whitespace produce a spurious
-    // content_hash / duplicate bank row.
     for (const c of TEXT_COLUMNS_TO_TRIM) {
       if (typeof copy[c] === "string") copy[c] = copy[c].trim();
     }
-    return {
-      ...copy,
-      content_hash: contentHash(copy),
-      source_test_id: test.id,
-      source_test_title: normalizedTitle,
-      source_question_id: q.id || null,
-      created_by: test.created_by || null,
-    };
+    for (const f of FIELDS) copy[f.imagePerceptualHash] = q[f.imagePerceptualHash] ?? null;
+    return { copy, hash: contentHash(copy), sourceQuestionId: q.id || null, bankQuestionId: q.bank_question_id || null };
   });
-  // De-duplicate within this batch too.
-  const unique = [...new Map(rows.map((r) => [r.content_hash, r])).values()];
-  const { data, error } = await supabase
+
+  const { data: groupRows, error: groupErr } = await supabase
     .from("question_bank")
-    .upsert(unique, { onConflict: "content_hash", ignoreDuplicates: true })
-    .select("id");
-  if (error) throw error;
-  return { added: (data || []).length };
+    .select(SYNC_MATCH_COLUMNS.join(", "))
+    .eq("source_test_id", test.id)
+    .order("created_at", { ascending: true });
+  if (groupErr) throw groupErr;
+  const existing = groupRows || [];
+  const claimed = new Set();
+
+  // Source rows of questions imported from the bank (for rule 3).
+  const importedIds = [...new Set(incoming.map((q) => q.bankQuestionId).filter(Boolean))];
+  let importedSources = new Map();
+  if (importedIds.length > 0) {
+    const { data, error } = await supabase.from("question_bank").select(SYNC_MATCH_COLUMNS.join(", ")).in("id", importedIds);
+    if (error) throw error;
+    importedSources = new Map((data || []).map((r) => [r.id, r]));
+  }
+
+  let added = 0;
+  let updated = 0;
+  const seenHashes = new Set();
+  // Pass 1 claims exact-content matches first, so a stem match in pass 2
+  // never "updates" a row onto content an older duplicate already holds.
+  const pending = [];
+  for (const q of incoming) {
+    if (seenHashes.has(q.hash)) continue; // same question twice in one test
+    seenHashes.add(q.hash);
+    const exact = existing.find((r) => !claimed.has(r.id) && r.content_hash === q.hash);
+    if (exact) {
+      claimed.add(exact.id);
+      if (exact.source_test_title !== normalizedTitle) {
+        await supabase.from("question_bank").update({ source_test_title: normalizedTitle }).eq("id", exact.id);
+      }
+    } else {
+      pending.push(q);
+    }
+  }
+
+  for (const q of pending) {
+    const probe = { ...q.copy };
+    const match = existing.find((r) => !claimed.has(r.id) && sameStem(r, probe));
+    if (match) {
+      claimed.add(match.id);
+      const { error } = await supabase
+        .from("question_bank")
+        .update({
+          ...q.copy,
+          content_hash: q.hash,
+          source_test_title: normalizedTitle,
+          source_question_id: match.source_question_id ? q.sourceQuestionId : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", match.id);
+      if (error && error.code !== "23505") throw error;
+      // 23505: this exact content already lives elsewhere in the bank, so
+      // nothing new is needed — the matched row is left exactly as it was.
+      if (!error) updated += 1;
+      continue;
+    }
+
+    const source = q.bankQuestionId ? importedSources.get(q.bankQuestionId) : null;
+    if (source && sameStem(source, probe)) continue; // imported from the bank — already stored there
+
+    const { data, error } = await supabase
+      .from("question_bank")
+      .upsert(
+        [{
+          ...q.copy,
+          content_hash: q.hash,
+          source_test_id: test.id,
+          source_test_title: normalizedTitle,
+          source_question_id: q.sourceQuestionId,
+          created_by: test.created_by || null,
+        }],
+        { onConflict: "content_hash", ignoreDuplicates: true }
+      )
+      .select("id");
+    if (error) throw error;
+    added += (data || []).length;
+  }
+
+  return { added, updated };
 }
 
 /**
@@ -198,6 +314,7 @@ async function createManual({ questions, label, createdBy, sourceTestId, subtopi
   for (let i = 0; i < list.length; i++) {
     const cols = toDbColumns(list[i], i + 1);
     await assertNoPerceptualDuplicate(cols);
+    await imageTextService.assertNoSameTextQuestions([cols], { label: () => (list.length > 1 ? `Question ${i + 1}` : "This question") });
     rows.push({
       ...cols,
       content_hash: contentHash(cols),
@@ -356,6 +473,7 @@ async function updateQuestion(bankQuestionId, updates, editorId) {
   if (!bankQuestionId) throw badRequest("bankQuestionId is required");
   const cols = toDbColumns(updates, 1);
   await assertNoPerceptualDuplicate(cols, { excludeId: bankQuestionId });
+  await imageTextService.assertNoSameTextQuestions([cols], { excludeBankId: bankQuestionId, label: () => "This question" });
   const payload = {
     ...cols,
     content_hash: contentHash(cols),
@@ -517,7 +635,7 @@ async function existingIds(ids) {
 }
 
 module.exports = {
-  dedupeByStem,
+  dedupeByStem, stemKey, sameStem,
   syncFromTest, createManual, backfillAll, listGroups, listQuestions, existingIds,
   updateQuestion, renameManualGroup, deleteQuestion, deleteGroup,
   listQuestionsForSubtopic, copyQuestionsToSubtopic,

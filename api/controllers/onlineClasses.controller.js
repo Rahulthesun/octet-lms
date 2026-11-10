@@ -8,6 +8,7 @@
 const svc = require("../services/onlineClasses.service");
 const { syncClassAttendance } = require("../services/onlineAttendanceSync.service");
 const { getSessionByOnlineClassId, getSessionAttendanceDetail } = require("../services/attendance.service");
+const engagement = require("../services/classEngagement.service");
 
 function handleError(res, err) {
   const status = err.status || 500;
@@ -33,7 +34,7 @@ async function schedule(req, res) {
 /** GET /api/online-classes — admin: every class (scheduled/rescheduled/cancelled), newest first. */
 async function listAdmin(req, res) {
   try {
-    res.json({ classes: await svc.listForAdmin() });
+    res.json({ classes: await engagement.attachEngagement(await svc.listForAdmin(), req.user.id) });
   } catch (err) {
     handleError(res, err);
   }
@@ -42,7 +43,7 @@ async function listAdmin(req, res) {
 /** GET /api/online-classes/me/upcoming — student: their own classes. */
 async function listMine(req, res) {
   try {
-    res.json({ classes: await svc.listForStudent(req.user.id) });
+    res.json({ classes: await engagement.attachEngagement(await svc.listForStudent(req.user.id), req.user.id) });
   } catch (err) {
     handleError(res, err);
   }
@@ -112,4 +113,45 @@ async function getAttendance(req, res) {
   }
 }
 
-module.exports = { schedule, listAdmin, listMine, getOne, reschedule, cancel, syncAttendance, getAttendance };
+// ─── Likes & comments (students + admins) ───────────────────────────────────
+
+/** GET /api/online-classes/:classId/engagement — likes, likedByMe, comments (+ likers for admins). */
+async function getEngagement(req, res) {
+  try {
+    res.json(await engagement.getEngagement(req.user, req.params.classId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/** POST /api/online-classes/:classId/like — toggles the caller's heart. */
+async function toggleLike(req, res) {
+  try {
+    res.json(await engagement.toggleLike(req.user, req.params.classId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/** POST /api/online-classes/:classId/comments  Body: { body } */
+async function addComment(req, res) {
+  try {
+    res.status(201).json({ comment: await engagement.addComment(req.user, req.params.classId, req.body?.body) });
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+/** DELETE /api/online-classes/:classId/comments/:commentId — own comment, or any as admin. */
+async function deleteComment(req, res) {
+  try {
+    res.json(await engagement.deleteComment(req.user, req.params.classId, req.params.commentId));
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
+module.exports = {
+  schedule, listAdmin, listMine, getOne, reschedule, cancel, syncAttendance, getAttendance,
+  getEngagement, toggleLike, addComment, deleteComment,
+};

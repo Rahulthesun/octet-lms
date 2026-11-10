@@ -45,17 +45,26 @@ export default function QuestionFieldInput({
   onChange,
   multiline = false,
   compact = false,
+  duplicateCheck,
 }: {
   label: string
   value: FieldValue
   onChange: (next: FieldValue) => void
   multiline?: boolean
   compact?: boolean
+  /**
+   * Question field only: after upload, reads the screenshot's text and
+   * returns a heads-up warning when the same question text is already
+   * posted (the image is kept), or null.
+   */
+  duplicateCheck?: (imageKey: string) => Promise<string | null>
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
   const zoneRef = useRef<HTMLDivElement>(null)
   const hoveredRef = useRef(false)
   const takeImageRef = useRef<(file: File | null) => void>(() => {})
@@ -87,10 +96,17 @@ export default function QuestionFieldInput({
     setBusy(true)
     try {
       const uploaded = await uploadQuestionImage(file)
+      setWarning(null)
+      if (duplicateCheck) {
+        setChecking(true)
+        setWarning(await duplicateCheck(uploaded.key))
+        setChecking(false)
+      }
       onChange({ ...value, type: 'image', imageKey: uploaded.key, imageUrl: uploaded.previewUrl, imageContentHash: uploaded.contentHash, imagePerceptualHash: uploaded.perceptualHash })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image upload failed')
     } finally {
+      setChecking(false)
       setBusy(false)
     }
   }
@@ -164,7 +180,7 @@ export default function QuestionFieldInput({
             <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}
               className="w-full text-center py-4 text-sm text-zinc-500 hover:text-violet-700 disabled:opacity-60">
               {busy ? (
-                'Uploading...'
+                checking ? 'Checking if this question is already posted…' : 'Uploading...'
               ) : (
                 <>
                   <span className="block text-zinc-700">Hover and press Ctrl+V to paste a screenshot</span>
@@ -173,7 +189,7 @@ export default function QuestionFieldInput({
               )}
             </button>
           )}
-          {busy && hasImage && <p className="text-xs text-violet-700 text-center mt-2">Uploading...</p>}
+          {busy && hasImage && <p className="text-xs text-violet-700 text-center mt-2">{checking ? 'Checking if this question is already posted…' : 'Uploading...'}</p>}
           <input
             ref={fileRef}
             type="file"
@@ -205,6 +221,7 @@ export default function QuestionFieldInput({
       )}
 
       {error && <p className="text-xs text-rose-600 mt-1" role="alert">{error}</p>}
+      {warning && isImage && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-1" role="status">{warning}</p>}
     </div>
   )
 }

@@ -15,6 +15,7 @@ import type { CreateTestInput, TestAdminDetail, TestQuestionInput, TestType, Opt
 import { authedFetch } from '@/lib/apiClient'
 import { PlusIcon, TrashIcon } from './icons'
 import QuestionFieldInput, { type FieldValue } from './QuestionFieldInput'
+import { checkQuestionImageText } from '@/lib/questionImages'
 import QuestionBankModal from './QuestionBankModal'
 import TimeInput12h from '@/components/shared/TimeInput12h'
 import { chapterLabel, todayISODate, isPastDate } from '@/lib/helpers'
@@ -559,7 +560,8 @@ export default function ScheduleTestForm({ testId }: { testId?: string } = {}) {
                 </div>
 
                 <QuestionFieldInput label="Question" multiline value={getField(q, 'question')}
-                  onChange={(v) => setQuestionField(i, 'question', v)} />
+                  onChange={(v) => setQuestionField(i, 'question', v)}
+                  duplicateCheck={(key) => checkQuestionImageText(key, { excludeTestId: testId })} />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {(['a', 'b', 'c', 'd'] as OptionKey[]).map((key) => {

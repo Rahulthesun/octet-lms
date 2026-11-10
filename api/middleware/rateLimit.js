@@ -43,6 +43,8 @@ module.exports = {
   admissionLimiter: make(60 * 60 * 1000, 10, "Too many applications from this network. Try again later."),
   // Forgot / reset password
   passwordResetLimiter: make(15 * 60 * 1000, 10, "Too many password reset attempts. Try again later."),
+  // Unauthenticated public "Parent's Feedback" form
+  parentFeedbackLimiter: make(60 * 60 * 1000, 5, "Too many reviews from this network. Please try again later."),
   // Unauthenticated tracking pixel / webhook
   publicHookLimiter: make(60 * 1000, 120, "Too many requests."),
 };

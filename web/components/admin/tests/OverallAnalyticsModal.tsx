@@ -132,7 +132,7 @@ export default function OverallAnalyticsModal({ onClose }: { onClose: () => void
                   type={distType}
                   onTypeChange={setDistType}
                   barData={toChartData(analytics.scoreDistribution, ACCENT)}
-                  pieData={toChartData(analytics.scoreDistribution, ACCENT)}
+                  pieData={analytics.scoreDistribution.map((p) => ({ label: p.label, value: p.value, color: p.color }))}
                   lineData={toChartData(analytics.scoreDistribution, ACCENT)}
                   defaultColor={ACCENT}
                   lineColor={ACCENT}

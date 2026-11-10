@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  useTestAnalytics, downloadTestAnalyticsPdf, downloadTestMarksXlsx, authedFetch,
+  useTestAnalytics, downloadTestAnalyticsPdf, downloadTestMarksXlsx, fetchTestMarksView, authedFetch,
   type TestSummary, type AnalyticsPoint,
 } from '@/hooks/useTests'
 import Pagination, { usePagination } from '@/components/ui/Pagination'
@@ -137,7 +137,7 @@ export default function TestAnalyticsModal({ test, onClose }: {
                   type={distType}
                   onTypeChange={setDistType}
                   barData={toChartData(analytics.scoreDistribution, ACCENT)}
-                  pieData={toChartData(analytics.scoreDistribution, ACCENT)}
+                  pieData={analytics.scoreDistribution.map((p) => ({ label: p.label, value: p.value, color: p.color }))}
                   lineData={toChartData(analytics.scoreDistribution, ACCENT)}
                   defaultColor={ACCENT}
                   lineColor={ACCENT}
@@ -241,8 +241,9 @@ export default function TestAnalyticsModal({ test, onClose }: {
               {downloading ? 'Preparing...' : 'Download as PDF'}
             </button>
             <ExcelDownloadButton
-              label="Download as Excel"
+              label="Excel — View / Download"
               onDownload={() => downloadTestMarksXlsx(test.id, `${test.title.replace(/[^a-zA-Z0-9]+/g, '_')}_marks.xlsx`)}
+              onView={() => fetchTestMarksView(test.id)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-emerald-300 text-emerald-700 text-[15px] hover:bg-emerald-50 transition-colors disabled:opacity-40"
             />
           </div>

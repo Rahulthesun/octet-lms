@@ -28,6 +28,7 @@
     "nodemailer": "^10.2.1",
     "pdfjs-dist": "^6.0.227",
     "pdfkit": "^0.19.1",
+    "tesseract.js": "^6.0.1",
     "uuid": "^14.0.0"
   },
   "devDependencies": {

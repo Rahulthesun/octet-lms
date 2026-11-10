@@ -14,6 +14,7 @@ export const PAGE_STATUS: Record<string, PageStatus> = {
   '/admin/profile': 'production',
   '/admin/alumni': 'production',
   '/admin/exams': 'production',
+  '/admin/parent-feedback': 'production',
 
   '/student': 'production',
   '/student/notes': 'production',
