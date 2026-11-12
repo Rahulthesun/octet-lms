@@ -16,6 +16,7 @@ const { sendWelcomeEmail } = require("../utils/email");
 const { createStudentAuthUser , deleteStudentAuthUser } = require("../utils/auth");
 const { todayInTz } = require("../utils/graduation");
 const alumniService = require("./alumni.service");
+const batchMembership = require("./batchMembership.service");
 
 // Keeps graduated students (date arrived, or already archived) out of every
 // "active students" list. They live under Alumni instead.
@@ -312,6 +313,19 @@ async function updateStudent(id, updates) {
     const graduationDate = hasGraduation ? (updates.graduation_date || null) : undefined;
     delete updates.graduation_date;
 
+    // A changed batch is a permanent move: the roster (batch_enrollments)
+    // follows it, and the old batch is kept as history so past attendance
+    // and tests still count against the batch the student was in then.
+    let movedTo = null;
+    if (updates.preferred_batch) {
+        const { data: before, error: beforeErr } = await supabase
+            .from("students").select("preferred_batch, status").eq("id", id).maybeSingle();
+        if (beforeErr) throw beforeErr;
+        if (before && before.status === "APPROVED" && before.preferred_batch !== updates.preferred_batch) {
+            movedTo = updates.preferred_batch;
+        }
+    }
+
     let data;
     if (Object.keys(updates).length > 0) {
         const result = await supabase
@@ -322,6 +336,10 @@ async function updateStudent(id, updates) {
             .single();
         if (result.error) throw result.error;
         data = result.data;
+    }
+
+    if (movedTo) {
+        await batchMembership.moveStudentToBatch(id, movedTo);
     }
 
     if (hasGraduation) {

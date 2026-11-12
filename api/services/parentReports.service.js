@@ -11,6 +11,7 @@
 const PDFDocument = require("pdfkit");
 const supabase = require("../config/supabase");
 const attendanceService = require("./attendance.service");
+const membership = require("./batchMembership.service");
 const studentsService = require("./students.service");
 const { sendEmail } = require("../utils/email");
 const { buildParentMonthlyReportPdf, monthName } = require("../utils/parentReportPdf");
@@ -46,18 +47,21 @@ async function getStudentMonthlyReportData(studentId, year, month) {
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
-  const batchIds = await attendanceService.getStudentBatchIds(studentId);
+  // The batches the student was in at the time (a batch change keeps history).
+  const windows = await membership.getWindows(studentId);
+  const batchIds = membership.windowBatchIds(windows);
 
   let days = [];
   {
-    const { data: sessions, error: sessErr } = await supabase
+    const { data: rawSessions, error: sessErr } = await supabase
       .from("attendance_sessions")
-      .select("id, date, source, online_classes(title)")
+      .select("id, date, source, batch_id, audience, online_classes(title)")
       .or(["audience.eq.ALL", batchIds.length ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
       .gte("date", startDate)
       .lte("date", endDate)
       .order("date", { ascending: true });
     if (sessErr) throw sessErr;
+    const sessions = (rawSessions || []).filter((s) => membership.countsFor(windows, s));
 
     const sessionIds = (sessions || []).map((s) => s.id);
     const recordMap = {};

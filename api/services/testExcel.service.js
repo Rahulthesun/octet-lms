@@ -31,6 +31,7 @@
 const ExcelJS = require("exceljs");
 const supabase = require("../config/supabase");
 const audienceService = require("./audience.service");
+const membership = require("./batchMembership.service");
 const { isExcludedFromExcel } = require("../config/excelExclusions");
 const { zonedTimeToUtcIso } = require("../utils/timezone");
 const { TIMEZONE } = require("../utils/graduation");
@@ -71,19 +72,6 @@ function testColumnName(title, index) {
   const t = String(title || "").trim().replace(/\s+/g, " ");
   if (/^test[\s\-–—_.:#]*\d+/i.test(t)) return t;
   return t ? `Test-${index + 1} ${t}` : `Test-${index + 1}`;
-}
-
-/** Map of batch_id → Set(student_id) for the given batches. */
-async function enrollmentsByBatch(batchIds) {
-  const map = new Map();
-  if (batchIds.length === 0) return map;
-  const { data, error } = await supabase.from("batch_enrollments").select("batch_id, student_id").in("batch_id", batchIds);
-  if (error) throw error;
-  for (const row of data || []) {
-    if (!map.has(row.batch_id)) map.set(row.batch_id, new Set());
-    map.get(row.batch_id).add(row.student_id);
-  }
-  return map;
 }
 
 /** Students who attempted but aren't in `known` (e.g. since moved batch) — still belong on the sheet. */
@@ -168,13 +156,14 @@ async function buildMonthlyRegister(month) {
     .filter((s) => !isExcludedFromExcel(s))
     .sort(byName);
 
-  const enrollments = await enrollmentsByBatch([...new Set(tests.map((t) => t.batch_id).filter(Boolean))]);
+  const windowsByStudent = await membership.getWindowsForStudents(students.map((s) => s.id));
   const now = new Date();
 
   const rows = students.map((s) => ({
     name: s.name,
     cells: tests.map((t) => {
-      const targeted = t.audience === "ALL" ? known.has(s.id) : !!enrollments.get(t.batch_id)?.has(s.id);
+      // Meant for them = in that batch when the test was held (a batch change keeps history).
+      const targeted = t.audience === "ALL" ? known.has(s.id) : membership.countsFor(windowsByStudent.get(s.id), t);
       const ended = new Date(t.scheduled_end || t.scheduled_start) <= now;
       return cellFor({ attempt: attemptMap.get(attemptKey(t.id, s.id)), targeted, ended });
     }),
@@ -213,9 +202,16 @@ async function buildTestRegister(testId) {
   if (attErr) throw attErr;
   const attemptMap = new Map((attempts || []).map((a) => [a.student_id, a]));
 
-  const targetedStudents = test.audience === "ALL"
-    ? await audienceService.getActiveStudents(STUDENT_COLUMNS)
-    : await audienceService.getActiveStudentsInBatches([test.batch_id], STUDENT_COLUMNS);
+  let targetedStudents;
+  if (test.audience === "ALL") {
+    targetedStudents = await audienceService.getActiveStudents(STUDENT_COLUMNS);
+  } else {
+    // Students who were in the batch when the test was held — including
+    // anyone who has since moved out, and not anyone who joined later.
+    const active = await audienceService.getActiveStudents(STUDENT_COLUMNS);
+    const windowsByStudent = await membership.getWindowsForStudents(active.map((s) => s.id));
+    targetedStudents = active.filter((s) => membership.countsFor(windowsByStudent.get(s.id), test));
+  }
   const targetedIds = new Set(targetedStudents.map((s) => s.id));
   const students = [...targetedStudents, ...(await fetchMissingStudents((attempts || []).map((a) => a.student_id), targetedIds))]
     .filter((s) => !isExcludedFromExcel(s))

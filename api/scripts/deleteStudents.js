@@ -1,8 +1,7 @@
 /**
  * scripts/deleteStudents.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Permanently deletes a FIXED list of student accounts (test / placeholder
- * accounts), through the same path as the admin "Delete student" button
+ * Permanently deletes a FIXED list of student accounts, through the same path as the admin "Delete student" button
  * (students.service.js → deleteStudent: Supabase Auth user + students row;
  * attempts, attendance, enrollments etc. go with it via ON DELETE CASCADE).
  *
@@ -23,29 +22,21 @@
 const supabase = require("../config/supabase");
 const { deleteStudent } = require("../services/students.service");
 
+// 2026-11-12: students removed from the course (list S.No 19, 24, 25, 41, 45).
+// (Earlier run deleted 15 test/placeholder accounts.)
 const TO_DELETE = [
-  { name: "Rahul", email: "ithihas.cps@gmail.com" },
-  { name: "Parvesh", email: "parvesh.sm2023@vitstudent.ac.in" },
-  { name: "Vinay", email: "roma@gmail.com" },
-  { name: "Rohit Singh", email: "rohit.s@example.com" },
-  { name: "Tanvi Joshi", email: "tanvi.j@example.com" },
-  { name: "Varun Nair", email: "varun.n@example.com" },
-  { name: "Ishita Verma", email: "ishita.v@example.com" },
-  { name: "Aditya Sharma", email: "aditya.s@example.com" },
-  { name: "Neha Gupta", email: "neha.g@example.com" },
-  { name: "Rahul Venkat", email: "rahul.v@example.com" },
-  { name: "Meenakshi A.", email: "meenakshi.a@example.com" },
-  { name: "Priya Thirumalai", email: "priya.t@example.com" },
-  { name: "Karthik S.", email: "karthik.s@example.com" },
-  { name: "Sneha Rajan", email: "sneha.rajan@example.com" },
-  { name: "Arjun Kumar", email: "arjun.kumar@example.com" },
+  { name: "Inesh Raja", email: "qaineshrjain@gmail.com" },
+  { name: "Nameera F", email: "nameerafazlullah@gmail.com" },
+  { name: "Niharika Samyuktha S", email: "nihaakshi@gmail.com" },
+  { name: "Sarvesh", email: "infisarvesh007@gmail.com" },
+  { name: "Soundarya S", email: "gangas2k18@gmail.com" },
 ];
 
 const APPLY = process.argv.includes("--apply");
 const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
 async function main() {
-  if (TO_DELETE.length !== 15) throw new Error(`Expected 15 entries, found ${TO_DELETE.length}`);
+  if (TO_DELETE.length === 0) throw new Error("Nothing to delete");
 
   const matched = [];
   const problems = [];

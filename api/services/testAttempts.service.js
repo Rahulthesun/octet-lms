@@ -11,6 +11,7 @@
 
 const supabase = require("../config/supabase");
 const attendanceService = require("./attendance.service");
+const membership = require("./batchMembership.service");
 const testsService = require("./tests.service");
 const { signKey } = require("./questionImages.service");
 const { serializeQuestion } = require("../utils/mcqQuestion");
@@ -56,8 +57,13 @@ async function assertStudentInTestBatch(studentId, test) {
   // An All Students test is for every active student (the auth middleware
   // already turns graduated students away before they get here).
   if (test.audience === "ALL") return;
-  const batchIds = await attendanceService.getStudentBatchIds(studentId);
-  if (!batchIds.includes(test.batch_id)) throw forbidden("This test is not assigned to your batch");
+  // The batch the student was in when the test was scheduled — so a past
+  // test from a previous batch stays viewable, but a new one there does not.
+  const windows = await membership.getWindows(studentId);
+  if (membership.countsFor(windows, test)) return;
+  const { data: attempt } = await supabase
+    .from("test_attempts").select("id").eq("test_id", test.id).eq("student_id", studentId).maybeSingle();
+  if (!attempt) throw forbidden("This test is not assigned to your batch");
 }
 
 // ─── Fetch test + attempt together ─────────────────────────────────────────
@@ -155,13 +161,19 @@ async function autoFinalizeExpiredAttempts() {
 
 async function listTestsForStudent(authUserId) {
   const student = await getStudentForUser(authUserId);
-  const batchIds = await attendanceService.getStudentBatchIds(student.id);
+  const windows = await membership.getWindows(student.id);
+  const batchIds = membership.windowBatchIds(windows);
 
   await autoFinalizeExpiredAttempts();
 
-  // Tests for the student's own batches plus every All Students test —
-  // one query, so a test can never appear twice however many batches they are in.
-  const { data: tests, error } = await supabase
+  // Tests for the batches the student was in when each test was scheduled,
+  // plus every All Students test and any test they attempted — one query,
+  // so a test can never appear twice however many batches they are in.
+  const { data: myAttempts, error: myAttErr } = await supabase
+    .from("test_attempts").select("test_id").eq("student_id", student.id);
+  if (myAttErr) throw myAttErr;
+  const attemptedIds = new Set((myAttempts || []).map((a) => a.test_id));
+  const { data: rawTests, error } = await supabase
     .from("tests")
     .select(testsService.TEST_SELECT)
     .or(["audience.eq.ALL", batchIds.length > 0 ? `batch_id.in.(${batchIds.join(",")})` : null].filter(Boolean).join(","))
@@ -169,6 +181,7 @@ async function listTestsForStudent(authUserId) {
     .neq("status", "draft") // drafts are admin-only in-progress authoring — never visible to students
     .order("scheduled_start", { ascending: false });
   if (error) throw error;
+  const tests = (rawTests || []).filter((t) => membership.countsFor(windows, t) || attemptedIds.has(t.id));
 
   const testIds = (tests || []).map((t) => t.id);
   let attemptMap = {};
@@ -612,7 +625,8 @@ async function getStudentMonthlyReport(studentId, month) {
   const localDate = (d) => todayInTz(d);
   const now = new Date();
 
-  const batchIds = await attendanceService.getStudentBatchIds(studentId);
+  const windows = await membership.getWindows(studentId);
+  const batchIds = membership.windowBatchIds(windows);
 
   let query = supabase
     .from("tests")
@@ -625,8 +639,14 @@ async function getStudentMonthlyReport(studentId, month) {
   } else {
     query = query.eq("audience", "ALL");
   }
-  const { data: tests, error: testsErr } = await query;
+  const { data: rawTests, error: testsErr } = await query;
   if (testsErr) throw testsErr;
+  // Only tests from the batch the student was in at the time (attempted ones always count).
+  const { data: myAttempts, error: myAttErr } = await supabase
+    .from("test_attempts").select("test_id").eq("student_id", studentId);
+  if (myAttErr) throw myAttErr;
+  const attemptedIds = new Set((myAttempts || []).map((a) => a.test_id));
+  const tests = (rawTests || []).filter((t) => membership.countsFor(windows, t) || attemptedIds.has(t.id));
 
   const testIds = (tests || []).map((t) => t.id);
   let attemptsByTestId = new Map();

@@ -32,6 +32,11 @@ const EXCEL_EXCLUDED_EMAILS = [
   "karthik.s@example.com", // Karthik S.
   "sneha.rajan@example.com", // Sneha Rajan
   "arjun.kumar@example.com", // Arjun Kumar
+  "qaineshrjain@gmail.com", // Inesh Raja — deleted 2026-11-12
+  "nameerafazlullah@gmail.com", // Nameera F — deleted 2026-11-12
+  "nihaakshi@gmail.com", // Niharika Samyuktha S — deleted 2026-11-12
+  "infisarvesh007@gmail.com", // Sarvesh — deleted 2026-11-12
+  "gangas2k18@gmail.com", // Soundarya S — deleted 2026-11-12
 ];
 
 const excludedSet = new Set(EXCEL_EXCLUDED_EMAILS.map((e) => e.trim().toLowerCase()));

@@ -20,6 +20,7 @@
 const  supabase  = require("../config/supabase");
 const crypto = require("crypto");
 const audienceService = require("./audience.service");
+const membership = require("./batchMembership.service");
 const { applyActiveStudentFilter, hasGraduated, todayInTz } = require("../utils/graduation");
 
 // "All Students" is a virtual target, never a row in `batches`. Wherever a
@@ -316,30 +317,31 @@ async function getBatchStudents(batchId) {
 
   // 2. All sessions that count for this batch (its own + All Students sessions)
   const { data: rawSessions, error: sessErr } = await applyBatchSessionScope(
-    supabase.from("attendance_sessions").select(`id, ${COUNTABLE_SESSION_COLS}`),
+    supabase.from("attendance_sessions").select(`id, batch_id, audience, ${COUNTABLE_SESSION_COLS}`),
     batchId
   );
 
   if (sessErr) throw sessErr;
   const sessions = await filterCountableSessions(rawSessions);
-
-  const totalSessions = sessions?.length || 0;
   const sessionIds = (sessions || []).map((s) => s.id);
 
+  // A student who joined this batch later is only measured on the sessions
+  // held since they joined (see batchMembership.service.js).
+  const windowsByStudent = await membership.getWindowsForStudents(studentIds);
+  const sessionsFor = (studentId) => (sessions || []).filter((s) => membership.countsFor(windowsByStudent.get(studentId), s));
+
   // 3. Attendance records for those sessions
-  let presentMap = {}; // studentId → count of sessions present
+  const presentSet = new Set(); // "studentId:sessionId"
   if (sessionIds.length > 0) {
     const { data: records, error: recErr } = await supabase
       .from("attendance_records")
-      .select("student_id, present")
+      .select("student_id, session_id, present")
       .in("session_id", sessionIds)
       .eq("present", true);
 
     if (recErr) throw recErr;
 
-    (records || []).forEach((r) => {
-      presentMap[r.student_id] = (presentMap[r.student_id] || 0) + 1;
-    });
+    (records || []).forEach((r) => presentSet.add(`${r.student_id}:${r.session_id}`));
   }
 
   // 4. Manual overrides (per real batch; All Students has none)
@@ -362,7 +364,9 @@ async function getBatchStudents(batchId) {
   // 5. Assemble
   return enrollments.map((e) => {
     const s = e.students;
-    const presentCount = presentMap[e.student_id] || 0;
+    const mine = sessionsFor(e.student_id);
+    const totalSessions = mine.length;
+    const presentCount = mine.filter((x) => presentSet.has(`${e.student_id}:${x.id}`)).length;
     return {
       id:            s.id,
       name:          s.name,
@@ -539,7 +543,7 @@ async function getBatchSummary(batchId) {
   const totalStudents = rosterStudents.length;
 
   const { data: allBatchSessions, error: sessErr } = await applyBatchSessionScope(
-    supabase.from("attendance_sessions").select(`id, ${COUNTABLE_SESSION_COLS}`),
+    supabase.from("attendance_sessions").select(`id, batch_id, audience, ${COUNTABLE_SESSION_COLS}`),
     batchId
   ).order("date", { ascending: false });
 
@@ -553,15 +557,26 @@ async function getBatchSummary(batchId) {
   if (totalSessions > 0 && totalStudents > 0 && sessionIds.length > 0) {
     const { data: records, error: recErr } = await supabase
       .from("attendance_records")
-      .select("student_id")
+      .select("student_id, session_id")
       .in("session_id", sessionIds)
       .eq("present", true);
 
     if (recErr) throw recErr;
 
-    // Only this roster's students count (an All Students session also has records from other batches' students).
-    const totalPresentMarks = (records || []).filter((r) => rosterIds.has(r.student_id)).length;
-    avgAttendancePct = Math.round((totalPresentMarks / (totalStudents * totalSessions)) * 100);
+    // Each roster student is measured only on the sessions held while they
+    // were in this batch; other batches' students on All Students sessions don't count.
+    const windowsByStudent = await membership.getWindowsForStudents([...rosterIds]);
+    const presentSet = new Set((records || []).map((r) => `${r.student_id}:${r.session_id}`));
+    let possible = 0;
+    let present = 0;
+    rosterIds.forEach((id) => {
+      sessions.forEach((sess) => {
+        if (!membership.countsFor(windowsByStudent.get(id), sess)) return;
+        possible++;
+        if (presentSet.has(`${id}:${sess.id}`)) present++;
+      });
+    });
+    avgAttendancePct = possible > 0 ? Math.round((present / possible) * 100) : null;
   }
 
   const todayStr = todayDateString();
@@ -1330,17 +1345,17 @@ async function getStudentBatchIds(studentId) {
  */
 async function getMyAttendanceSummary(authUserId) {
   const student = await getStudentByAuthUserId(authUserId);
-  const batchIds = await getStudentBatchIds(student.id);
+  const windows = await membership.getWindows(student.id);
 
-  // Own batches' sessions plus All Students sessions — each session once,
-  // however many batches the student is in.
+  // Sessions of the batches the student was in at the time, plus All
+  // Students sessions — each session once, however many batches they are in.
   const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select(`id, ${COUNTABLE_SESSION_COLS}`)
-    .or(sessionScopeFilter(batchIds));
+    .select(`id, batch_id, audience, ${COUNTABLE_SESSION_COLS}`)
+    .or(sessionScopeFilter(membership.windowBatchIds(windows)));
 
   if (sessErr) throw sessErr;
-  const sessions = await filterCountableSessions(rawSessions);
+  const sessions = await filterCountableSessions((rawSessions || []).filter((s) => membership.countsFor(windows, s)));
 
   const totalSessions = sessions?.length || 0;
   const sessionIds = (sessions || []).map((s) => s.id);
@@ -1374,16 +1389,16 @@ async function getMyAttendanceSummary(authUserId) {
  */
 async function getMyAttendanceHistory(authUserId, limit = 50) {
   const student = await getStudentByAuthUserId(authUserId);
-  const batchIds = await getStudentBatchIds(student.id);
+  const windows = await membership.getWindows(student.id);
 
-  const { data: sessions, error: sessErr } = await supabase
+  const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, date, source, audience, batches(name, delivery_type, start_time), online_classes(title)")
-    .or(sessionScopeFilter(batchIds))
-    .order("date", { ascending: false })
-    .limit(limit);
+    .select("id, date, source, audience, batch_id, batches(name, delivery_type, start_time), online_classes(title)")
+    .or(sessionScopeFilter(membership.windowBatchIds(windows)))
+    .order("date", { ascending: false });
 
   if (sessErr) throw sessErr;
+  const sessions = (rawSessions || []).filter((s) => membership.countsFor(windows, s)).slice(0, limit);
   if (!sessions || sessions.length === 0) return [];
 
   const sessionIds = sessions.map((s) => s.id);
@@ -1439,22 +1454,23 @@ async function getMyAttendanceHistory(authUserId, limit = 50) {
  */
 async function getMyMonthAttendance(authUserId, year, month) {
   const student = await getStudentByAuthUserId(authUserId);
-  const batchIds = await getStudentBatchIds(student.id);
+  const windows = await membership.getWindows(student.id);
 
   const monthStr = String(month).padStart(2, "0");
   const startDate = `${year}-${monthStr}-01`;
   const lastDay = new Date(year, month, 0).getDate(); // last day of that month
   const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
-  const { data: sessions, error: sessErr } = await supabase
+  const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, date")
-    .or(sessionScopeFilter(batchIds))
+    .select("id, date, batch_id, audience")
+    .or(sessionScopeFilter(membership.windowBatchIds(windows)))
     .gte("date", startDate)
     .lte("date", endDate)
     .order("date", { ascending: true });
 
   if (sessErr) throw sessErr;
+  const sessions = (rawSessions || []).filter((s) => membership.countsFor(windows, s));
   if (!sessions || sessions.length === 0) {
     return { days: [], totalSessions: 0, presentCount: 0, attendancePct: null };
   }
@@ -1550,19 +1566,10 @@ async function getAttendancePercentagesForStudents(studentIds) {
   if (!studentIds || studentIds.length === 0) return result;
   studentIds.forEach((id) => { result[id] = null; });
 
-  const { data: enrollments, error: enrollErr } = await supabase
-    .from("batch_enrollments")
-    .select("student_id, batch_id")
-    .in("student_id", studentIds);
-  if (enrollErr) throw enrollErr;
-
-  const batchIdsByStudent = {};
+  // Each student's batch memberships over time (current + past batches).
+  const windowsByStudent = await membership.getWindowsForStudents(studentIds);
   const allBatchIds = new Set();
-  (enrollments || []).forEach((e) => {
-    if (!batchIdsByStudent[e.student_id]) batchIdsByStudent[e.student_id] = [];
-    batchIdsByStudent[e.student_id].push(e.batch_id);
-    allBatchIds.add(e.batch_id);
-  });
+  windowsByStudent.forEach((w) => membership.windowBatchIds(w).forEach((b) => allBatchIds.add(b)));
 
   // Every session that could count for anyone in the list: their batches'
   // sessions plus All Students sessions (which count once for everybody).
@@ -1572,26 +1579,13 @@ async function getAttendancePercentagesForStudents(studentIds) {
     .or(sessionScopeFilter(Array.from(allBatchIds)));
   if (sessErr) throw sessErr;
   const sessions = await filterCountableSessions(rawSessions);
-
-  const sessionIdsByBatch = {};
-  const allStudentsSessionIds = [];
-  const allSessionIds = [];
-  (sessions || []).forEach((s) => {
-    allSessionIds.push(s.id);
-    if (s.audience === "ALL") {
-      allStudentsSessionIds.push(s.id);
-      return;
-    }
-    if (!sessionIdsByBatch[s.batch_id]) sessionIdsByBatch[s.batch_id] = [];
-    sessionIdsByBatch[s.batch_id].push(s.id);
-  });
-  if (allSessionIds.length === 0) return result;
+  if (!sessions || sessions.length === 0) return result;
 
   const { data: records, error: recErr } = await supabase
     .from("attendance_records")
     .select("student_id, session_id, present")
     .in("student_id", studentIds)
-    .in("session_id", allSessionIds)
+    .in("session_id", sessions.map((s) => s.id))
     .eq("present", true);
   if (recErr) throw recErr;
 
@@ -1602,13 +1596,12 @@ async function getAttendancePercentagesForStudents(studentIds) {
   });
 
   studentIds.forEach((id) => {
-    // A Set of session ids: a session can never be counted twice for a
-    // student, even one enrolled in several batches.
-    const mine = new Set(allStudentsSessionIds);
-    (batchIdsByStudent[id] || []).forEach((bId) => (sessionIdsByBatch[bId] || []).forEach((sid) => mine.add(sid)));
-    if (mine.size === 0) return;
-    const present = [...mine].filter((sid) => presentSessionsByStudent[id]?.has(sid)).length;
-    result[id] = Math.round((present / mine.size) * 100);
+    // Only sessions held while the student was in that batch (each session once).
+    const windows = windowsByStudent.get(id) || [];
+    const mine = sessions.filter((s) => membership.countsFor(windows, s));
+    if (mine.length === 0) return;
+    const present = mine.filter((s) => presentSessionsByStudent[id]?.has(s.id)).length;
+    result[id] = Math.round((present / mine.length) * 100);
   });
 
   return result;
@@ -1631,17 +1624,18 @@ async function getStudentAttendanceReport(studentId) {
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
-  const batchIds = await getStudentBatchIds(studentId);
+  const windows = await membership.getWindows(studentId);
 
   let records = [];
   {
-    const { data: sessions, error: sessErr } = await supabase
+    const { data: rawSessions, error: sessErr } = await supabase
       .from("attendance_sessions")
-      .select("id, date, source, audience, batches(name, delivery_type, start_time), online_classes(title)")
-      .or(sessionScopeFilter(batchIds))
+      .select("id, date, source, audience, batch_id, batches(name, delivery_type, start_time), online_classes(title)")
+      .or(sessionScopeFilter(membership.windowBatchIds(windows)))
       .order("date", { ascending: false });
 
     if (sessErr) throw sessErr;
+    const sessions = (rawSessions || []).filter((s) => membership.countsFor(windows, s));
 
     const sessionIds = (sessions || []).map((s) => s.id);
 
@@ -1744,10 +1738,14 @@ async function getBatchAttendanceReport(batchId) {
   const rosterIds = new Set(students.map((e) => e.student_id));
 
   const { data: sessions, error: sessErr } = await applyBatchSessionScope(
-    supabase.from("attendance_sessions").select("id, date, source, sync_status, online_classes(title)"),
+    supabase.from("attendance_sessions").select("id, date, source, sync_status, batch_id, audience, online_classes(title)"),
     batchId
   ).order("date", { ascending: true });
   if (sessErr) throw sessErr;
+
+  // A student who joined this batch later is only counted on sessions held since then.
+  const windowsByStudent = await membership.getWindowsForStudents([...rosterIds]);
+  const belongs = (studentId, sess) => membership.countsFor(windowsByStudent.get(studentId), sess);
 
   const sessionIds = (sessions || []).map((s) => s.id);
 
@@ -1777,7 +1775,9 @@ async function getBatchAttendanceReport(batchId) {
     const s = e.students;
     let presentCount = 0;
     let partialCount = 0;
-    (sessions || []).forEach((sess) => {
+    const mine = (sessions || []).filter((sess) => belongs(e.student_id, sess));
+    const totalSessions = mine.length;
+    mine.forEach((sess) => {
       const rec = recordsBySession[sess.id]?.get(e.student_id);
       if (rec?.present) presentCount++;
       else if (effectiveStatus(rec) === "partial") partialCount++;
@@ -1797,10 +1797,12 @@ async function getBatchAttendanceReport(batchId) {
   // Per-day breakdown, now tri-state and source-aware.
   const dailyBreakdown = (sessions || []).map((sess) => {
     const recordsForSession = recordsBySession[sess.id] || new Map();
+    // Roster students who were in this batch on that day.
+    const totalStudents = students.filter((e) => belongs(e.student_id, sess)).length;
     let presentCount = 0;
     let partialCount = 0;
     recordsForSession.forEach((rec, recStudentId) => {
-      if (!rosterIds.has(recStudentId)) return; // ignore other batches' students on All Students sessions
+      if (!rosterIds.has(recStudentId) || !belongs(recStudentId, sess)) return; // ignore other batches' students on All Students sessions
       const status = effectiveStatus(rec);
       if (status === "present") presentCount++;
       else if (status === "partial") partialCount++;
@@ -1852,18 +1854,18 @@ async function getStudentTrend(studentId, sessionCount = 5) {
   if (stuErr) throw stuErr;
   if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
 
-  // Their batches (a student may be in several)
-  const batchIds = await getStudentBatchIds(studentId);
+  // The batches they were in at the time (a student may be in several)
+  const windows = await membership.getWindows(studentId);
 
-  // Get last N sessions across their batches plus All Students sessions
-  const { data: sessions, error: sessErr } = await supabase
+  // Get last N sessions across those batches plus All Students sessions
+  const { data: rawSessions, error: sessErr } = await supabase
     .from("attendance_sessions")
-    .select("id, date")
-    .or(sessionScopeFilter(batchIds))
-    .order("date", { ascending: false })
-    .limit(sessionCount);
+    .select("id, date, batch_id, audience")
+    .or(sessionScopeFilter(membership.windowBatchIds(windows)))
+    .order("date", { ascending: false });
 
   if (sessErr) throw sessErr;
+  const sessions = (rawSessions || []).filter((s) => membership.countsFor(windows, s)).slice(0, sessionCount);
   if (!sessions || sessions.length === 0) return [];
 
   const sessionIds = sessions.map((s) => s.id);
